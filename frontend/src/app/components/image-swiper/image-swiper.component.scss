@@ -1,0 +1,25 @@
+:host {
+  display: block;
+  background: black;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+.container {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+
+  transform: translateX(var(--translateX));
+
+  &.animate {
+    transition: transform 166ms ease-out;
+  }
+}
+
+.child {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  flex-shrink: 0;
+}

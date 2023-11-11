@@ -1,0 +1,25 @@
+:host {
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 2px;
+
+  background: rgba(0, 0, 0, 0.15) 50% 50%;
+
+  transition: opacity ease-out 150ms, box-shadow ease-out 150ms;
+
+  cursor: pointer;
+}
+
+img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+:host:hover {
+  opacity: 0.95;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}

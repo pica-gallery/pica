@@ -1,0 +1,5 @@
+<img class="thumbnail" [src]="thumbsUrl" loading="lazy" alt="Thumbnail">
+
+<ng-container *ngIf="load$|async">
+  <img class="image" [src]="imageUrl" loading="eager" [alt]="image.name">
+</ng-container>

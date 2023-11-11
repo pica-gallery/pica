@@ -1,0 +1,29 @@
+:host {
+  display: block;
+  position: relative;
+
+  width: 100vw;
+  height: 100vh;
+}
+
+.image {
+  display: block;
+  position: relative;
+  object-fit: contain;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+}
+
+.thumbnail {
+  display: block;
+  position: absolute;
+
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+
+  object-fit: contain;
+  z-index: 0;
+}

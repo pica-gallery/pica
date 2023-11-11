@@ -1,0 +1,5 @@
+<app-grid>
+  <ng-container *ngFor="let image of images; trackBy: trackByImageId">
+    <app-thumbnail [src]="thumbOf(image)" (click)="imageClicked.emit(image)"></app-thumbnail>
+  </ng-container>
+</app-grid>

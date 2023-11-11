@@ -1,0 +1,7 @@
+<div class="container" #Container>
+  <ng-container *ngFor="let image of images; trackBy:trackByImageId">
+    <div class="child">
+      <app-image-view [image]="image"></app-image-view>
+    </div>
+  </ng-container>
+</div>
