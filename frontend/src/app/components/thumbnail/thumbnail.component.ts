@@ -4,7 +4,7 @@ import {ChangeDetectionStrategy, Component, HostBinding, Input} from '@angular/c
   selector: 'app-thumbnail',
   standalone: true,
   imports: [],
-  template: '<img [src]="src" loading="lazy" [alt]="alt">',
+  template: '<img [src]="src" loading="eager" decoding="async" [alt]="alt">',
   styleUrls: ['./thumbnail.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })

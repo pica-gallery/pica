@@ -1,5 +1,12 @@
-<app-grid>
-  @for (item of items; track item.id) {
-    <app-thumbnail [src]="item.urls.thumb" (click)="imageClicked.emit(item)"></app-thumbnail>
-  }
-</app-grid>
+<ng-container *ngIf="sizing$|async as sizing">
+  <cdk-virtual-scroll-viewport
+    [itemSize]="sizing.rowSize" class="viewport"
+    [ngStyle]="{'--row-height': sizing.rowSize + 'px'}">
+
+    <div class="row" *cdkVirtualFor="let row of (rows$|async)">
+      @for (item of row.items;track item.id) {
+        <app-thumbnail [src]="item.urls.thumb" (click)="imageClicked.emit(item)"></app-thumbnail>
+      }
+    </div>
+  </cdk-virtual-scroll-viewport>
+</ng-container>

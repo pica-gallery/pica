@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import {CommonModule} from '@angular/common';
 import type {MediaId} from '../../service/api';
-import {ImageViewComponent} from '../image-view/image-view.component';
+import {ImageViewComponent, type VisibilityState} from '../image-view/image-view.component';
 import type {MediaItem} from '../../service/gallery';
 import {asyncScheduler, distinctUntilChanged, observeOn, ReplaySubject} from 'rxjs';
 import {enterNgZone} from '../../util'
@@ -57,10 +57,13 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
 
     const updateVisibility = () => {
       this.ngZone.run(() => {
-        console.info('Update load state of images.');
+        console.info('Update visibility of images.');
         for (let i = 0; i < this.items.length; i++) {
-          const visible = i >= currentIdx - 1 && i <= currentIdx + 1;
-          this.imageViews.get(i)?.visible(visible);
+          const focus = i >= currentIdx - 1 && i <= currentIdx + 1;
+          const visible = i >= currentIdx - 5 && i <= currentIdx + 5;
+
+          const state: VisibilityState = focus ? 'focus' : visible ? 'visible' : 'hidden'
+          this.imageViews.get(i)?.updateVisibility(state);
         }
       });
     }
@@ -68,7 +71,7 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
     // when an animation stops, we update the visibility
     container.addEventListener('transitionend', () => {
       updateVisibility();
-      container.classList.remove("animate");
+      container.classList.remove('animate');
     })
 
     this.currentItemSubject.next(this.items[currentIdx]);
@@ -98,6 +101,11 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
         container.style.transform = `translateX(${-translateX}px)`;
       };
 
+      window.addEventListener('resize', () => {
+        // ensure we are correctly positioned
+        translateX = currentIdx * window.innerWidth;
+        applyTranslation();
+      })
 
       updateVisibility();
       applyTranslation();

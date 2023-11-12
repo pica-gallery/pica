@@ -4,11 +4,15 @@
     <div class="info">{{ album.items.length }} images, {{ album.timestamp|date:'shortDate' }}</div>
   </div>
 
-  <app-album [items]="album.items" (imageClicked)="imageClicked($event)"></app-album>
+  <app-album
+    class="album"
+    [items]="album.items"
+    (imageClicked)="imageClicked($event)"></app-album>
 
-  <div *ngIf="imageToShow != null" class="image-viewer">
-    <app-image-swiper [items]="album.items" [imageToShow]="imageToShow.id"></app-image-swiper>
-    <button class="close" (click)="imageToShow=null">Back</button>
-  </div>
+  @if (imageToShow != null) {
+    <div class="image-viewer">
+      <app-image-swiper [items]="album.items" [imageToShow]="imageToShow.id"></app-image-swiper>
+      <button class="close" (click)="imageToShow=null">Back</button>
+    </div>
+  }
 </ng-container>
-

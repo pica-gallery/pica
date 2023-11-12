@@ -1,22 +1,85 @@
-import {ChangeDetectionStrategy, Component, EventEmitter, Input, Output} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  EventEmitter,
+  inject,
+  Input,
+  NgZone,
+  Output
+} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {GridComponent} from '../grid/grid.component';
 import {ThumbnailComponent} from '../thumbnail/thumbnail.component';
-import {type MediaItemTo} from '../../service/api';
 import type {MediaItem} from '../../service/gallery';
+import {CdkFixedSizeVirtualScroll, CdkVirtualForOf, CdkVirtualScrollViewport} from '@angular/cdk/scrolling';
+import {toObservable} from '@angular/core/rxjs-interop';
+import {combineLatestWith, distinctUntilChanged, distinctUntilKeyChanged, map, ReplaySubject} from 'rxjs';
+import {enterNgZone} from '../../util';
+
+export type Row = {
+  items: MediaItem[]
+}
+
+type Sizing = {
+  columnCount: number,
+  rowSize: number,
+}
 
 @Component({
   selector: 'app-album',
   standalone: true,
-  imports: [CommonModule, GridComponent, ThumbnailComponent],
+  imports: [CommonModule, GridComponent, ThumbnailComponent, CdkVirtualScrollViewport, CdkVirtualForOf, CdkFixedSizeVirtualScroll],
   templateUrl: './images.component.html',
   styleUrls: ['./images.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ImagesComponent {
+  private readonly screenWidthSubject = new ReplaySubject<number>(1);
+
+  protected readonly sizing$ = this.screenWidthSubject.pipe(
+    enterNgZone(inject(NgZone)),
+
+    map((screenWidth: number): Sizing => {
+      const columnCount = Math.ceil(screenWidth / 100);
+      const columnSpacing = 4;
+      const rowSize = Math.floor((screenWidth - (columnCount - 1) * columnSpacing) / columnCount);
+      return {rowSize, columnCount}
+    }),
+  )
+
+  private readonly itemsSubject = new ReplaySubject<MediaItem[]>(1);
+  protected readonly rows$ = this.sizing$.pipe(
+    map(sizing => sizing.columnCount),
+    distinctUntilChanged(),
+    combineLatestWith(this.itemsSubject),
+    map(([columnCount, items]) => {
+      const rows: Row[] = [];
+
+      for (let i = 0; i < items.length; i += columnCount) {
+        const row = {items: items.slice(i, i + columnCount)};
+        rows.push(row);
+      }
+
+      return rows;
+    })
+  )
+
+  constructor(elementRef: ElementRef) {
+    const observer = new ResizeObserver(event => {
+      const width = event[0].contentRect.width;
+      this.screenWidthSubject.next(width);
+    })
+
+    observer.observe(elementRef.nativeElement);
+  }
+
   @Input({required: true})
-  public items!: MediaItem[];
+  public set items(items: MediaItem[]) {
+    this.itemsSubject.next(items);
+  }
 
   @Output()
   public imageClicked = new EventEmitter<MediaItem>();
+  protected readonly toObservable = toObservable;
 }

@@ -5,6 +5,8 @@ import {ProgressBarComponent} from '../progressbar/progress-bar.component';
 import {BehaviorSubject, concatWith, distinctUntilChanged, filter, map, startWith, switchMap, timer} from 'rxjs';
 import {toObservable} from '@angular/core/rxjs-interop';
 
+export type VisibilityState = 'visible' | 'focus' | 'hidden'
+
 @Component({
   selector: 'app-image-view',
   standalone: true,
@@ -14,13 +16,13 @@ import {toObservable} from '@angular/core/rxjs-interop';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ImageViewComponent {
-  protected readonly visibleSignal = signal(false);
+  protected readonly visibleSignal = signal<VisibilityState>("hidden");
 
   private readonly loadedSubject = new BehaviorSubject(false);
 
   protected readonly loaderIsVisible$ = toObservable(this.visibleSignal).pipe(
     distinctUntilChanged(),
-    filter(visible => visible),
+    filter(visible => visible === 'focus'),
     switchMap(value => {
       const notYetLoaded$ = this.loadedSubject.pipe(map(loaded => !loaded));
 
@@ -34,7 +36,7 @@ export class ImageViewComponent {
   @Input({required: true})
   public media!: MediaItem;
 
-  public visible(visible: boolean) {
+  public updateVisibility(visible: VisibilityState) {
     if (this.visibleSignal() != visible) {
       this.loadedSubject.next(false);
       this.visibleSignal.set(visible);

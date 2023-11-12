@@ -1,14 +1,16 @@
-<img class="thumbnail" decoding="async" loading="lazy" alt="Thumbnail" [src]="media.urls.thumb">
+@if (visibleSignal() != 'hidden') {
+  <img class="thumbnail" decoding="async" loading="eager" alt="Thumbnail" [src]="media.urls.thumb">
 
-@if (visibleSignal()) {
-  @if (loaderIsVisible$|async) {
-    <div class="progress-container">
-      <app-progress-bar class="progress"></app-progress-bar>
-    </div>
+  @if (visibleSignal() == 'focus') {
+    @if (loaderIsVisible$|async) {
+      <div class="progress-container">
+        <app-progress-bar class="progress"></app-progress-bar>
+      </div>
+    }
+
+    <!-- we take over lazy loading here, so we load 'eager'. -->
+    <img class="image" decoding="async" loading="eager"
+         (load)="onImageLoad()"
+         [alt]="media.name" [src]="media.urls.preview">
   }
-
-  <!-- we take over lazy loading here, so we load 'eager'. -->
-  <img class="image" decoding="async" loading="eager"
-       (load)="onImageLoad()"
-       [alt]="media.name" [src]="media.urls.preview">
 }
