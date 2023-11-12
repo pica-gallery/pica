@@ -10,8 +10,9 @@ use indicatif::ProgressIterator;
 use itertools::Itertools;
 use serde_with::SerializeDisplay;
 use tokio::sync::RwLock;
+use tracing::warn;
 
-use crate::pica::cache::Cache;
+use crate::pica::cache::{Cache, MediaInfo};
 
 mod album;
 mod index;
@@ -104,8 +105,8 @@ pub struct MediaItem {
     pub path: PathBuf,
     pub name: String,
     pub filesize: u64,
-    pub timestamp: DateTime<Utc>,
     pub typ: MediaType,
+    pub info: MediaInfo,
 }
 
 /// An [Album] can group multiple [MediaItem] under a common timestamp and name.
@@ -124,13 +125,23 @@ pub fn list(cache: &Cache, root: impl AsRef<Path>) -> Result<Vec<MediaItem>> {
     let files: Vec<_> = indexer.scan().try_collect()?;
 
     // and create media items from it
-    let items = files
+    let results = files
         .into_iter()
         .progress()
-        .map(|entry| indexer.parse(entry))
-        .try_collect()?;
+        .map(|entry| (entry.path().to_owned(), indexer.parse(entry)))
+        .collect_vec();
 
-    Ok(items)
+    let items = results.into_iter().flat_map(|(path, result)| {
+        match result {
+            Ok(item) => Some(item),
+            Err(err) => {
+                warn!("Failed to import path {:?}: {:?}", path, err);
+                None
+            }
+        }
+    });
+
+    Ok(items.collect())
 }
 
 /// Builds a list of album from the given media files.

@@ -3,4 +3,8 @@
   grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: 4px;
   // padding: 8px;
+
+  @media (min-width: 425px) {
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+  }
 }

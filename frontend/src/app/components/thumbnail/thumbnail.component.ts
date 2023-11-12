@@ -1,5 +1,4 @@
 import {ChangeDetectionStrategy, Component, HostBinding, Input} from '@angular/core';
-import {DomSanitizer, SafeStyle} from '@angular/platform-browser';
 
 @Component({
   selector: 'app-thumbnail',

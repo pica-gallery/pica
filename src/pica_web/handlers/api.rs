@@ -1,3 +1,5 @@
+use std::cmp::Reverse;
+
 use axum::extract::State;
 use axum::Json;
 use axum::response::IntoResponse;
@@ -13,6 +15,8 @@ struct MediaItemView<'a> {
     id: MediaId,
     name: &'a str,
     timestamp: DateTime<Utc>,
+    width: u32,
+    height: u32,
 }
 
 impl<'a> From<&'a MediaItem> for MediaItemView<'a> {
@@ -20,7 +24,9 @@ impl<'a> From<&'a MediaItem> for MediaItemView<'a> {
         Self {
             id: image.id,
             name: &image.name,
-            timestamp: image.timestamp,
+            timestamp: image.info.timestamp,
+            width: image.info.width,
+            height: image.info.height,
         }
     }
 }
@@ -37,14 +43,13 @@ pub async fn handle_stream_get(state: State<AppState>) -> impl IntoResponse {
     let items = state.store.items().await;
 
     let items = items.iter()
-        .sorted_unstable_by_key(|img| img.timestamp)
-        .rev()
+        .sorted_unstable_by_key(|img| Reverse(img.info.timestamp))
         .take(1000)
         .map(MediaItemView::from)
         .collect_vec();
 
     let album = AlbumView {
-        name: "Stream",
+        name: "Pictures",
         timestamp: items.first().map(|item| item.timestamp),
         items,
     };

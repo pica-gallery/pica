@@ -25,24 +25,22 @@ pub fn by_directory(images: Vec<MediaItem>) -> Vec<Album> {
             Album {
                 items: Vec::new(),
                 name: name.clone(),
-                timestamp: image.timestamp,
+                timestamp: image.info.timestamp,
             }
         });
 
-        album.timestamp = album.timestamp.min(image.timestamp);
+        album.timestamp = album.timestamp.min(image.info.timestamp);
         album.items.push(image);
     }
-
-    let by_timestamp = |lhs: &MediaItem, rhs: &MediaItem| lhs.timestamp.cmp(&rhs.timestamp);
 
     // get a sorted list of all albums
     let mut albums = albums.into_values()
         .sorted_unstable_by_key(|a| a.timestamp)
         .collect_vec();
 
-    // sort images within all albums
+    // sort images within all albums by time
     for album in &mut albums {
-        album.items.sort_by(by_timestamp)
+        album.items.sort_by_key(|item| item.info.timestamp)
     }
 
     albums

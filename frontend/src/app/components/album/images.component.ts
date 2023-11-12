@@ -2,7 +2,8 @@ import {ChangeDetectionStrategy, Component, EventEmitter, Input, Output} from '@
 import {CommonModule} from '@angular/common';
 import {GridComponent} from '../grid/grid.component';
 import {ThumbnailComponent} from '../thumbnail/thumbnail.component';
-import {Image} from '../../service/api';
+import {type MediaItemTo} from '../../service/api';
+import type {MediaItem} from '../../service/gallery';
 
 @Component({
   selector: 'app-album',
@@ -14,14 +15,8 @@ import {Image} from '../../service/api';
 })
 export class ImagesComponent {
   @Input({required: true})
-  public images!: Image[];
+  public items!: MediaItem[];
 
   @Output()
-  public imageClicked = new EventEmitter<Image>();
-
-  protected trackByImageId = (_idx: number, image: Image) => image.id
-
-  protected thumbOf(image: Image): string {
-    return `/thumbs/${encodeURIComponent(image.id)}`
-  }
+  public imageClicked = new EventEmitter<MediaItem>();
 }

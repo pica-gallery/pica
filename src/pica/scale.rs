@@ -64,6 +64,7 @@ fn resize(source: impl AsRef<Path>, format: &str, size: u32) -> Result<Vec<u8>> 
     target_avif.push(target.as_ref());
 
     let res = Command::new("convert")
+        .arg("-auto-orient")
         .arg("-resize")
         .arg(format!("{}x{}", size, size))
         .arg("-quality")

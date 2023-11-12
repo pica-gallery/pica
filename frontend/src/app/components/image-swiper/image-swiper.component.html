@@ -1,7 +1,11 @@
 <div class="container" #Container>
-  <ng-container *ngFor="let image of images; trackBy:trackByImageId">
+  @for (item of items;track item.id) {
     <div class="child">
-      <app-image-view [image]="image"></app-image-view>
+      <app-image-view [media]="item"></app-image-view>
     </div>
-  </ng-container>
+  }
 </div>
+
+<ng-container *ngIf="currentItem$|async as item">
+  <a class="fullsize-link" target="_blank" [href]="item.urls.fullsize">Fullsize</a>
+</ng-container>

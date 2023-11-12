@@ -1,8 +1,7 @@
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {CommonModule, DatePipe} from '@angular/common';
-import {Image} from '../../service/api';
 import {ImagesComponent} from '../../components/album/images.component';
-import {Gallery} from '../../service/gallery';
+import {Gallery, type MediaItem} from '../../service/gallery';
 import {ImageSwiperComponent} from '../../components/image-swiper/image-swiper.component';
 
 @Component({
@@ -16,10 +15,10 @@ import {ImageSwiperComponent} from '../../components/image-swiper/image-swiper.c
 export class AlbumPageComponent {
   private readonly gallery = inject(Gallery);
 
-  protected imageToShow: Image | null = null;
+  protected imageToShow: MediaItem | null = null;
   protected readonly album$ = this.gallery.album('$Camera');
 
-  async imageClicked(image: Image) {
+  async imageClicked(image: MediaItem) {
     this.imageToShow = image;
   }
 }

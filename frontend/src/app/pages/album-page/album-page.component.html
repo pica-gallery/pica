@@ -1,13 +1,13 @@
 <ng-container *ngIf="album$|async as album">
   <div class="title">
-    <h1>{{ album.title }}</h1>
-    <div class="info">{{ album.images.length }} images, {{ album.date|date:'shortDate' }}</div>
+    <h1>{{ album.name }}</h1>
+    <div class="info">{{ album.items.length }} images, {{ album.timestamp|date:'shortDate' }}</div>
   </div>
 
-  <app-album [images]="album.images" (imageClicked)="imageClicked($event)"></app-album>
+  <app-album [items]="album.items" (imageClicked)="imageClicked($event)"></app-album>
 
   <div *ngIf="imageToShow != null" class="image-viewer">
-    <app-image-swiper [images]="album.images" [imageToShow]="imageToShow.id"></app-image-swiper>
+    <app-image-swiper [items]="album.items" [imageToShow]="imageToShow.id"></app-image-swiper>
     <button class="close" (click)="imageToShow=null">Back</button>
   </div>
 </ng-container>

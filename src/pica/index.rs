@@ -13,7 +13,7 @@ use rexif::{ExifTag, TagValue};
 use walkdir::{DirEntry, WalkDir};
 
 use crate::pica::{MediaId, MediaItem, MediaType};
-use crate::pica::cache::{Cache, ImageInfo};
+use crate::pica::cache::{Cache, MediaInfo};
 
 static RE_TIMESTAMP: OnceLock<Regex> = OnceLock::new();
 
@@ -61,20 +61,34 @@ impl<'a> IndexContext<'a> {
             .to_string_lossy()
             .replace(core::char::REPLACEMENT_CHARACTER, "_");
 
-        let info = self.cache.get(id)?;
-        let cached_timestamp = info.map(|info| info.timestamp);
+        let info = match self.cache.get(id)? {
+            Some(info) => info,
 
-        let timestamp = match cached_timestamp.or_else(|| timestamp_from_filename(&name)) {
-            Some(ts) => ts,
-            None => match timestamp_from_exif(&path).ok().flatten() {
-                Some(ts) => ts,
-                None => timestamp_file_modified(&path)?,
+            None => {
+                let reader = image::io::Reader::open(&path)?;
+                let (width, height) = reader
+                    .with_guessed_format()?
+                    .into_dimensions()?;
+
+                let timestamp = match timestamp_from_filename(&name) {
+                    Some(ts) => ts,
+                    None => match timestamp_from_exif(&path).ok().flatten() {
+                        Some(ts) => ts,
+                        None => timestamp_file_modified(&path)?,
+                    }
+                };
+
+                let info = MediaInfo {
+                    timestamp,
+                    width,
+                    height,
+                };
+
+                self.cache.put(id, info.clone())?;
+
+                info
             }
         };
-
-        if cached_timestamp.is_none() {
-            self.cache.put(id, ImageInfo { timestamp })?;
-        }
 
         let extension = path.extension()
             .and_then(|e| e.to_str())
@@ -87,7 +101,7 @@ impl<'a> IndexContext<'a> {
             other => bail!("unknown extension: {:?}", other),
         };
 
-        let image = MediaItem { id, path, name, filesize, timestamp, typ: media_type };
+        let image = MediaItem { id, path, name, filesize, typ: media_type, info };
         Ok(image)
     }
 }

@@ -2,13 +2,13 @@
   display: block;
   background: black;
   overflow: hidden;
-  touch-action: manipulation;
 }
 
 .container {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
+  touch-action: manipulation;
 
   transform: translateX(var(--translateX));
 
@@ -22,4 +22,15 @@
   width: 100vw;
   height: 100vh;
   flex-shrink: 0;
+}
+
+.fullsize-link {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 8px;
+  border: 0;
+  background: #555;
+  color: white;
+  text-decoration: none;
 }

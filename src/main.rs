@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
@@ -32,7 +33,7 @@ async fn main() -> Result<()> {
     let scaler = MediaScaler::new(1024 * 1024 * 1024);
     let media = MediaAccessor::new(&config.thumbs, scaler);
 
-    let store = pica::MediaStore::new(images);
+    let store = MediaStore::new(images);
 
     let sizes = vec![config.thumb_size, config.preview_size];
     spawn(prepare(media.clone(), sizes, store.clone()));
@@ -46,7 +47,13 @@ async fn prepare(accessor: MediaAccessor, sizes: Vec<u32>, store: MediaStore) {
     let semaphore = Arc::new(Semaphore::new(16));
     let mut tasks = JoinSet::new();
 
-    for item in store.items().await.iter().progress() {
+    // get all items
+    let mut items = store.items().await;
+
+    // sort them by timestamp desc
+    items.sort_by_key(|item| Reverse(item.info.timestamp));
+
+    for item in items.iter().progress() {
         for &size in &sizes {
             let item = item.clone();
 
