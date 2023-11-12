@@ -55,6 +55,22 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
     // jump to the selected image
     let currentIdx = Math.max(0, this.items.findIndex(img => img.id === this.imageToShow));
 
+    const updateVisibility = () => {
+      this.ngZone.run(() => {
+        console.info('Update load state of images.');
+        for (let i = 0; i < this.items.length; i++) {
+          const visible = i >= currentIdx - 1 && i <= currentIdx + 1;
+          this.imageViews.get(i)?.visible(visible);
+        }
+      });
+    }
+
+    // when an animation stops, we update the visibility
+    container.addEventListener('transitionend', () => {
+      updateVisibility();
+      container.classList.remove("animate");
+    })
+
     this.currentItemSubject.next(this.items[currentIdx]);
 
     this.ngZone.runOutsideAngular(() => {
@@ -77,7 +93,14 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
 
       // and actually display it
       translateX = currentIdx * window.innerWidth;
-      container.style.setProperty('--translateX', `${-translateX}px`);
+
+      const applyTranslation = () => {
+        container.style.transform = `translateX(${-translateX}px)`;
+      };
+
+
+      updateVisibility();
+      applyTranslation();
 
       this.container.nativeElement.addEventListener('touchstart', event => {
         event.preventDefault();
@@ -140,7 +163,7 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
 
           if (state === 'scroll-x') {
             translateX = Math.max(0, touchStartTranslateX + (touchStartX - curX));
-            container.style.setProperty('--translateX', `${-translateX}px`);
+            applyTranslation();
           }
 
           if (Math.abs(curX - touchPreviousX) > 2) {
@@ -167,7 +190,7 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
 
           translateX = currentIdx * window.innerWidth;
           container.classList.add('animate')
-          container.style.setProperty('--translateX', `${-translateX}px`);
+          applyTranslation();
         }
 
         if (state === 'undecided' && touchStartX != null) {
@@ -188,7 +211,7 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
           if (updated) {
             translateX = currentIdx * window.innerWidth;
             container.classList.add('animate')
-            container.style.setProperty('--translateX', `${-translateX}px`);
+            applyTranslation();
           }
         }
 

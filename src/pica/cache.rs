@@ -13,6 +13,7 @@ pub struct MediaInfo {
     pub height: u32,
 }
 
+#[derive(Clone)]
 pub struct Cache {
     db: sled::Db,
 }

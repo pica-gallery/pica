@@ -4,7 +4,7 @@ use axum::routing::get;
 use tower_http::compression::CompressionLayer;
 
 use crate::pica::media::MediaAccessor;
-use crate::pica::MediaStore;
+use crate::pica::store::MediaStore;
 
 mod handlers;
 

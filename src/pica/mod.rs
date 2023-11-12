@@ -1,58 +1,24 @@
 use std::fmt::{Debug, Display, Formatter};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
 
-use anyhow::{ensure, Result};
+use anyhow::ensure;
 use chrono::{DateTime, Utc};
 use derive_more::{AsRef, From};
 use indicatif::ProgressIterator;
 use itertools::Itertools;
 use serde_with::SerializeDisplay;
-use tokio::sync::RwLock;
-use tracing::warn;
 
-use crate::pica::cache::{Cache, MediaInfo};
+use crate::pica::cache::MediaInfo;
 
 mod album;
-mod index;
+pub mod index;
 
 pub mod config;
 pub mod cache;
 pub mod scale;
 pub mod media;
-
-
-#[derive(Clone)]
-pub struct MediaStore {
-    items: Arc<RwLock<Vec<MediaItem>>>,
-}
-
-impl MediaStore {
-    pub fn new(items: Vec<MediaItem>) -> Self {
-        Self { items: Arc::new(items.into()) }
-    }
-
-    pub async fn get(&self, id: MediaId) -> Option<MediaItem> {
-        let items = self.items.read().await;
-        items.iter()
-            .find(|item| item.id == id)
-            .cloned()
-    }
-
-    pub async fn update(&self, new_items: Vec<MediaItem>) {
-        let mut items = self.items.write().await;
-
-        // replace previous items with the new ones
-        *items = new_items
-    }
-
-    pub async fn items(&self) -> Vec<MediaItem> {
-        let items = self.items.write().await;
-        items.clone()
-    }
-}
-
+pub mod store;
 
 #[derive(Copy, Clone, Eq, PartialEq, From, AsRef)]
 #[derive(SerializeDisplay)]
@@ -115,33 +81,6 @@ pub struct Album {
     pub name: String,
     pub items: Vec<MediaItem>,
     pub timestamp: DateTime<Utc>,
-}
-
-/// Lists all media files in the given directory.
-pub fn list(cache: &Cache, root: impl AsRef<Path>) -> Result<Vec<MediaItem>> {
-    let indexer = index::IndexContext::new(cache, root.as_ref().to_path_buf());
-
-    // quickly scan all files
-    let files: Vec<_> = indexer.scan().try_collect()?;
-
-    // and create media items from it
-    let results = files
-        .into_iter()
-        .progress()
-        .map(|entry| (entry.path().to_owned(), indexer.parse(entry)))
-        .collect_vec();
-
-    let items = results.into_iter().flat_map(|(path, result)| {
-        match result {
-            Ok(item) => Some(item),
-            Err(err) => {
-                warn!("Failed to import path {:?}: {:?}", path, err);
-                None
-            }
-        }
-    });
-
-    Ok(items.collect())
 }
 
 /// Builds a list of album from the given media files.

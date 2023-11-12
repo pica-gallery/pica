@@ -9,8 +9,7 @@
   flex-direction: row;
   flex-wrap: nowrap;
   touch-action: manipulation;
-
-  transform: translateX(var(--translateX));
+  will-change: transform;
 
   &.animate {
     transition: transform 166ms ease-out;

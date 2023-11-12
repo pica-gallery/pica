@@ -68,7 +68,7 @@ fn resize(source: impl AsRef<Path>, format: &str, size: u32) -> Result<Vec<u8>> 
         .arg("-resize")
         .arg(format!("{}x{}", size, size))
         .arg("-quality")
-        .arg("65")
+        .arg("60")
         .arg(source.as_ref())
         .arg(target_avif)
         .output()?;
