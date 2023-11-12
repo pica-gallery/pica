@@ -5,8 +5,8 @@ use std::str::FromStr;
 use anyhow::ensure;
 use chrono::{DateTime, Utc};
 use derive_more::{AsRef, From};
-use indicatif::ProgressIterator;
-use itertools::Itertools;
+
+
 use serde_with::SerializeDisplay;
 
 use crate::pica::cache::MediaInfo;

@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use indicatif::ProgressIterator;
+
 use tokio::spawn;
 
 use crate::pica::cache::Cache;

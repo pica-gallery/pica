@@ -26,7 +26,7 @@ impl MediaStore {
         let mut items = self.items.write().await;
 
         // do not add the item if it is already in the media store
-        if items.iter().find(|i| i.id == item.id).is_some() {
+        if items.iter().any(|i| i.id == item.id) {
             return;
         }
 
