@@ -41,7 +41,7 @@ export class ImagesComponent {
     enterNgZone(inject(NgZone)),
 
     map((screenWidth: number): Sizing => {
-      const columnCount = Math.ceil(screenWidth / 100);
+      const columnCount = Math.ceil(screenWidth / 120);
       const columnSpacing = 4;
       const rowSize = Math.floor((screenWidth - (columnCount - 1) * columnSpacing) / columnCount);
       return {rowSize, columnCount}
