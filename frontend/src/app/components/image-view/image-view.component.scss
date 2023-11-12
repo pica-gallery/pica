@@ -6,24 +6,44 @@
   height: 100%;
 }
 
-.image {
-  display: block;
-  position: relative;
-  object-fit: contain;
+.progress-container {
+  position: absolute;
   width: 100vw;
   height: 100vh;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
   z-index: 1;
+
+  .progress {
+    width: 128px;
+  }
 }
 
-.thumbnail {
+.image {
   display: block;
-  position: absolute;
+  object-fit: contain;
 
+  position: absolute;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
 
+  z-index: 2;
+}
+
+.thumbnail {
+  display: block;
   object-fit: contain;
+
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+
   z-index: 0;
 }

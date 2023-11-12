@@ -1,6 +1,14 @@
 <img class="thumbnail" decoding="async" loading="lazy" alt="Thumbnail" [src]="media.urls.thumb">
 
-<ng-container *ngIf="visible$|async">
+@if (visibleSignal()) {
+  @if (loaderIsVisible$|async) {
+    <div class="progress-container">
+      <app-progress-bar class="progress"></app-progress-bar>
+    </div>
+  }
+
   <!-- we take over lazy loading here, so we load 'eager'. -->
-  <img class="image" decoding="async" loading="eager" [alt]="media.name" [src]="media.urls.preview">
-</ng-container>
+  <img class="image" decoding="async" loading="eager"
+       (load)="onImageLoad()"
+       [alt]="media.name" [src]="media.urls.preview">
+}
