@@ -44,7 +44,7 @@ pub async fn handle_stream_get(state: State<AppState>) -> impl IntoResponse {
 
     let items = items.iter()
         .sorted_unstable_by_key(|img| Reverse(img.info.timestamp))
-        .take(1000)
+        .take(10000)
         .map(MediaItemView::from)
         .collect_vec();
 

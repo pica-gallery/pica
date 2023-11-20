@@ -73,6 +73,7 @@ pub struct MediaItem {
     pub filesize: u64,
     pub typ: MediaType,
     pub info: MediaInfo,
+    pub hdr: bool,
 }
 
 /// An [Album] can group multiple [MediaItem] under a common timestamp and name.

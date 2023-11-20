@@ -4,7 +4,7 @@ use std::fs::Metadata;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -23,19 +23,22 @@ use crate::pica::cache::{Cache, MediaInfo};
 use crate::pica::media::MediaAccessor;
 use crate::pica::store::MediaStore;
 
-static RE_TIMESTAMP: OnceLock<Regex> = OnceLock::new();
+thread_local! {
+    static RE_TIMESTAMP: Regex = Regex::new(r#"(20\d\d[01]\d[0123]\d)_?([012]\d[012345]\d[012345]\d)"#).unwrap();
+}
+
 
 pub struct ScanItem {
     pub path: PathBuf,
     pub meta: Metadata,
 }
 
+#[derive(Clone)]
 pub struct IndexTask {
     pub root: PathBuf,
     pub store: MediaStore,
     pub media: MediaAccessor,
     pub cache: Cache,
-    pub sizes: Vec<u32>,
 }
 
 pub async fn index(task: IndexTask) -> Result<()> {
@@ -95,12 +98,10 @@ pub async fn index(task: IndexTask) -> Result<()> {
 async fn index_one(task: &IndexTask, item: &ScanItem) -> Result<()> {
     let item = parse(&task.root, &task.cache, item).await?;
 
-    for &size in &task.sizes {
-        // prepare media of the given size
-        task.media.get(&item, size).await?;
-    }
+    // ask for the media, this will generate thumbnails & preview images
+    task.media.get(&item).await?;
 
-    // add item to store, this makes the media available
+    // add item to store, this makes the media available to the frontend
     task.store.push(item).await;
 
     Ok(())
@@ -144,6 +145,7 @@ async fn parse(root: &Path, cache: &Cache, item: &ScanItem) -> Result<MediaItem>
     let path = item.path.to_owned();
 
     let id = {
+        // hash the relative path into an id
         let relpath = path.strip_prefix(root)?;
         let hash = sha1_smol::Sha1::from(relpath.as_os_str().as_bytes()).digest().bytes();
 
@@ -152,12 +154,13 @@ async fn parse(root: &Path, cache: &Cache, item: &ScanItem) -> Result<MediaItem>
         MediaId::from(bytes)
     };
 
+    // take the file name and clear any invalid characters from it
     let name = path.file_name()
         .ok_or_else(|| anyhow!("no filename for {:?}", path))?
         .to_string_lossy()
         .replace(core::char::REPLACEMENT_CHARACTER, "_");
 
-    let info = match cache.get(id)? {
+    let info = match cache.get(id).await? {
         Some(info) => info,
 
         None => {
@@ -168,9 +171,9 @@ async fn parse(root: &Path, cache: &Cache, item: &ScanItem) -> Result<MediaItem>
 
             let timestamp = match timestamp_from_filename(&name) {
                 Some(ts) => ts,
-                None => match timestamp_from_exif(&path).ok().flatten() {
+                None => match timestamp_from_exif(&path).await.ok().flatten() {
                     Some(ts) => ts,
-                    None => timestamp_file_modified(&path)?,
+                    None => timestamp_file_modified(&item.meta)?,
                 }
             };
 
@@ -180,7 +183,7 @@ async fn parse(root: &Path, cache: &Cache, item: &ScanItem) -> Result<MediaItem>
                 height,
             };
 
-            cache.put(id, info.clone())?;
+            cache.put(id, info.clone()).await?;
 
             info
         }
@@ -197,13 +200,16 @@ async fn parse(root: &Path, cache: &Cache, item: &ScanItem) -> Result<MediaItem>
         other => bail!("unknown extension: {:?}", other),
     };
 
-    let image = MediaItem { id, path, name, filesize, typ: media_type, info };
+    let hdr = false;
+    let image = MediaItem { id, path, name, filesize, typ: media_type, info, hdr };
+
     Ok(image)
 }
 
 
-fn timestamp_from_exif(path: &Path) -> Result<Option<DateTime<Utc>>> {
-    let (exif, _) = rexif::parse_buffer_quiet(&std::fs::read(path)?);
+async fn timestamp_from_exif(path: &Path) -> Result<Option<DateTime<Utc>>> {
+    let content = tokio::fs::read(path).await?;
+    let (exif, _) = block_in_place(|| rexif::parse_buffer_quiet(&content));
 
     if let Some(e) = exif?.entries.iter().find(|e| e.tag == ExifTag::DateTimeOriginal) {
         if let TagValue::Ascii(datestr) = &e.value {
@@ -215,9 +221,8 @@ fn timestamp_from_exif(path: &Path) -> Result<Option<DateTime<Utc>>> {
     Ok(None)
 }
 
-fn timestamp_file_modified(path: impl AsRef<Path>) -> Result<DateTime<Utc>> {
-    let metadata = std::fs::metadata(path)?;
-    let modified = metadata.modified()?;
+fn timestamp_file_modified(metadata: &Metadata) -> Result<DateTime<Utc>> {
+    let modified = metadata.modified().or_else(|_| metadata.created())?;
     let epoch_seconds = modified.duration_since(SystemTime::UNIX_EPOCH)?.as_secs();
 
     Ok(
@@ -228,18 +233,18 @@ fn timestamp_file_modified(path: impl AsRef<Path>) -> Result<DateTime<Utc>> {
 }
 
 fn timestamp_from_filename(name: &str) -> Option<DateTime<Utc>> {
-    let re = RE_TIMESTAMP.get_or_init(|| Regex::new(r#"(20\d\d[01]\d[0123]\d)_?([012]\d[012345]\d[012345]\d)"#).unwrap());
+    RE_TIMESTAMP.with(|re| {
+        if let Some(m) = re.captures(name) {
+            let date = m.get(1)?.as_str();
+            let time = m.get(2)?.as_str();
 
-    if let Some(m) = re.captures(name) {
-        let date = m.get(1)?.as_str();
-        let time = m.get(2)?.as_str();
+            let datestr = String::from(date) + time;
+            let date = NaiveDateTime::parse_from_str(&datestr, "%Y%m%d%H%M%S").ok()?.and_utc();
+            return Some(date);
+        }
 
-        let datestr = String::from(date) + time;
-        let date = NaiveDateTime::parse_from_str(&datestr, "%Y%m%d%H%M%S").ok()?.and_utc();
-        return Some(date);
-    }
-
-    None
+        None
+    })
 }
 
 fn file_is_hidden(name: &OsStr) -> bool {

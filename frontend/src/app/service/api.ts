@@ -47,7 +47,7 @@ export type MediaUrls = {
 export function mediaUrlsOf(item: MediaItemTo): MediaUrls {
   return {
     thumb: `/media/thumb/${item.id}/${item.name}`,
-    preview: `/media/preview/${item.id}/${item.name}`,
+    preview: `/media/preview/sdr/${item.id}/${item.name}`,
     fullsize: `/media/fullsize/${item.id}/${item.name}`,
   }
 }
