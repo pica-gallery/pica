@@ -7,29 +7,29 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
-axum = "0.6.20"
+axum = "0.7.1"
 bincode = "1.3.3"
 chrono = { version = "0.4.31", features = ["serde"] }
 derive_more = "0.99.17"
 hex = "0.4.3"
 image = { version = "0.24.7", default-features = false, features = ["jpeg"] }
 indicatif = "0.17.7"
-itertools = "0.11.0"
+itertools = "0.12.0"
 kamadak-exif = "0.5.5"
 mime = "0.3.17"
 priority-queue = "1.3.2"
 regex = "1.10.2"
 rexif = "0.7.3"
-serde = { version = "1.0.189", features = ["derive"] }
+serde = { version = "1.0.193", features = ["derive"] }
 serde_regex = "1.1.0"
 serde_with = "3.4.0"
 serde_yaml = "0.9.27"
 sha1_smol = "1.0.0"
 sled = "0.34.7"
 tempfile = "3.8.1"
-tokio = { version = "1.33.0", features = ["full"] }
+tokio = { version = "1.34.0", features = ["full"] }
 tower = { version = "0.4.13", features = ["util"] }
-tower-http = { version = "0.4.4", features = ["fs", "util", "compression-gzip", "set-header"] }
-tracing = "0.1.39"
-tracing-subscriber = { version = "0.3.17", features = ["fmt"] }
+tower-http = { version = "0.5.0", features = ["fs", "util", "compression-gzip", "set-header"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["fmt"] }
 walkdir = "2.4.0"

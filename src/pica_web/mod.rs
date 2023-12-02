@@ -31,9 +31,8 @@ pub async fn serve(store: MediaStore, accessor: MediaAccessor) -> Result<()> {
         .merge(handlers::frontend::router())
         .with_state(state);
 
-    axum::Server::bind(&"0.0.0.0:3000".parse()?)
-        .serve(app.into_make_service())
-        .await?;
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }

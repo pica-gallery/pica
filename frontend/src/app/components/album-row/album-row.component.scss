@@ -1,0 +1,9 @@
+:host {
+  height: var(--row-height, 32px);
+
+  gap: 4px;
+  display: flex;
+  flex-direction: row;
+  padding-bottom: 4px;
+  justify-content: space-between;
+}
