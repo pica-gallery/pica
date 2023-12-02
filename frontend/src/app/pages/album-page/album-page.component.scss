@@ -4,6 +4,10 @@
   height: 100vh;
 }
 
+.viewport {
+  height: 100vh;
+}
+
 .title {
   padding: 16px;
 
@@ -37,4 +41,8 @@
     background: #555;
     color: white;
   }
+}
+
+.placeholder {
+  height: 100px;
 }

@@ -5,14 +5,5 @@
 
 .viewport {
   height: 100%;
-}
-
-.row {
-  height: var(--row-height);
-
-  gap: 4px;
-  display: flex;
-  flex-direction: row;
-  padding-bottom: 4px;
-  justify-content: space-between;
+  min-height: 100px;
 }

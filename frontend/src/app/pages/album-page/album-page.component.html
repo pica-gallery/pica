@@ -1,20 +1,27 @@
-@if (album$|async;as album) {
-  <div class="title">
-    <h1>{{ album.name }}</h1>
-    <div class="info">{{ album.items.length }} images, {{ album.timestamp|date:'shortDate' }}</div>
-  </div>
+@if (items$|async;as items) {
+  <cdk-virtual-scroll-viewport autosize class="viewport">
 
-  <app-album
-    class="album"
-    [items]="album.items"
-    (imageClicked)="imageClicked($event)"></app-album>
+    <div class="row" *cdkVirtualFor="let item of items">
+      @switch (item.type) {
+        @case ("header") {
+          <div class="title">
+            <h1>{{ item.header.name }}</h1>
+            <div class="info">{{ item.header.mediaCount }} images, {{ item.header.timestamp|date:'shortDate' }}</div>
+          </div>
+        }
+        @case ("row") {
+          <app-album-row [items]="item.items" (mediaClicked)="mediaClicked($event)" [columns]="item.columns"/>
+        }
+      }
+    </div>
+  </cdk-virtual-scroll-viewport>
+}
 
-  @if (mediaToShow(); as media) {
-    @defer {
-      <div class="image-viewer">
-        <app-image-swiper [items]="album.items" [mediaToShowOnInit]="media.id"></app-image-swiper>
-        <button class="close" (click)="clearMediaToShow()">Back</button>
-      </div>
-    }
+@defer {
+  @if (mediaToShow();as toShow) {
+    <div class="image-viewer">
+      <app-image-swiper [items]="toShow.items" [mediaToShowOnInit]="toShow.item"></app-image-swiper>
+      <button class="close" (click)="clearMediaToShow()">Back</button>
+    </div>
   }
 }

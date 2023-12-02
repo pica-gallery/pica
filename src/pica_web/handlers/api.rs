@@ -39,6 +39,12 @@ struct AlbumView<'a> {
     timestamp: Option<DateTime<Utc>>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StreamView<'a> {
+    items: Vec<MediaItemView<'a>>,
+}
+
 pub async fn handle_stream_get(state: State<AppState>) -> impl IntoResponse {
     let items = state.store.items().await;
 
@@ -48,12 +54,7 @@ pub async fn handle_stream_get(state: State<AppState>) -> impl IntoResponse {
         .map(MediaItemView::from)
         .collect_vec();
 
-    let album = AlbumView {
-        name: "Pictures",
-        timestamp: items.first().map(|item| item.timestamp),
-        items,
-    };
-
-    Json(album).into_response()
+    let stream = StreamView { items };
+    Json(stream).into_response()
 }
 

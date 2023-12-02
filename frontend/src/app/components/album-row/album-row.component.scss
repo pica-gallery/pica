@@ -1,9 +1,15 @@
 :host {
-  height: var(--row-height, 32px);
+  --row-columns: 4;
+}
 
+:host {
   gap: 4px;
   display: flex;
   flex-direction: row;
   padding-bottom: 4px;
-  justify-content: space-between;
+  justify-content: start;
+}
+
+app-thumbnail {
+  width: calc((100% - ((var(--row-columns) - 1) * 4px)) / var(--row-columns));
 }

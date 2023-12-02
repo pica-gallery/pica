@@ -10,12 +10,11 @@ import {
 } from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {GridComponent} from '../grid/grid.component';
-import {ThumbnailComponent} from '../thumbnail/thumbnail.component';
 import type {MediaItem} from '../../service/gallery';
 import {CdkFixedSizeVirtualScroll, CdkVirtualForOf, CdkVirtualScrollViewport} from '@angular/cdk/scrolling';
-import {toObservable} from '@angular/core/rxjs-interop';
-import {combineLatestWith, distinctUntilChanged, distinctUntilKeyChanged, map, ReplaySubject} from 'rxjs';
+import {combineLatestWith, distinctUntilChanged, map, ReplaySubject} from 'rxjs';
 import {enterNgZone} from '../../util';
+import {AlbumRowComponent} from '../album-row/album-row.component';
 
 export type Row = {
   items: MediaItem[]
@@ -29,7 +28,7 @@ type Sizing = {
 @Component({
   selector: 'app-album',
   standalone: true,
-  imports: [CommonModule, GridComponent, ThumbnailComponent, CdkVirtualScrollViewport, CdkVirtualForOf, CdkFixedSizeVirtualScroll],
+  imports: [CommonModule, GridComponent, CdkVirtualScrollViewport, CdkVirtualForOf, CdkFixedSizeVirtualScroll, AlbumRowComponent],
   templateUrl: './images.component.html',
   styleUrls: ['./images.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -81,5 +80,5 @@ export class ImagesComponent {
   }
 
   @Output()
-  public imageClicked = new EventEmitter<MediaItem>();
+  public mediaClicked = new EventEmitter<MediaItem>();
 }

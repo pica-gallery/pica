@@ -17,8 +17,6 @@ const fMediaItem = object({
 
 export type StreamTo = TypeOf<typeof fStream>;
 const fStream = object({
-  name: string(),
-  timestamp: fDate,
   items: array(fMediaItem),
 })
 
@@ -28,11 +26,14 @@ export class ApiService {
   }
 
   public stream(): Observable<StreamTo> {
-    return this.album('stream')
+    return this.httpClient.get<unknown>('/api/stream').pipe(
+      map(resp => fStream.parse(resp)),
+    )
   }
 
-  private album(id: string): Observable<StreamTo> {
-    return this.httpClient.get<unknown>('/api/stream').pipe(
+  private album(albumId: string): Observable<StreamTo> {
+    return this.httpClient.get<unknown>('/api/album/' + encodeURIComponent(albumId)).pipe(
+      // TODO use fAlbum type here
       map(resp => fStream.parse(resp)),
     )
   }
