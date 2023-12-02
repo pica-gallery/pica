@@ -1,11 +1,11 @@
 <div class="container" #Container>
-  @for (item of items;track item.id) {
-    <div class="child">
-      <app-image-view [media]="item"></app-image-view>
+  @for (item of visibleItems$|async;track item.id) {
+    <div class="child" [ngStyle]="{'--index': item.index}">
+      <app-image-view [media]="item.media" [focus]="item.focus"></app-image-view>
     </div>
   }
 </div>
 
-<ng-container *ngIf="currentItem$|async as item">
+@if (currentItem$|async;as item) {
   <a class="fullsize-link" target="_blank" [href]="item.urls.fullsize">Fullsize</a>
-</ng-container>
+}

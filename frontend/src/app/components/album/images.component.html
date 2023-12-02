@@ -1,4 +1,4 @@
-<ng-container *ngIf="sizing$|async as sizing">
+@if (sizing$|async;as sizing) {
   <cdk-virtual-scroll-viewport
     [itemSize]="sizing.rowSize" class="viewport"
     [ngStyle]="{'--row-height': sizing.rowSize + 'px'}">
@@ -9,4 +9,4 @@
       }
     </div>
   </cdk-virtual-scroll-viewport>
-</ng-container>
+}

@@ -2,20 +2,25 @@ import {
   type AfterViewInit,
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
+  type ElementRef,
   Input,
   NgZone,
   type OnDestroy,
-  QueryList,
-  ViewChild,
-  ViewChildren
+  ViewChild
 } from '@angular/core';
 import {CommonModule} from '@angular/common';
 import type {MediaId} from '../../service/api';
-import {ImageViewComponent, type VisibilityState} from '../image-view/image-view.component';
+import {ImageViewComponent} from '../image-view/image-view.component';
 import type {MediaItem} from '../../service/gallery';
 import {asyncScheduler, distinctUntilChanged, observeOn, ReplaySubject} from 'rxjs';
 import {enterNgZone} from '../../util'
+
+type ViewItem = {
+  id: MediaId,
+  index: number,
+  media: MediaItem,
+  focus: boolean,
+}
 
 @Component({
   selector: 'app-image-swiper',
@@ -30,21 +35,48 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
   public items!: MediaItem[]
 
   @Input()
-  public imageToShow: MediaId | null = null;
+  public mediaToShowOnInit: MediaId | null = null;
 
   @ViewChild('Container')
   protected container!: ElementRef<HTMLElement>;
 
-  @ViewChildren(ImageViewComponent)
-  protected imageViews!: QueryList<ImageViewComponent>;
+  // the item that is currently visible
+  protected readonly currentItemSubject = new ReplaySubject<MediaItem>(1);
 
-  private readonly currentItemSubject = new ReplaySubject<MediaItem>(1);
-
+  // the currently selected item
   protected readonly currentItem$ = this.currentItemSubject.pipe(
     observeOn(asyncScheduler),
     distinctUntilChanged(),
     enterNgZone(this.ngZone),
   )
+
+  private readonly visibleItemsSubject = new ReplaySubject<ViewItem[]>(1);
+  protected readonly visibleItems$ = this.visibleItemsSubject.pipe(
+    distinctUntilChanged((lhs, rhs) => {
+      if (lhs.length !== rhs.length) {
+        return false;
+      }
+
+      for (let idx = 0; idx < lhs.length; idx++) {
+        let lhsItem = lhs[idx];
+        let rhsItem = rhs[idx];
+
+        if (lhsItem.id !== rhsItem.id) {
+          return false;
+        }
+
+        if (lhsItem.focus !== rhsItem.focus) {
+          return false;
+        }
+
+        if (lhsItem.index !== rhsItem.index) {
+          return false;
+        }
+      }
+
+      return true;
+    })
+  );
 
   constructor(private readonly ngZone: NgZone) {
   }
@@ -53,18 +85,27 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
     const container = this.container.nativeElement!;
 
     // jump to the selected image
-    let currentIdx = Math.max(0, this.items.findIndex(img => img.id === this.imageToShow));
+    let currentIdx = Math.max(0, this.items.findIndex(img => img.id === this.mediaToShowOnInit));
 
     const updateVisibility = () => {
       this.ngZone.run(() => {
         console.info('Update visibility of images.');
-        for (let i = 0; i < this.items.length; i++) {
-          const focus = i >= currentIdx - 1 && i <= currentIdx + 1;
-          const visible = i >= currentIdx - 5 && i <= currentIdx + 5;
 
-          const state: VisibilityState = focus ? 'focus' : visible ? 'visible' : 'hidden'
-          this.imageViews.get(i)?.updateVisibility(state);
+        const items: ViewItem[] = [];
+
+        for (let idx = 0; idx < this.items.length; idx++) {
+          const visible = idx >= currentIdx - 5 && idx <= currentIdx + 5;
+          if (!visible) {
+            continue
+          }
+
+          const focus = idx >= currentIdx - 1 && idx <= currentIdx + 1;
+
+          const media = this.items[idx];
+          items.push({id: media.id, index: idx, media, focus})
         }
+
+        this.visibleItemsSubject.next(items);
       });
     }
 

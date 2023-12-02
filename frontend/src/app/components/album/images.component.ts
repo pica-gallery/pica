@@ -49,6 +49,7 @@ export class ImagesComponent {
   )
 
   private readonly itemsSubject = new ReplaySubject<MediaItem[]>(1);
+
   protected readonly rows$ = this.sizing$.pipe(
     map(sizing => sizing.columnCount),
     distinctUntilChanged(),
@@ -81,5 +82,4 @@ export class ImagesComponent {
 
   @Output()
   public imageClicked = new EventEmitter<MediaItem>();
-  protected readonly toObservable = toObservable;
 }

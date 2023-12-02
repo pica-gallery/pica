@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
+import {ChangeDetectionStrategy, Component, inject, signal} from '@angular/core';
 import {CommonModule, DatePipe} from '@angular/common';
 import {ImagesComponent} from '../../components/album/images.component';
 import {Gallery, type MediaItem} from '../../service/gallery';
@@ -15,10 +15,14 @@ import {ImageSwiperComponent} from '../../components/image-swiper/image-swiper.c
 export class AlbumPageComponent {
   private readonly gallery = inject(Gallery);
 
-  protected imageToShow: MediaItem | null = null;
+  protected mediaToShow = signal<MediaItem | null>(null);
   protected readonly album$ = this.gallery.album('$Camera');
 
   async imageClicked(image: MediaItem) {
-    this.imageToShow = image;
+    this.mediaToShow.set(image);
+  }
+
+  clearMediaToShow() {
+    this.mediaToShow.set(null);
   }
 }

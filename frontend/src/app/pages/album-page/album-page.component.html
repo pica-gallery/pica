@@ -1,4 +1,4 @@
-<ng-container *ngIf="album$|async as album">
+@if (album$|async;as album) {
   <div class="title">
     <h1>{{ album.name }}</h1>
     <div class="info">{{ album.items.length }} images, {{ album.timestamp|date:'shortDate' }}</div>
@@ -9,12 +9,12 @@
     [items]="album.items"
     (imageClicked)="imageClicked($event)"></app-album>
 
-  @if (imageToShow != null) {
+  @if (mediaToShow(); as media) {
     @defer {
       <div class="image-viewer">
-        <app-image-swiper [items]="album.items" [imageToShow]="imageToShow.id"></app-image-swiper>
-        <button class="close" (click)="imageToShow=null">Back</button>
+        <app-image-swiper [items]="album.items" [mediaToShowOnInit]="media.id"></app-image-swiper>
+        <button class="close" (click)="clearMediaToShow()">Back</button>
       </div>
     }
   }
-</ng-container>
+}

@@ -5,11 +5,12 @@
 }
 
 .container {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
+  display: block;
   touch-action: manipulation;
   will-change: transform;
+
+  width: 100vw;
+  height: 100vh;
 
   &.animate {
     transition: transform 166ms ease-out;
@@ -20,7 +21,10 @@
   display: block;
   width: 100vw;
   height: 100vh;
-  flex-shrink: 0;
+
+  position: absolute;
+  top: 0;
+  left: calc(var(--index) * 100vw);
 }
 
 .fullsize-link {

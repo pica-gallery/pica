@@ -5,8 +5,6 @@ import {ProgressBarComponent} from '../progressbar/progress-bar.component';
 import {BehaviorSubject, concatWith, distinctUntilChanged, filter, map, startWith, switchMap, timer} from 'rxjs';
 import {toObservable} from '@angular/core/rxjs-interop';
 
-export type VisibilityState = 'visible' | 'focus' | 'hidden'
-
 @Component({
   selector: 'app-image-view',
   standalone: true,
@@ -16,19 +14,19 @@ export type VisibilityState = 'visible' | 'focus' | 'hidden'
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ImageViewComponent {
-  protected readonly visibleSignal = signal<VisibilityState>("hidden");
-
   private readonly loadedSubject = new BehaviorSubject(false);
+  protected readonly focusSignal = signal(false);
 
-  protected readonly loaderIsVisible$ = toObservable(this.visibleSignal).pipe(
+  protected readonly loaderIsVisible$ = toObservable(this.focusSignal).pipe(
     distinctUntilChanged(),
-    filter(visible => visible === 'focus'),
-    switchMap(value => {
+    filter(focus => focus),
+    switchMap(() => {
       const notYetLoaded$ = this.loadedSubject.pipe(map(loaded => !loaded));
 
       return timer(250).pipe(
         startWith(false),
         concatWith(notYetLoaded$),
+        distinctUntilChanged(),
       )
     })
   )
@@ -36,10 +34,11 @@ export class ImageViewComponent {
   @Input({required: true})
   public media!: MediaItem;
 
-  public updateVisibility(visible: VisibilityState) {
-    if (this.visibleSignal() != visible) {
+  @Input()
+  public set focus(focus: boolean) {
+    if (this.focusSignal() !== focus) {
       this.loadedSubject.next(false);
-      this.visibleSignal.set(visible);
+      this.focusSignal.set(focus);
     }
   }
 
