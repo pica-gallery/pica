@@ -1,0 +1,13 @@
+@if (items$|async;as items) {
+  <app-image-swiper
+    [items]="items"
+    [mediaToShowOnInit]="mediaId"
+    (itemChanged)="itemChanged($event)"
+  ></app-image-swiper>
+}
+
+<button class="close" (click)="close()">Back</button>
+
+@if (currentItem(); as item) {
+  <a class="fullsize-link" target="_blank" [href]="item.urls.fullsize">Fullsize</a>
+}

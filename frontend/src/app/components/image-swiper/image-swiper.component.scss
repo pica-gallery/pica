@@ -26,14 +26,3 @@
   top: 0;
   left: calc(var(--index) * 100vw);
 }
-
-.fullsize-link {
-  position: absolute;
-  top: 0;
-  right: 0;
-  padding: 8px;
-  border: 0;
-  background: #555;
-  color: white;
-  text-decoration: none;
-}

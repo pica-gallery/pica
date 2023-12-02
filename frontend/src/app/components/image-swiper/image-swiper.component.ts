@@ -3,17 +3,18 @@ import {
   ChangeDetectionStrategy,
   Component,
   type ElementRef,
+  EventEmitter,
   Input,
   NgZone,
   type OnDestroy,
+  Output,
   ViewChild
 } from '@angular/core';
 import {CommonModule} from '@angular/common';
 import type {MediaId} from '../../service/api';
 import {ImageViewComponent} from '../image-view/image-view.component';
 import type {MediaItem} from '../../service/gallery';
-import {asyncScheduler, distinctUntilChanged, observeOn, ReplaySubject} from 'rxjs';
-import {enterNgZone} from '../../util'
+import {distinctUntilChanged, ReplaySubject} from 'rxjs';
 
 type ViewItem = {
   id: MediaId,
@@ -40,17 +41,14 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
   @ViewChild('Container')
   protected container!: ElementRef<HTMLElement>;
 
+  @Output()
+  protected readonly itemChanged = new EventEmitter<MediaItem>();
+
   // the item that is currently visible
   protected readonly currentItemSubject = new ReplaySubject<MediaItem>(1);
 
-  // the currently selected item
-  protected readonly currentItem$ = this.currentItemSubject.pipe(
-    observeOn(asyncScheduler),
-    distinctUntilChanged(),
-    enterNgZone(this.ngZone),
-  )
-
   private readonly visibleItemsSubject = new ReplaySubject<ViewItem[]>(1);
+
   protected readonly visibleItems$ = this.visibleItemsSubject.pipe(
     distinctUntilChanged((lhs, rhs) => {
       if (lhs.length !== rhs.length) {
@@ -106,6 +104,9 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
         }
 
         this.visibleItemsSubject.next(items);
+
+        this.itemChanged.next(this.items[currentIdx]);
+        this.currentItemSubject.next(this.items[currentIdx]);
       });
     }
 
@@ -115,7 +116,8 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
       container.classList.remove('animate');
     })
 
-    this.currentItemSubject.next(this.items[currentIdx]);
+    // this.currentItemSubject.next(this.items[currentIdx]);
+    // this.itemChanged.next(this.items[currentIdx]);
 
     this.ngZone.runOutsideAngular(() => {
       let translateX = 0;
@@ -267,7 +269,7 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
         touchStartX = null;
         p1 = p2 = null;
 
-        this.currentItemSubject.next(this.items[currentIdx])
+        // this.currentItemSubject.next(this.items[currentIdx])
 
         state = 'undecided';
       };

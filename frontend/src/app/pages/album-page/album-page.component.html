@@ -17,11 +17,4 @@
   </cdk-virtual-scroll-viewport>
 }
 
-@defer {
-  @if (mediaToShow();as toShow) {
-    <div class="image-viewer">
-      <app-image-swiper [items]="toShow.items" [mediaToShowOnInit]="toShow.item"></app-image-swiper>
-      <button class="close" (click)="clearMediaToShow()">Back</button>
-    </div>
-  }
-}
+<router-outlet></router-outlet>

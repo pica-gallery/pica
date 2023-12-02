@@ -5,10 +5,11 @@ import {Gallery, type MediaItem, type Section} from '../../service/gallery';
 import {ImageSwiperComponent} from '../../components/image-swiper/image-swiper.component';
 import {AlbumRowComponent} from '../../components/album-row/album-row.component';
 import {CdkFixedSizeVirtualScroll, CdkVirtualForOf, CdkVirtualScrollViewport} from '@angular/cdk/scrolling';
-import {combineLatestWith, distinctUntilChanged, firstValueFrom, map} from 'rxjs';
+import {combineLatestWith, distinctUntilChanged, map} from 'rxjs';
 import {ScrollingModule} from '@angular/cdk-experimental/scrolling';
 import type {MediaId} from '../../service/api';
 import {enterNgZone, observeElementSize, type Size} from '../../util';
+import {Router, RouterOutlet} from '@angular/router';
 
 type SectionHeader = {
   name: string,
@@ -28,13 +29,14 @@ type MediaToShowState = {
 @Component({
   selector: 'app-album-page',
   standalone: true,
-  imports: [CommonModule, ImagesComponent, DatePipe, ImageSwiperComponent, AlbumRowComponent, CdkFixedSizeVirtualScroll, CdkVirtualForOf, CdkVirtualScrollViewport, ScrollingModule],
+  imports: [CommonModule, DatePipe, AlbumRowComponent, CdkFixedSizeVirtualScroll, CdkVirtualForOf, CdkVirtualScrollViewport, ScrollingModule, RouterOutlet],
   templateUrl: './album-page.component.html',
   styleUrls: ['./album-page.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AlbumPageComponent {
   private readonly gallery = inject(Gallery);
+  private readonly router = inject(Router);
 
   protected mediaToShow = signal<MediaToShowState | null>(null);
 
@@ -60,8 +62,9 @@ export class AlbumPageComponent {
   }
 
   protected async mediaClicked(item: MediaItem) {
-    const allItems = await firstValueFrom(this.allItems$);
-    this.mediaToShow.set({items: allItems, item: item.id})
+    await this.router.navigate(['/stream/', item.id]);
+
+    // this.mediaToShow.set({items: allItems, item: item.id})
   }
 
   private convertSection(section: Section, columnCount: number): RowState[] {

@@ -1,0 +1,26 @@
+:host {
+  position: fixed;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+.close {
+  position: absolute;
+  top: 0;
+  padding: 8px;
+  border: 0;
+  background: #555;
+  color: white;
+}
+
+.fullsize-link {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 8px;
+  border: 0;
+  background: #555;
+  color: white;
+  text-decoration: none;
+}

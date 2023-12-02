@@ -6,9 +6,17 @@ import {provideRouter, type Route, withComponentInputBinding, withInMemoryScroll
 const routes: Route[] = [
   {
     path: '',
-    pathMatch: 'full',
+    pathMatch: 'prefix',
     loadComponent: () => import('./app/pages/album-page/album-page.component').then(m => m.AlbumPageComponent),
+    children: [
+      {
+        path: 'stream/:mediaId',
+        pathMatch: 'full',
+        loadComponent: () => import('./app/pages/media-page/media-page.component').then(m => m.MediaPageComponent),
+      }
+    ]
   },
+
   // {
   //   path: 'album/:albumId/image/:imageId',
   //   pathMatch: 'full',
