@@ -9,6 +9,7 @@ use serde::Serialize;
 
 use crate::pica::{MediaId, MediaItem};
 use crate::pica_web::AppState;
+use crate::pica_web::handlers::WebError;
 
 #[derive(Serialize)]
 struct MediaItemView<'a> {
@@ -45,8 +46,8 @@ struct StreamView<'a> {
     items: Vec<MediaItemView<'a>>,
 }
 
-pub async fn handle_stream_get(state: State<AppState>) -> impl IntoResponse {
-    let items = state.store.items().await;
+pub async fn handle_stream_get(state: State<AppState>) -> Result<impl IntoResponse, WebError> {
+    let items = state.store.items().await?;
 
     let items = items.iter()
         .sorted_unstable_by_key(|img| Reverse(img.info.timestamp))
@@ -55,6 +56,6 @@ pub async fn handle_stream_get(state: State<AppState>) -> impl IntoResponse {
         .collect_vec();
 
     let stream = StreamView { items };
-    Json(stream).into_response()
+    Ok(Json(stream).into_response())
 }
 

@@ -1,114 +1,75 @@
-use std::cmp::Reverse;
 use std::ffi::OsStr;
 use std::fs::Metadata;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use indicatif::ProgressIterator;
 use itertools::Itertools;
 use regex::Regex;
 use rexif::{ExifTag, TagValue};
-use tokio::sync::Semaphore;
-use tokio::task::{block_in_place, JoinSet};
-use tracing::{info, warn};
+use tokio::sync::Mutex;
+use tokio::task::block_in_place;
+use tokio::time::sleep;
+use tracing::{debug, info, warn};
 use walkdir::WalkDir;
 
-use crate::pica::{MediaId, MediaItem, MediaType};
-use crate::pica::cache::{Cache, MediaInfo};
-use crate::pica::media::MediaAccessor;
-use crate::pica::store::MediaStore;
+use crate::pica::{db, MediaId, MediaInfo, MediaItem, MediaType};
+use crate::pica::queue::ScanQueue;
 
 thread_local! {
     static RE_TIMESTAMP: Regex = Regex::new(r#"(20\d\d[01]\d[0123]\d)_?([012]\d[012345]\d[012345]\d)"#).unwrap();
 }
 
-
 pub struct ScanItem {
+    pub id: MediaId,
     pub path: PathBuf,
+    pub relpath: PathBuf,
     pub meta: Metadata,
 }
 
-#[derive(Clone)]
-pub struct IndexTask {
-    pub root: PathBuf,
-    pub store: MediaStore,
-    pub media: MediaAccessor,
-    pub cache: Cache,
+pub struct Scanner {
+    root: PathBuf,
+    queue: Arc<Mutex<ScanQueue>>,
 }
 
-pub async fn index(task: IndexTask) -> Result<()> {
-    info!("Starting index run for {:?}", task.root);
-
-    let mut files = block_in_place(|| {
-        scan(&task.root)
-            .flat_map(|res| {
-                match res {
-                    Ok(item) => Some(item),
-                    Err(err) => {
-                        warn!("Failed to scan file: {:?}", err);
-                        None
-                    }
-                }
-            })
-            .collect_vec()
-    });
-
-    info!("Found {} files in scan", files.len());
-
-    // now sort files by date
-    files.sort_unstable_by_key(|item| {
-        Reverse(item.meta.modified().unwrap_or(SystemTime::UNIX_EPOCH))
-    });
-
-    let task = Arc::new(task);
-    let semaphore = Arc::new(Semaphore::new(4));
-
-    let mut tasks = JoinSet::new();
-
-    for item in files.into_iter().progress() {
-        let permit = semaphore.clone().acquire_owned().await?;
-        let task = Arc::clone(&task);
-
-        tasks.spawn(async move {
-            if let Err(err) = index_one(&task, &item).await {
-                warn!("Failed to index {:?}: {:?}", item.path, err);
-            }
-
-            drop(permit);
-        });
+impl Scanner {
+    pub fn new(root: impl Into<PathBuf>, queue: Arc<Mutex<ScanQueue>>) -> Self {
+        Self { root: root.into(), queue }
     }
 
-    info!("Waiting for tasks to finish");
-    while let Some(result) = tasks.join_next().await {
-        if let Err(err) = result {
-            warn!("Joining task failed: {:?}", err)
+    /// Runs scanning once and writes the files found to the scan queue
+    pub fn scan(&self) {
+        info!("Starting index run for {:?}", self.root);
+
+        for item in scan_iter(&self.root) {
+            let item = match item {
+                Ok(item) => item,
+                Err(err) => {
+                    warn!("Failed to scan file: {:?}", err);
+                    continue;
+                }
+            };
+
+            let path = item.path.clone();
+            if let Err(err) = self.add(item) {
+                warn!("Failed to enqueue scanned file {:?}: {:?}", path, err)
+            }
         }
     }
 
-    info!("Indexing finished");
-
-    Ok(())
+    fn add(&self, item: ScanItem) -> Result<()> {
+        let timestamp = guess_timestamp(&item)?;
+        self.queue.blocking_lock().add(item, timestamp);
+        Ok(())
+    }
 }
 
-async fn index_one(task: &IndexTask, item: &ScanItem) -> Result<()> {
-    let item = parse(&task.root, &task.cache, item).await?;
-
-    // ask for the media, this will generate thumbnails & preview images
-    task.media.get(&item).await?;
-
-    // add item to store, this makes the media available to the frontend
-    task.store.push(item).await;
-
-    Ok(())
-}
-
-/// Scan returns an iterator over files we might want to index
-fn scan(root: &Path) -> impl Iterator<Item=Result<ScanItem>> {
+/// Returns an iterator over files we might want to index
+fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
     let files_iter = WalkDir::new(root)
         .same_file_system(true)
         .follow_links(false)
@@ -126,10 +87,27 @@ fn scan(root: &Path) -> impl Iterator<Item=Result<ScanItem>> {
         .filter_ok(|entry| entry.file_type().is_file() && file_is_jpeg(entry.file_name()))
 
         // extract metadata and convert into scan items
-        .map_ok(|entry| -> Result<ScanItem> {
+        .map_ok(move |entry| -> Result<ScanItem> {
+            let relpath = entry.path().strip_prefix(&root)
+                .with_context(|| entry.path().display().to_string())?
+                .to_owned();
+
+            // hash the relative path into an id
+            let hash = sha1_smol::Sha1::from(relpath.as_os_str().as_bytes()).digest().bytes();
+
+            let mut bytes = [0_u8; 8];
+            bytes.copy_from_slice(&hash[..8]);
+            let id = MediaId::from(bytes);
+
             Ok(
                 ScanItem {
-                    meta: entry.metadata().with_context(|| entry.path().display().to_string())?,
+                    id,
+                    relpath,
+
+                    meta: entry
+                        .metadata()
+                        .with_context(|| entry.path().display().to_string())?,
+
                     path: entry.into_path(),
                 }
             )
@@ -138,16 +116,73 @@ fn scan(root: &Path) -> impl Iterator<Item=Result<ScanItem>> {
         .flatten_ok()
 }
 
-/// Parses a MediaItem from a dir entry.
-async fn parse(root: &Path, cache: &Cache, item: &ScanItem) -> Result<MediaItem> {
+fn file_is_hidden(name: &OsStr) -> bool {
+    name.to_str()
+        .map(|name| name.starts_with('.'))
+        .unwrap_or(false)
+}
+
+fn file_is_jpeg(name: &OsStr) -> bool {
+    name.to_str()
+        .map(|name| {
+            let lower = name.to_lowercase();
+            lower.ends_with(".jpg") || lower.ends_with(".jpeg")
+        })
+        .unwrap_or(false)
+}
+
+pub struct Indexer {
+    db: sqlx::sqlite::SqlitePool,
+    queue: Arc<Mutex<ScanQueue>>,
+}
+
+impl Indexer {
+    pub fn new(db: sqlx::sqlite::SqlitePool, queue: Arc<Mutex<ScanQueue>>) -> Self {
+        Self { db, queue }
+    }
+
+    pub async fn run(self) {
+        loop {
+            let item = match self.queue.lock().await.poll() {
+                Some(item) => item,
+                None => {
+                    // no more data in queue, wait a moment before trying again
+                    sleep(Duration::from_millis(100)).await;
+                    continue;
+                }
+            };
+
+            if let Err(err) = self.index_one(&item).await {
+                warn!("Failed to parse item {:?}: {:?}", item.path, err);
+            }
+        }
+    }
+
+    async fn index_one(&self, item: &ScanItem) -> Result<()> {
+        debug!("Indexing file: {:?}", item.relpath);
+        let item = parse(item).await?;
+
+        // put item into database
+        let mut tx = self.db.begin().await?;
+        db::store_media_item(&mut tx, &item).await?;
+        tx.commit().await?;
+
+        // mark as done in queue (TODO also handle errors correctly)
+        self.queue.lock().await.done(item.id);
+
+        Ok(())
+    }
+}
+
+/// Parses a [ScanItem] into a new [MediaItem]
+async fn parse(item: &ScanItem) -> Result<MediaItem> {
     let filesize = item.meta.size();
 
     let path = item.path.to_owned();
 
     let id = {
         // hash the relative path into an id
-        let relpath = path.strip_prefix(root)?;
-        let hash = sha1_smol::Sha1::from(relpath.as_os_str().as_bytes()).digest().bytes();
+        let hash = sha1_smol::Sha1::from(item.relpath.as_os_str().as_bytes()).digest().bytes();
 
         let mut bytes = [0_u8; 8];
         bytes.copy_from_slice(&hash[..8]);
@@ -160,33 +195,23 @@ async fn parse(root: &Path, cache: &Cache, item: &ScanItem) -> Result<MediaItem>
         .to_string_lossy()
         .replace(core::char::REPLACEMENT_CHARACTER, "_");
 
-    let info = match cache.get(id).await? {
-        Some(info) => info,
+    let reader = image::io::Reader::open(&path)?;
+    let (width, height) = reader
+        .with_guessed_format()?
+        .into_dimensions()?;
 
-        None => {
-            let reader = image::io::Reader::open(&path)?;
-            let (width, height) = reader
-                .with_guessed_format()?
-                .into_dimensions()?;
-
-            let timestamp = match timestamp_from_filename(&name) {
-                Some(ts) => ts,
-                None => match timestamp_from_exif(&path).await.ok().flatten() {
-                    Some(ts) => ts,
-                    None => timestamp_file_modified(&item.meta)?,
-                }
-            };
-
-            let info = MediaInfo {
-                timestamp,
-                width,
-                height,
-            };
-
-            cache.put(id, info.clone()).await?;
-
-            info
+    let timestamp = match timestamp_from_filename(&name) {
+        Some(ts) => ts,
+        None => match timestamp_from_exif(&path).await.ok().flatten() {
+            Some(ts) => ts,
+            None => timestamp_file_modified(&item.meta)?,
         }
+    };
+
+    let info = MediaInfo {
+        timestamp,
+        width,
+        height,
     };
 
     let extension = path.extension()
@@ -200,10 +225,7 @@ async fn parse(root: &Path, cache: &Cache, item: &ScanItem) -> Result<MediaItem>
         other => bail!("unknown extension: {:?}", other),
     };
 
-    let hdr = false;
-    let image = MediaItem { id, path, name, filesize, typ: media_type, info, hdr };
-
-    Ok(image)
+    Ok(MediaItem { id, path, name, filesize, typ: media_type, info, hdr: false })
 }
 
 
@@ -247,17 +269,13 @@ fn timestamp_from_filename(name: &str) -> Option<DateTime<Utc>> {
     })
 }
 
-fn file_is_hidden(name: &OsStr) -> bool {
-    name.to_str()
-        .map(|name| name.starts_with('.'))
-        .unwrap_or(false)
-}
+// Best effort guess for the file name of a scan item
+fn guess_timestamp(item: &ScanItem) -> Result<DateTime<Utc>> {
+    if let Some(name) = item.path.file_name().unwrap_or_default().to_str() {
+        if let Some(timestamp) = timestamp_from_filename(name) {
+            return Ok(timestamp);
+        }
+    }
 
-fn file_is_jpeg(name: &OsStr) -> bool {
-    name.to_str()
-        .map(|name| {
-            let lower = name.to_lowercase();
-            lower.ends_with(".jpg") || lower.ends_with(".jpeg")
-        })
-        .unwrap_or(false)
+    timestamp_file_modified(&item.meta)
 }

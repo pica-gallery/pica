@@ -1,47 +1,26 @@
-use std::ops::Deref;
-use std::sync::Arc;
+use anyhow::Result;
+use sqlx::SqlitePool;
 
-use tokio::sync::RwLock;
+use crate::pica::{db, MediaId, MediaItem};
 
-use crate::pica::{MediaId, MediaItem};
-
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct MediaStore {
-    items: Arc<RwLock<Vec<MediaItem>>>,
+    db: SqlitePool,
 }
 
 impl MediaStore {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(db: SqlitePool) -> Self {
+        Self { db }
     }
 
-    pub async fn get(&self, id: MediaId) -> Option<MediaItem> {
-        let items = self.items.read().await;
-        items.iter()
-            .find(|item| item.id == id)
-            .cloned()
+    pub async fn get(&self, id: MediaId) -> Result<Option<MediaItem>> {
+        let mut tx = self.db.begin().await?;
+        db::read_media_item(&mut tx, id).await
     }
 
-    pub async fn push(&self, item: MediaItem) {
-        let mut items = self.items.write().await;
-
-        // do not add the item if it is already in the media store
-        if items.iter().any(|i| i.id == item.id) {
-            return;
-        }
-
-        items.push(item)
-    }
-
-    pub async fn replace(&self, new_items: Vec<MediaItem>) {
-        let mut items = self.items.write().await;
-
-        // replace previous items with the new ones
-        *items = new_items
-    }
-
-    pub async fn items(&self) -> impl Deref<Target=Vec<MediaItem>> + '_ {
-        self.items.read().await
+    pub async fn items(&self) -> Result<Vec<MediaItem>> {
+        let mut tx = self.db.begin().await?;
+        db::read_media_items(&mut tx).await
     }
 }
 

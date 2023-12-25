@@ -10,7 +10,8 @@ pub struct PicaConfig {
     pub thumb_size: u32,
     pub preview_size: u32,
 
-    pub cache: PathBuf,
+    // sqlite database url
+    pub database: String,
     pub thumbs: PathBuf,
 
     // Patterns to include. If not specified, everything will be included.

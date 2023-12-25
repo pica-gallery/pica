@@ -5,22 +5,19 @@ use std::str::FromStr;
 use anyhow::ensure;
 use chrono::{DateTime, Utc};
 use derive_more::{AsRef, From};
-
-
 use serde_with::SerializeDisplay;
-
-use crate::pica::cache::MediaInfo;
 
 mod album;
 pub mod index;
 
 pub mod config;
-pub mod cache;
 pub mod scale;
 pub mod media;
 pub mod store;
+pub mod db;
+pub mod queue;
 
-#[derive(Copy, Clone, Eq, PartialEq, From, AsRef)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, From, AsRef)]
 #[derive(SerializeDisplay)]
 pub struct MediaId([u8; 8]);
 
@@ -62,6 +59,22 @@ impl Display for MediaId {
 pub enum MediaType {
     Image,
     Video,
+}
+
+impl MediaType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MediaType::Image => "image",
+            MediaType::Video => "video",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct MediaInfo {
+    pub timestamp: DateTime<Utc>,
+    pub width: u32,
+    pub height: u32,
 }
 
 /// A [MediaItem] references a media file on the filesystem.

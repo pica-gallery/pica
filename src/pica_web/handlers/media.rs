@@ -49,7 +49,7 @@ async fn handle_image_scaled(
     selector: impl FnOnce(Media) -> Option<PathBuf>,
 ) -> Result<Response, WebError> {
     let image = state.store.get(id)
-        .await
+        .await?
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
 
     let Some(thumbnail) = selector(state.accessor.get(&image).await?) else {
@@ -78,8 +78,9 @@ pub async fn handle_fullsize(
     request: Request<Body>,
 ) -> Result<Response, WebError> {
     let id = MediaId::from_str(&id)?;
+
     let image = state.store.get(id)
-        .await
+        .await?
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
 
     debug!("Serve full image for {:?}", image.path);
