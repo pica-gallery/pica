@@ -6,8 +6,8 @@ use tokio::sync::Mutex;
 use tracing::info;
 
 use crate::pica::index::{Indexer, Scanner};
-use crate::pica::media;
-use crate::pica::media::MediaAccessor;
+use crate::pica::accessor;
+use crate::pica::accessor::MediaAccessor;
 use crate::pica::queue::ScanQueue;
 use crate::pica::scale::MediaScaler;
 use crate::pica::store::MediaStore;
@@ -46,20 +46,21 @@ async fn main() -> Result<()> {
         }
     });
 
-    // start four indexer queues
-    for _ in 0..4 {
-        let indexer = Indexer::new(db.clone(), queue.clone());
-        tokio::task::spawn(indexer.run());
-    }
-
-    let sizes = media::Sizes {
+    let sizes = accessor::Sizes {
         thumb: config.thumb_size,
         preview: config.preview_size,
     };
 
-    let store = MediaStore::new(db);
+    let store = MediaStore::new(db.clone());
     let scaler = MediaScaler::new(1024 * 1024 * 1024);
-    let media = MediaAccessor::new(&config.thumbs, scaler, sizes);
+    let media = MediaAccessor::new(db.clone(), scaler, sizes, &source.path);
+
+    // start four indexer queues
+    for _ in 0..4 {
+        let indexer = Indexer::new(db.clone(), queue.clone(), media.clone());
+        tokio::task::spawn(indexer.run());
+    }
+
 
     pica_web::serve(store, media).await?;
 

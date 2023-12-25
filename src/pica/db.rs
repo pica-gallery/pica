@@ -100,7 +100,7 @@ pub async fn store_media_item(tx: &mut Transaction<'_, Sqlite>, item: &MediaItem
         .bind(item.filesize as i64)
         .bind(item.info.width)
         .bind(item.info.height)
-        .bind(item.path.as_os_str().as_bytes())
+        .bind(item.relpath.as_os_str().as_bytes())
         .bind(&item.name)
         .execute(tx.deref_mut())
         .await?;
@@ -115,7 +115,7 @@ impl From<MediaRow> for MediaItem {
         // convert to media item
         Self {
             id: row.id,
-            path: relpath,
+            relpath: relpath,
             name: row.name,
             filesize: row.bytesize.0,
             typ: row.typ,
@@ -159,4 +159,25 @@ pub async fn list_media_ids(tx: &mut Transaction<'_, Sqlite>) -> Result<Vec<Medi
         .collect_vec();
 
     Ok(ids)
+}
+
+pub async fn store_image(tx: &mut Transaction<'_, Sqlite>, id: MediaId, size: u32, image: &[u8]) -> Result<()> {
+    sqlx::query("INSERT INTO pica_image (media, size, thumbnail) VALUES (?, ?, ?)")
+        .bind(id)
+        .bind(size)
+        .bind(image)
+        .execute(tx.deref_mut())
+        .await?;
+
+    Ok(())
+}
+
+pub async fn load_image(tx: &mut Transaction<'_, Sqlite>, id: MediaId, size: u32) -> Result<Option<Vec<u8>>> {
+    let image = sqlx::query_scalar("SELECT thumbnail FROM pica_image WHERE media=? AND size=? AND thumbnail IS NOT NULL")
+        .bind(id)
+        .bind(size)
+        .fetch_optional(tx.deref_mut())
+        .await?;
+
+    Ok(image)
 }

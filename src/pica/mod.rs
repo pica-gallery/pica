@@ -12,7 +12,7 @@ pub mod index;
 
 pub mod config;
 pub mod scale;
-pub mod media;
+pub mod accessor;
 pub mod store;
 pub mod db;
 pub mod queue;
@@ -81,7 +81,7 @@ pub struct MediaInfo {
 #[derive(Clone, Debug)]
 pub struct MediaItem {
     pub id: MediaId,
-    pub path: PathBuf,
+    pub relpath: PathBuf,
     pub name: String,
     pub filesize: u64,
     pub typ: MediaType,

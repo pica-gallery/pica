@@ -1,3 +1,5 @@
+PRAGMA page_size=16384;
+
 CREATE TABLE pica_media
 (
     -- the unique id of this media info item
@@ -28,8 +30,9 @@ CREATE INDEX pica_media__timestamp
 
 CREATE TABLE pica_image
 (
-    -- the media this thumbnail references
-    media     integer REFERENCES pica_media (id),
+    -- the media this thumbnail references. We do not use a foreign key, because a thumbnail
+    -- for a media item will be created before the actual media item is stored in the database.
+    media     integer,
 
     -- the media size of the thumbnail
     size      INT4 NOT NULL,

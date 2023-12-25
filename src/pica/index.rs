@@ -18,6 +18,7 @@ use tracing::{debug, info, warn};
 use walkdir::WalkDir;
 
 use crate::pica::{db, MediaId, MediaInfo, MediaItem, MediaType};
+use crate::pica::accessor::MediaAccessor;
 use crate::pica::queue::ScanQueue;
 
 thread_local! {
@@ -134,11 +135,12 @@ fn file_is_jpeg(name: &OsStr) -> bool {
 pub struct Indexer {
     db: sqlx::sqlite::SqlitePool,
     queue: Arc<Mutex<ScanQueue>>,
+    accessor: MediaAccessor,
 }
 
 impl Indexer {
-    pub fn new(db: sqlx::sqlite::SqlitePool, queue: Arc<Mutex<ScanQueue>>) -> Self {
-        Self { db, queue }
+    pub fn new(db: sqlx::sqlite::SqlitePool, queue: Arc<Mutex<ScanQueue>>, accessor: MediaAccessor) -> Self {
+        Self { db, queue, accessor }
     }
 
     pub async fn run(self) {
@@ -162,7 +164,12 @@ impl Indexer {
         debug!("Indexing file: {:?}", item.relpath);
         let item = parse(item).await?;
 
+        debug!("Create thumbnails for: {:?}", item.relpath);
+        self.accessor.thumb(&item).await?;
+        self.accessor.preview(&item).await?;
+
         // put item into database
+        debug!("Put media item {:?} into database: {:?}", item.id, item.relpath);
         let mut tx = self.db.begin().await?;
         db::store_media_item(&mut tx, &item).await?;
         tx.commit().await?;
@@ -225,7 +232,7 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
         other => bail!("unknown extension: {:?}", other),
     };
 
-    Ok(MediaItem { id, path, name, filesize, typ: media_type, info, hdr: false })
+    Ok(MediaItem { id, relpath: path, name, filesize, typ: media_type, info, hdr: false })
 }
 
 

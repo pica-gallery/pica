@@ -12,7 +12,7 @@ pub fn by_directory(images: Vec<MediaItem>) -> Vec<Album> {
     let mut albums = HashMap::<String, Album>::new();
 
     for image in images {
-        let name = image.path.iter().rev().skip(1).find_map(|segment| {
+        let name = image.relpath.iter().rev().skip(1).find_map(|segment| {
             let is_match = re_album.is_match_at(segment.as_bytes(), 0);
             if is_match { std::str::from_utf8(segment.as_bytes()).ok() } else { None }
         });
