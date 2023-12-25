@@ -14,7 +14,7 @@ import {CommonModule} from '@angular/common';
 import type {MediaId} from '../../service/api';
 import {ImageViewComponent} from '../image-view/image-view.component';
 import type {MediaItem} from '../../service/gallery';
-import {distinctUntilChanged, ReplaySubject} from 'rxjs';
+import {BehaviorSubject, distinctUntilChanged, ReplaySubject} from 'rxjs';
 
 type ViewItem = {
   id: MediaId,
@@ -47,7 +47,7 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
   // the item that is currently visible
   protected readonly currentItemSubject = new ReplaySubject<MediaItem>(1);
 
-  private readonly visibleItemsSubject = new ReplaySubject<ViewItem[]>(1);
+  private readonly visibleItemsSubject = new BehaviorSubject<ViewItem[]>([]);
 
   protected readonly visibleItems$ = this.visibleItemsSubject.pipe(
     distinctUntilChanged((lhs, rhs) => {
@@ -193,7 +193,8 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
           const cdY = cp1.y - cp2.y;
           const current = Math.sqrt(cdX * cdX + cdY * cdY);
 
-          const node = container.children.item(currentIdx) as HTMLElement;
+          const childIndex = currentIdx - this.visibleItemsSubject.value[0].index ?? 0;
+          const node = (container.children.item(childIndex) as HTMLElement).firstChild as HTMLElement;
           if (Math.abs(current - initial) > 8 && state === 'undecided') {
             state = 'zooming';
             baseScale = ((node as any).baseScale ?? 1) as number;

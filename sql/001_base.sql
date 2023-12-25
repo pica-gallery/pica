@@ -6,7 +6,7 @@ CREATE TABLE pica_media
     id        INT8 PRIMARY KEY,
 
     -- the presentation timestamp of this item in UTC
-    timestamp timestamp NOT NULL,
+    timestamp timestamp NOT NULL,oom
 
     -- media type. should be either 'image' or 'video'
     type      text      NOT NULL CHECK (type IN ('image', 'video')),

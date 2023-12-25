@@ -25,4 +25,6 @@
   position: absolute;
   top: 0;
   left: calc(var(--index) * 100vw);
+
+  overflow: hidden;
 }
