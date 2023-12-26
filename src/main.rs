@@ -1,15 +1,18 @@
+use std::num::{NonZeroU32, NonZeroU64};
 use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use tokio::sync::Mutex;
+use tokio::time::sleep;
 use tracing::info;
 
-use crate::pica::index::{Indexer, Scanner};
-use crate::pica::accessor;
+use crate::pica::{accessor, scale};
 use crate::pica::accessor::MediaAccessor;
+use crate::pica::config::ImageCodecConfig;
+use crate::pica::index::{Indexer, Scanner};
 use crate::pica::queue::ScanQueue;
-use crate::pica::scale::MediaScaler;
+use crate::pica::scale::{ImageType, MediaScaler};
 use crate::pica::store::MediaStore;
 
 pub mod pica;
@@ -29,41 +32,57 @@ async fn main() -> Result<()> {
 
     let mut queue = ScanQueue::default();
 
+    info!("Initialize queue with already indexed files");
     pica::db::list_media_indexed(&mut db.begin().await?)
         .await?
         .into_iter().for_each(|id| queue.done(id));
 
+    info!("Starting with {} files already indexed", queue.done_len());
+
     let queue = Arc::new(Mutex::new(queue));
 
+    info!("Starting scanner");
     let scanner = Scanner::new(&source.path, queue.clone());
-
-    tokio::task::spawn_blocking(move || {
-        loop {
-            info!("Scanning for new media files...");
-            scanner.scan();
-
-            std::thread::sleep(Duration::from_secs(10));
-        }
-    });
+    tokio::task::spawn(scanner_loop(scanner, Duration::from_secs(config.scan_interval_in_seconds.get() as _)));
 
     let sizes = accessor::Sizes {
         thumb: config.thumb_size,
         preview: config.preview_size,
     };
 
+    let scaler_options = scale::Options {
+        use_image_magick: config.use_image_magick,
+
+        max_memory: NonZeroU64::from(config.max_memory_in_megabytes)
+            .checked_mul(NonZeroU64::new(1024 * 1024).unwrap())
+            .ok_or_else(|| anyhow!("max memory > 4gb"))?,
+
+        image_type: match config.image_codec {
+            ImageCodecConfig::Avif => ImageType::Avif,
+            ImageCodecConfig::Jpeg => ImageType::Jpeg,
+        },
+    };
+
     let store = MediaStore::new(db.clone());
-    let scaler = MediaScaler::new(1024 * 1024 * 1024);
+    let scaler = MediaScaler::new(scaler_options);
     let media = MediaAccessor::new(db.clone(), scaler, sizes, &source.path);
 
     // start four indexer queues
-    for _ in 0..4 {
-        let indexer = Indexer::new(db.clone(), queue.clone(), media.clone());
+    info!("Starting {} indexers", config.indexer_threads.get());
+    for _ in 0..config.indexer_threads.get() {
+        let indexer = Indexer::new(db.clone(), queue.clone(), (!config.lazy_thumbs).then(|| media.clone()));
         tokio::task::spawn(indexer.run());
     }
 
-
-    pica_web::serve(store, media).await?;
+    info!("Starting webserver on {:?}", config.http_address);
+    pica_web::serve(store, media, config.http_address).await?;
 
     Ok(())
 }
 
+async fn scanner_loop(scanner: Scanner, interval: Duration) {
+    loop {
+        scanner.scan().await;
+        sleep(interval).await;
+    }
+}

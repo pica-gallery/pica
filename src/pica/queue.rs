@@ -21,14 +21,15 @@ pub struct ScanQueue {
 }
 
 impl ScanQueue {
-    pub fn add(&mut self, item: ScanItem, timestamp: chrono::DateTime<Utc>) {
+    pub fn add(&mut self, item: ScanItem, timestamp: chrono::DateTime<Utc>) -> bool {
         if self.state.contains_key(&item.id) {
-            return;
+            return false
         }
 
         self.queue.push(item.id, timestamp);
         self.state.insert(item.id, State::Queued);
         self.queued.insert(item.id, item);
+        true
     }
 
     pub fn poll(&mut self) -> Option<ScanItem> {
@@ -46,5 +47,9 @@ impl ScanQueue {
 
     pub fn done(&mut self, id: MediaId) {
         self.state.insert(id, State::Done);
+    }
+
+    pub fn done_len(&self) -> usize {
+        return self.state.len();
     }
 }

@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use std::fs;
+use std::num::NonZeroU64;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -10,16 +11,29 @@ use tokio::sync::Semaphore;
 use tokio::task::spawn_blocking;
 
 #[derive(Clone)]
+pub enum ImageType {
+    Jpeg,
+    Avif,
+}
+
+#[derive(Clone)]
+pub struct Options {
+    pub use_image_magick: bool,
+    pub image_type: ImageType,
+    pub max_memory: NonZeroU64,
+}
+
+#[derive(Clone)]
 pub struct MediaScaler {
-    max_memory: u32,
+    options: Options,
     memory: Arc<Semaphore>,
 }
 
 impl MediaScaler {
-    pub fn new(max_memory: u32) -> Self {
+    pub fn new(options: Options) -> Self {
         MediaScaler {
-            max_memory,
-            memory: Arc::new(Semaphore::new(max_memory as usize)),
+            memory: Arc::new(Semaphore::new(options.max_memory.get() as _)),
+            options,
         }
     }
 
@@ -27,24 +41,23 @@ impl MediaScaler {
     pub async fn image(&self, path: impl AsRef<Path>, size: u32) -> Result<Image> {
         let (width, height) = image_dimensions(path.as_ref())?;
 
+        // memory to reserve
+        let memory = self.options.max_memory.get().min(width as u64 * height as u64 * 4);
+
         // reserve some bytes to load the image into memory
         let _guard = self.memory
-            .acquire_many(self.max_memory.min(width * height * 4))
+            .acquire_many(u32::try_from(memory).unwrap_or(u32::MAX))
             .await?;
 
         let path = path.as_ref().to_owned();
+        let image_type = self.options.image_type.clone();
 
         // run resize in a different task to not block the executor
-        let bytes = spawn_blocking(move || resize(path, "avif", size)).await??;
+        let bytes = spawn_blocking(move || resize(path, &image_type, size)).await??;
 
         let thumb = Image { typ: ImageType::Avif, bytes };
         Ok(thumb)
     }
-}
-
-pub enum ImageType {
-    Jpeg,
-    Avif,
 }
 
 pub struct Image {
@@ -52,8 +65,13 @@ pub struct Image {
     pub bytes: Vec<u8>,
 }
 
-fn resize(source: impl AsRef<Path>, format: &str, size: u32) -> Result<Vec<u8>> {
+fn resize(source: impl AsRef<Path>, format: &ImageType, size: u32) -> Result<Vec<u8>> {
     use std::process::Command;
+
+    let format = match format {
+        ImageType::Jpeg => "jpeg",
+        ImageType::Avif => "avif",
+    };
 
     // a temporary file that will cleanup after itself
     let target = NamedTempFile::new()?;

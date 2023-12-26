@@ -15,7 +15,7 @@ use regex::Regex;
 use tokio::sync::Mutex;
 use tokio::task::block_in_place;
 use tokio::time::sleep;
-use tracing::{debug, debug_span, info, Instrument, warn};
+use tracing::{debug, debug_span, Instrument, warn};
 use walkdir::WalkDir;
 
 use crate::pica::{db, MediaId, MediaInfo, MediaItem, MediaType};
@@ -44,10 +44,13 @@ impl Scanner {
     }
 
     /// Runs scanning once and writes the files found to the scan queue
-    pub fn scan(&self) {
-        info!("Starting index run for {:?}", self.root);
+    pub async fn scan(&self) {
+        debug!("Starting scan run for {:?}", self.root);
 
-        for item in scan_iter(&self.root) {
+        let mut new_count = 0;
+
+        let mut iter = scan_iter(&self.root);
+        while let Some(item) = block_in_place(|| iter.next()) {
             let item = match item {
                 Ok(item) => item,
                 Err(err) => {
@@ -57,16 +60,23 @@ impl Scanner {
             };
 
             let path = item.relpath.clone();
-            if let Err(err) = self.add(item) {
-                warn!("Failed to enqueue scanned file {:?}: {:?}", path, err)
+            match self.add(item).await {
+                Ok(true) => new_count += 1,
+
+                Err(err) => {
+                    warn!("Failed to enqueue scanned file {:?}: {:?}", path, err)
+                }
+
+                _ => (),
             }
         }
+
+        debug!("Scan found {} new files", new_count);
     }
 
-    fn add(&self, item: ScanItem) -> Result<()> {
+    async fn add(&self, item: ScanItem) -> Result<bool> {
         let timestamp = guess_timestamp(&item)?;
-        self.queue.blocking_lock().add(item, timestamp);
-        Ok(())
+        Ok(self.queue.lock().await.add(item, timestamp))
     }
 }
 
@@ -97,6 +107,7 @@ fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
             // hash the relative path into an id
             let hash = sha1_smol::Sha1::from(relpath.as_os_str().as_bytes()).digest().bytes();
 
+            // build id from hash
             let mut bytes = [0_u8; 8];
             bytes.copy_from_slice(&hash[..8]);
             let id = MediaId::from(bytes);
@@ -136,17 +147,21 @@ fn file_is_jpeg(name: &OsStr) -> bool {
 pub struct Indexer {
     db: sqlx::sqlite::SqlitePool,
     queue: Arc<Mutex<ScanQueue>>,
-    accessor: MediaAccessor,
+    accessor: Option<MediaAccessor>,
 }
 
 impl Indexer {
-    pub fn new(db: sqlx::sqlite::SqlitePool, queue: Arc<Mutex<ScanQueue>>, accessor: MediaAccessor) -> Self {
+    pub fn new(db: sqlx::sqlite::SqlitePool, queue: Arc<Mutex<ScanQueue>>, accessor: Option<MediaAccessor>) -> Self {
         Self { db, queue, accessor }
     }
 
     pub async fn run(self) {
         loop {
-            let item = match self.queue.lock().await.poll() {
+            // must not be inlined into the match statement. This would keep the temporary lock alive
+            // for the expression, including the sleep.
+            let item = self.queue.lock().await.poll();
+
+            let item = match item {
                 Some(item) => item,
                 None => {
                     // no more data in queue, wait a moment before trying again
@@ -187,9 +202,11 @@ impl Indexer {
         db::store_media_item(&mut tx, &item).await?;
         tx.commit().await?;
 
-        debug!("Create thumbnails");
-        self.accessor.thumb(&item).await?;
-        self.accessor.preview(&item).await?;
+        if let Some(accessor) = &self.accessor {
+            debug!("Create thumbnails");
+            accessor.thumb(&item).await?;
+            accessor.preview(&item).await?;
+        }
 
         // mark as done in queue (TODO also handle errors correctly)
         self.queue.lock().await.done(item.id);
