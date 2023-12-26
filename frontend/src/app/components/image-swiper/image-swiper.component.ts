@@ -2,6 +2,7 @@ import {
   type AfterViewInit,
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   type ElementRef,
   EventEmitter,
   Input,
@@ -14,8 +15,9 @@ import {CommonModule} from '@angular/common';
 import type {MediaId} from '../../service/api';
 import {ImageViewComponent} from '../image-view/image-view.component';
 import type {MediaItem} from '../../service/gallery';
-import {BehaviorSubject, distinctUntilChanged, ReplaySubject, tap} from 'rxjs';
+import {BehaviorSubject, distinctUntilChanged, fromEvent, ReplaySubject, tap} from 'rxjs';
 import PointerTracker, {type Pointer} from 'pointer-tracker';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 
 type ViewItem = {
   id: MediaId,
@@ -58,7 +60,10 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
   // initialized in ngAfterViewInit
   private tracker!: PointerTracker;
 
-  constructor(private readonly ngZone: NgZone) {
+  constructor(
+    private readonly destroyRef: DestroyRef,
+    private readonly ngZone: NgZone,
+  ) {
   }
 
   ngAfterViewInit(): void {
@@ -81,7 +86,9 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
         end: (pointer, event, cancelled) => touch.end(this.tracker, pointer),
       })
 
-      window.addEventListener('resize', () => touch.onWindowResize());
+      fromEvent(window, 'resize')
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(() => touch.onWindowResize());
 
       const findCurrentChild = (idx: number): HTMLElement => {
         const media = this.items[idx];
@@ -173,7 +180,7 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    // this.io.unobserve(this.element.nativeElement)
+    this.tracker.stop();
   }
 }
 
