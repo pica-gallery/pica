@@ -5,22 +5,25 @@
   height: 100dvh;
 }
 
-.close {
+.button-back {
   position: absolute;
   top: 0;
-  padding: 8px;
-  border: 0;
-  background: #555;
-  color: white;
+  left: 0;
 }
 
-.fullsize-link {
+.button-fullsize {
   position: absolute;
   top: 0;
   right: 0;
-  padding: 8px;
-  border: 0;
-  background: #555;
+}
+
+.button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
   color: white;
   text-decoration: none;
+  background: transparent;
+  border: 0;
 }

@@ -40,5 +40,9 @@
   transform: translate(var(--x), var(--y)) scale(var(--scale));
   transform-origin: 0 0;
 
+  &.animate {
+    transition: transform 166ms ease-out;
+  }
+
   overflow: hidden;
 }

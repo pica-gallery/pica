@@ -71,7 +71,6 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
     this.ngZone.runOutsideAngular(() => {
       // when an animation stops, we update the visibility
       container.addEventListener('transitionend', () => {
-
         touch.transitionEnd();
       })
 
@@ -81,55 +80,74 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
         move: (previous, changed, event) => touch.move(this.tracker, previous),
         end: (pointer, event, cancelled) => touch.end(this.tracker, pointer),
       })
-    });
 
-    touch.events.subscribe(event => {
-      this.ngZone.run(() => {
-        switch (event.type) {
-          case 'animateSwipe':
-            console.info('Start animation to swipe target');
-            container.classList.add('animate')
-            container.style.setProperty('--transformX', event.transformX + 'px');
-            break;
+      window.addEventListener('resize', () => touch.onWindowResize());
 
-          case 'applySwipeTransform':
-            container.classList.remove('animate')
-            container.style.setProperty('--transformX', event.transformX + 'px');
-            break;
+      const findCurrentChild = (idx: number): HTMLElement => {
+        const media = this.items[idx];
 
-          case 'applyZoomTransform':
-            const media = this.items[event.currentIndex];
+        const currentChild = Array
+          .from(container.children)
+          .find(el => el instanceof HTMLElement && el.dataset['mediaId'] === media.id) as HTMLElement | undefined;
 
-            const currentChild = Array
-              .from(container.children)
-              .find(el => el instanceof HTMLElement && el.dataset['mediaId'] === media.id) as HTMLElement | undefined;
+        if (currentChild == null) {
+          throw new Error(`Did not find child with mediaId=${media.id}`)
+        }
 
-            if (currentChild != null) {
+        return currentChild;
+      }
+
+      touch.events.subscribe(event => {
+        this.ngZone.run(() => {
+          switch (event.type) {
+            case 'animateSwipe':
+              console.info('Start animation to swipe target');
+              container.classList.add('animate')
+              container.style.setProperty('--transformX', event.transformX + 'px');
+              break;
+
+            case 'applySwipeTransform':
+              container.classList.remove('animate')
+              container.style.setProperty('--transformX', event.transformX + 'px');
+              break;
+
+            case 'animateZoomTransform': {
+              const currentChild = findCurrentChild(event.currentIndex);
+              currentChild.classList.add('animate');
               currentChild.style.setProperty('--x', event.transform.e + 'px')
               currentChild.style.setProperty('--y', event.transform.f + 'px')
               currentChild.style.setProperty('--scale', event.transform.a.toString())
+              break;
             }
 
-            break;
+            case 'applyZoomTransform': {
+              const currentChild = findCurrentChild(event.currentIndex);
+              currentChild.classList.remove('animate');
+              currentChild.style.setProperty('--x', event.transform.e + 'px')
+              currentChild.style.setProperty('--y', event.transform.f + 'px')
+              currentChild.style.setProperty('--scale', event.transform.a.toString())
+              break;
+            }
 
-          case 'stopAnimation':
-            console.info('Animation has stopped.');
-            container.classList.remove('animate');
-            break;
+            case 'stopAnimation':
+              console.info('Animation has stopped.');
+              container.classList.remove('animate');
+              break;
 
-          case 'updateCurrent':
-            console.info('Current index is now:', event.currentIndex);
-            this.updateItemVisibility(event.currentIndex);
+            case 'updateCurrent':
+              console.info('Current index is now:', event.currentIndex);
+              this.ngZone.run(() => this.updateItemVisibility(event.currentIndex));
 
-            const curr = this.items[event.currentIndex];
-            touch.currentAspectRatio = curr.width / curr.height;
+              const curr = this.items[event.currentIndex];
+              touch.currentAspectRatio = curr.width / curr.height;
 
-            break;
-        }
+              break;
+          }
+        })
       })
-    })
 
-    touch.initialize();
+      touch.initialize();
+    });
   }
 
   private updateItemVisibility(itemIndex: number) {
@@ -194,6 +212,7 @@ type AnimationEvent =
   | { type: 'animateSwipe', transformX: number }
   | { type: 'applySwipeTransform', transformX: number }
   | { type: 'applyZoomTransform', currentIndex: number, transform: DOMMatrix }
+  | { type: 'animateZoomTransform', currentIndex: number, transform: DOMMatrix }
   | { type: 'updateCurrent', currentIndex: number }
   | { type: 'stopAnimation' }
 
@@ -201,17 +220,17 @@ type AnimationEvent =
 class Touch {
   private state: TouchState = 'undecided';
 
-  private zoomed: boolean = false;
   private zoomTransform: DOMMatrix = identity();
+  private zoomLookingAt: Point = {x: 0, y: 0};
 
   // both values are always negative
   private swipeTranslateXStart: number = 0;
   private swipeTranslateX: number = 0;
   private swipeFlingTo: number = 0;
 
-  readonly events = new EventEmitter<AnimationEvent>();
+  public readonly events = new EventEmitter<AnimationEvent>();
 
-  currentAspectRatio: number = 1;
+  public currentAspectRatio: number = 1;
 
   constructor(private idxCurrent: number) {
   }
@@ -313,8 +332,6 @@ class Touch {
         currentIndex: this.idxCurrent,
         transform: this.zoomTransform,
       });
-
-      this.zoomed = Math.abs(this.zoomScale - 1.0) > 1e-5;
     }
   }
 
@@ -336,22 +353,21 @@ class Touch {
         type: 'animateSwipe',
         transformX: this.swipeXOfIndex(targetIndex),
       })
+
+      // block input until animation finishes
+      this.state = 'blocked';
+      return;
     }
 
     if (this.state === 'zooming') {
-      if(this.zoomed && this.zoomScale < 1.01) {
-        this.zoomed = false;
+      if (this.zoomed && this.zoomScale < 1.2) {
         this.zoomTransform = identity();
 
         this.events.emit({
-          type: 'applyZoomTransform',
+          type: 'animateZoomTransform',
           currentIndex: this.idxCurrent,
           transform: this.zoomTransform,
         });
-      }
-
-      if (this.zoomed) {
-        console.info('Still zoomed right now.');
       }
     }
 
@@ -371,6 +387,27 @@ class Touch {
 
     this.events.emit({
       type: 'stopAnimation',
+    });
+  }
+
+  public onWindowResize() {
+    if (this.zoomed) {
+      this.zoomTransform = identity();
+
+      this.events.emit({
+        type: 'applyZoomTransform',
+        currentIndex: this.idxCurrent,
+        transform: this.zoomTransform,
+      });
+    }
+
+    this.events.emit({type: 'stopAnimation'});
+
+    this.swipeTranslateX = this.swipeXOfIndex(this.idxCurrent);
+
+    this.events.emit({
+      type: 'applySwipeTransform',
+      transformX: this.swipeTranslateX,
     });
   }
 
@@ -418,6 +455,10 @@ class Touch {
     return this.zoomTransform.f;
   }
 
+  private get zoomed(): boolean {
+    return Math.abs(this.zoomScale - 1) > 1e-5;
+  }
+
   private updateZoomTransform(opts: {
     originX: number,
     originY: number,
@@ -443,22 +484,7 @@ class Touch {
       // Apply current scale.
       .scale(this.zoomScale);
 
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    // aspect ratio of image
-    const aspect = this.currentAspectRatio;
-
-    let widthOfImage: number;
-    let heightOfImage: number;
-
-    if (width / height < aspect) {
-      widthOfImage = width;
-      heightOfImage = widthOfImage / aspect;
-    } else {
-      heightOfImage = height;
-      widthOfImage = heightOfImage * aspect;
-    }
+    const {width, height, widthOfImage, heightOfImage} = this.zoomConfig();
 
     // top left point of image in the child component, transformed to 'container' space
     const tl = this.zoomTransform.transformPoint({
@@ -503,6 +529,37 @@ class Touch {
       // center vertically
       this.zoomTransform.f = (height - height * this.zoomScale) / 2;
     }
+
+    // transform the center point of the screen to the transformed image so we know what exactly
+    // we are currently looking at.
+    this.zoomLookingAt = this.zoomTransform.inverse().transformPoint({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2
+    });
+
+    this.zoomLookingAt.x -= width / 2 - widthOfImage / 2;
+    this.zoomLookingAt.y -= height / 2 - heightOfImage / 2;
+  }
+
+  private zoomConfig() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // aspect ratio of image
+    const aspect = this.currentAspectRatio;
+
+    let widthOfImage: number;
+    let heightOfImage: number;
+
+    if (width / height < aspect) {
+      widthOfImage = width;
+      heightOfImage = widthOfImage / aspect;
+    } else {
+      heightOfImage = height;
+      widthOfImage = heightOfImage * aspect;
+    }
+
+    return {width, height, widthOfImage, heightOfImage};
   }
 }
 

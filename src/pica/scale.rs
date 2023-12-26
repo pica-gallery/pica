@@ -87,6 +87,7 @@ fn resize(source: impl AsRef<Path>, format: &ImageType, size: u32) -> Result<Vec
         .arg(format!("{}x{}", size, size))
         .arg("-quality")
         .arg("60")
+        .arg("-strip")
         .arg(source.as_ref())
         .arg(target_avif)
         .output()?;

@@ -5,11 +5,12 @@ import {AsyncPipe} from '@angular/common';
 import {ImageSwiperComponent} from '../../components/image-swiper/image-swiper.component';
 import {Router} from '@angular/router';
 import type {MediaId} from '../../service/api';
+import {IconComponent} from '../../components/icon/icon.component';
 
 @Component({
   selector: 'app-media-page',
   standalone: true,
-  imports: [AsyncPipe, ImageSwiperComponent],
+  imports: [AsyncPipe, ImageSwiperComponent, IconComponent],
   templateUrl: './media-page.component.html',
   styleUrl: './media-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
