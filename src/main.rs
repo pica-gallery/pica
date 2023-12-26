@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
 
     let mut queue = ScanQueue::default();
 
-    pica::db::list_media_ids(&mut db.begin().await?)
+    pica::db::list_media_indexed(&mut db.begin().await?)
         .await?
         .into_iter().for_each(|id| queue.done(id));
 

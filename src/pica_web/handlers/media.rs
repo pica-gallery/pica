@@ -70,20 +70,21 @@ pub async fn handle_fullsize(
 ) -> Result<Response, WebError> {
     let id = MediaId::from_str(&id)?;
 
-    let image = state.store.get(id)
+    let media = state.store.get(id)
         .await?
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
 
-    debug!("Serve full image for {:?}", image.relpath);
+    debug!("Serve full image for {:?}", media.relpath);
 
     let mime = Mime::from_str("image/jpeg").unwrap();
 
-    let mut resp = ServeFile::new_with_mime(&image.relpath, &mime)
+    let path = state.accessor.full(&media);
+    let mut resp = ServeFile::new_with_mime(&path, &mime)
         .oneshot(request)
         .await?;
 
     resp.headers_mut().insert(
-        axum::http::header::CACHE_CONTROL,
+        http::header::CACHE_CONTROL,
         HeaderValue::from_static("immutable"),
     );
 

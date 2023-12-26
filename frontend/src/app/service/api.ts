@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import {array, object, string, transform, type TypeOf} from 'fud-ts';
+import {array, number, object, string, transform, type TypeOf} from 'fud-ts';
 import {map, Observable} from 'rxjs';
 import {HttpClient} from '@angular/common/http';
 
@@ -13,6 +13,8 @@ const fMediaItem = object({
   id: fMediaId,
   name: string(),
   timestamp: fDate,
+  width: number(),
+  height: number(),
 })
 
 export type StreamTo = TypeOf<typeof fStream>;

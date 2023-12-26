@@ -14,7 +14,8 @@ import {CommonModule} from '@angular/common';
 import type {MediaId} from '../../service/api';
 import {ImageViewComponent} from '../image-view/image-view.component';
 import type {MediaItem} from '../../service/gallery';
-import {BehaviorSubject, distinctUntilChanged, ReplaySubject} from 'rxjs';
+import {BehaviorSubject, distinctUntilChanged, ReplaySubject, tap} from 'rxjs';
+import PointerTracker, {type Pointer} from 'pointer-tracker';
 
 type ViewItem = {
   id: MediaId,
@@ -38,7 +39,7 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
   @Input()
   public mediaToShowOnInit: MediaId | null = null;
 
-  @ViewChild('Container')
+  @ViewChild('Container', {static: true})
   protected container!: ElementRef<HTMLElement>;
 
   @Output()
@@ -50,31 +51,12 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
   private readonly visibleItemsSubject = new BehaviorSubject<ViewItem[]>([]);
 
   protected readonly visibleItems$ = this.visibleItemsSubject.pipe(
-    distinctUntilChanged((lhs, rhs) => {
-      if (lhs.length !== rhs.length) {
-        return false;
-      }
-
-      for (let idx = 0; idx < lhs.length; idx++) {
-        let lhsItem = lhs[idx];
-        let rhsItem = rhs[idx];
-
-        if (lhsItem.id !== rhsItem.id) {
-          return false;
-        }
-
-        if (lhsItem.focus !== rhsItem.focus) {
-          return false;
-        }
-
-        if (lhsItem.index !== rhsItem.index) {
-          return false;
-        }
-      }
-
-      return true;
-    })
+    distinctUntilChanged(itemsAreEqual),
+    tap(items => console.log('View items have changed:', items)),
   );
+
+  // initialized in ngAfterViewInit
+  private tracker!: PointerTracker;
 
   constructor(private readonly ngZone: NgZone) {
   }
@@ -83,204 +65,462 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
     const container = this.container.nativeElement!;
 
     // jump to the selected image
-    let currentIdx = Math.max(0, this.items.findIndex(img => img.id === this.mediaToShowOnInit));
-
-    const updateVisibility = () => {
-      this.ngZone.run(() => {
-        console.info('Update visibility of images.');
-
-        const items: ViewItem[] = [];
-
-        for (let idx = 0; idx < this.items.length; idx++) {
-          const visible = idx >= currentIdx - 5 && idx <= currentIdx + 5;
-          if (!visible) {
-            continue
-          }
-
-          const focus = idx >= currentIdx - 1 && idx <= currentIdx + 1;
-
-          const media = this.items[idx];
-          items.push({id: media.id, index: idx, media, focus})
-        }
-
-        this.visibleItemsSubject.next(items);
-
-        this.itemChanged.next(this.items[currentIdx]);
-        this.currentItemSubject.next(this.items[currentIdx]);
-      });
-    }
-
-    // when an animation stops, we update the visibility
-    container.addEventListener('transitionend', () => {
-      updateVisibility();
-      container.classList.remove('animate');
-    })
-
-    // this.currentItemSubject.next(this.items[currentIdx]);
-    // this.itemChanged.next(this.items[currentIdx]);
+    const initialIndex = Math.max(0, this.items.findIndex(img => img.id === this.mediaToShowOnInit));
+    const touch = new Touch(initialIndex);
 
     this.ngZone.runOutsideAngular(() => {
-      let translateX = 0;
-      let touchStartTranslateX = 0;
-      let touchStartX: number | null = null;
-      let touchPreviousX: number = 0;
-      let flingTo: number = 0;
+      // when an animation stops, we update the visibility
+      container.addEventListener('transitionend', () => {
 
-      let state: 'undecided' | 'scroll-x' | 'zooming' = 'undecided';
-
-      type Point = { x: number, y: number };
-
-      let p1: Point | null = null;
-      let p2: Point | null = null;
-
-      let isZoomedIn = false;
-
-      let baseScale = 1;
-
-      // and actually display it
-      translateX = currentIdx * window.innerWidth;
-
-      const applyTranslation = () => {
-        container.style.transform = `translateX(${-translateX}px)`;
-      };
-
-      window.addEventListener('resize', () => {
-        // ensure we are correctly positioned
-        translateX = currentIdx * window.innerWidth;
-        applyTranslation();
+        touch.transitionEnd();
       })
 
-      updateVisibility();
-      applyTranslation();
-
-      this.container.nativeElement.addEventListener('touchstart', event => {
-        event.preventDefault();
-
-        if (state !== 'undecided') {
-          console.info('Gesture already in progress:', state)
-          return;
-        }
-
-        console.info('Start touch at', Array.from(event.touches));
-
-        if (event.touches.length === 1) {
-          // maybe we want to start a scroll
-          touchStartX = event.touches[0].clientX;
-          touchPreviousX = touchStartX;
-          touchStartTranslateX = translateX;
-        }
-
-        if (event.touches.length === 2) {
-          // start a zoom gesture
-          p1 = {x: event.touches[0].clientX, y: event.touches[0].screenY};
-          p2 = {x: event.touches[1].clientX, y: event.touches[1].screenY};
-        }
-
-        container.classList.remove('animate')
-      });
-
-      this.container.nativeElement.addEventListener('touchmove', event => {
-        const curX = event.touches[0].clientX;
-
-        if (p1 && p2) {
-          const dX = p1.x - p2.x;
-          const dY = p1.y - p2.y;
-          const initial = Math.sqrt(dX * dX + dY * dY);
-
-          const cp1 = {x: event.touches[0].clientX, y: event.touches[0].screenY};
-          const cp2 = {x: event.touches[1].clientX, y: event.touches[1].screenY};
-          const cdX = cp1.x - cp2.x;
-          const cdY = cp1.y - cp2.y;
-          const current = Math.sqrt(cdX * cdX + cdY * cdY);
-
-          const childIndex = currentIdx - this.visibleItemsSubject.value[0].index ?? 0;
-          const node = (container.children.item(childIndex) as HTMLElement).firstChild as HTMLElement;
-          if (Math.abs(current - initial) > 8 && state === 'undecided') {
-            state = 'zooming';
-            baseScale = ((node as any).baseScale ?? 1) as number;
-          }
-
-          if (state === 'zooming') {
-            const scale = Math.min(Math.max(1, baseScale * current / initial), 8);
-            (node as any).baseScale = scale;
-            node.style.transform = `scale(${scale})`;
-            isZoomedIn = scale > 1;
-          }
-
-        } else if (touchStartX != null && !isZoomedIn) {
-          const deltaX = Math.abs(touchStartX - curX);
-          if (deltaX > 8 && state === 'undecided') {
-            state = 'scroll-x';
-          }
-
-          if (state === 'scroll-x') {
-            translateX = Math.max(0, touchStartTranslateX + (touchStartX - curX));
-            applyTranslation();
-          }
-
-          if (Math.abs(curX - touchPreviousX) > 2) {
-            flingTo = Math.sign(touchPreviousX - curX);
-          } else {
-            flingTo = 0;
-          }
-
-          touchPreviousX = curX;
-        }
-      });
-
-      let touchend = (event: TouchEvent) => {
-        if (state === 'scroll-x') {
-          if (flingTo) {
-            console.log('Fling', flingTo);
-            currentIdx = Math.max(0, currentIdx + flingTo);
-            flingTo = 0;
-          } else {
-            currentIdx = Math.floor((translateX + window.innerWidth / 2) / window.innerWidth);
-          }
-
-          console.info(`Current translation is ${translateX}, mapping to index ${currentIdx}");`);
-
-          translateX = currentIdx * window.innerWidth;
-          container.classList.add('animate')
-          applyTranslation();
-        }
-
-        if (state === 'undecided' && touchStartX != null) {
-          let updated = false;
-
-          const pos = touchStartX / window.innerWidth;
-
-          if (pos < 0.33 && currentIdx > 0) {
-            currentIdx--;
-            updated = true;
-          }
-
-          if (pos > 0.66) {
-            currentIdx++;
-            updated = true;
-          }
-
-          if (updated) {
-            translateX = currentIdx * window.innerWidth;
-            container.classList.add('animate')
-            applyTranslation();
-          }
-        }
-
-        touchStartX = null;
-        p1 = p2 = null;
-
-        // this.currentItemSubject.next(this.items[currentIdx])
-
-        state = 'undecided';
-      };
-
-      this.container.nativeElement.addEventListener('touchend', touchend);
-      this.container.nativeElement.addEventListener('touchcancel', touchend);
+      this.tracker = new PointerTracker(container, {
+        // avoidPointerEvents: true,
+        start: (pointer, event) => touch.start(this.tracker, pointer),
+        move: (previous, changed, event) => touch.move(this.tracker, previous),
+        end: (pointer, event, cancelled) => touch.end(this.tracker, pointer),
+      })
     });
+
+    touch.events.subscribe(event => {
+      this.ngZone.run(() => {
+        switch (event.type) {
+          case 'animateSwipe':
+            console.info('Start animation to swipe target');
+            container.classList.add('animate')
+            container.style.setProperty('--transformX', event.transformX + 'px');
+            break;
+
+          case 'applySwipeTransform':
+            container.classList.remove('animate')
+            container.style.setProperty('--transformX', event.transformX + 'px');
+            break;
+
+          case 'applyZoomTransform':
+            const media = this.items[event.currentIndex];
+
+            const currentChild = Array
+              .from(container.children)
+              .find(el => el instanceof HTMLElement && el.dataset['mediaId'] === media.id) as HTMLElement | undefined;
+
+            if (currentChild != null) {
+              currentChild.style.setProperty('--x', event.transform.e + 'px')
+              currentChild.style.setProperty('--y', event.transform.f + 'px')
+              currentChild.style.setProperty('--scale', event.transform.a.toString())
+            }
+
+            break;
+
+          case 'stopAnimation':
+            console.info('Animation has stopped.');
+            container.classList.remove('animate');
+            break;
+
+          case 'updateCurrent':
+            console.info('Current index is now:', event.currentIndex);
+            this.updateItemVisibility(event.currentIndex);
+
+            const curr = this.items[event.currentIndex];
+            touch.currentAspectRatio = curr.width / curr.height;
+
+            break;
+        }
+      })
+    })
+
+    touch.initialize();
+  }
+
+  private updateItemVisibility(itemIndex: number) {
+    console.info('Update visibility of images, current index:', itemIndex);
+
+    const items: ViewItem[] = [];
+
+    for (let idx = 0; idx < this.items.length; idx++) {
+      const visible = idx >= itemIndex - 5 && idx <= itemIndex + 5;
+      if (!visible) {
+        continue
+      }
+
+      const focus = idx >= itemIndex - 1 && idx <= itemIndex + 1;
+      const media = this.items[idx];
+      items.push({id: media.id, index: idx, media, focus})
+    }
+
+    this.visibleItemsSubject.next(items);
+
+    this.itemChanged.next(this.items[itemIndex]);
+    this.currentItemSubject.next(this.items[itemIndex]);
   }
 
   ngOnDestroy() {
     // this.io.unobserve(this.element.nativeElement)
   }
+}
+
+function itemsAreEqual(lhs: ViewItem[], rhs: ViewItem[]): boolean {
+  if (lhs.length !== rhs.length) {
+    return false;
+  }
+
+  for (let idx = 0; idx < lhs.length; idx++) {
+    let lhsItem = lhs[idx];
+    let rhsItem = rhs[idx];
+
+    if (lhsItem.id !== rhsItem.id) {
+      return false;
+    }
+
+    if (lhsItem.focus !== rhsItem.focus) {
+      return false;
+    }
+
+    if (lhsItem.index !== rhsItem.index) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+type TouchState =
+  | 'blocked'
+  | 'undecided'
+  | 'zooming'
+  | 'swiping'
+
+type AnimationEvent =
+  | { type: 'animateSwipe', transformX: number }
+  | { type: 'applySwipeTransform', transformX: number }
+  | { type: 'applyZoomTransform', currentIndex: number, transform: DOMMatrix }
+  | { type: 'updateCurrent', currentIndex: number }
+  | { type: 'stopAnimation' }
+
+
+class Touch {
+  private state: TouchState = 'undecided';
+
+  private zoomed: boolean = false;
+  private zoomTransform: DOMMatrix = identity();
+
+  // both values are always negative
+  private swipeTranslateXStart: number = 0;
+  private swipeTranslateX: number = 0;
+  private swipeFlingTo: number = 0;
+
+  readonly events = new EventEmitter<AnimationEvent>();
+
+  currentAspectRatio: number = 1;
+
+  constructor(private idxCurrent: number) {
+  }
+
+  initialize() {
+    this.events.emit({
+      type: 'applySwipeTransform',
+      transformX: this.swipeXOfIndex(this.idxCurrent),
+    });
+
+    this.events.emit({
+      type: 'updateCurrent',
+      currentIndex: this.idxCurrent,
+    });
+  }
+
+  start(tracker: PointerTracker, pointer: Pointer): boolean {
+    if (this.state === 'blocked') {
+      // do not accept new touch input right now
+      return false;
+    }
+
+    if (this.state === 'swiping' && tracker.currentPointers.length >= 1) {
+      // only track the first pointer
+      return false;
+    }
+
+    // in general, track only two pointers
+    return tracker.currentPointers.length < 2;
+  }
+
+  move(tracker: PointerTracker, previous: Pointer[]): void {
+    if (this.state === 'undecided') {
+      const newState = this.tryCommitToState(tracker);
+      if (newState == null) {
+        return;
+      }
+
+      console.info('Comitted to state:', this.state);
+
+      if (newState === 'swiping') {
+        this.swipeTranslateXStart = this.swipeXOfIndex(this.idxCurrent);
+      }
+    }
+
+    const initial = tracker.startPointers;
+    const current = tracker.currentPointers;
+
+    if (this.state === 'swiping') {
+      const dxSinceStart = current[0].clientX - initial[0].clientX;
+      this.swipeTranslateX = this.swipeTranslateXStart + dxSinceStart;
+
+      this.events.emit({
+        type: 'applySwipeTransform',
+        transformX: this.swipeTranslateX,
+      });
+
+      // if we would end touch now, we might need to initiate a fling
+      const dxSincePrev = previous[0].clientX - current[0].clientX;
+      this.swipeFlingTo = Math.abs(dxSincePrev) > 2 ? Math.sign(dxSincePrev) : 0;
+    }
+
+    if (this.state === 'zooming') {
+      if (previous.length === 1) {
+        // simple pan only
+
+        const dx = current[0].clientX - previous[0].clientX;
+        const dy = current[0].clientY - previous[0].clientY;
+
+        this.updateZoomTransform({panX: dx, panY: dy, scale: 1, originX: 0, originY: 0});
+      }
+
+      if (previous.length === 2) {
+        const bbOffset = this.zoomTransform.transformPoint({x: 0, y: 0});
+
+        // estimate pan based on midpoints
+        let m1 = midpoint(previous[0], previous[1]);
+        let m2 = midpoint(current[0], current[1]);
+
+        // Midpoint within the element
+        const originX = m1.x - bbOffset.x;
+        const originY = m1.y - bbOffset.y;
+
+        // estimate scale based on change of distance
+        let d1 = distanceTo(previous[0], previous[1]) || 1;
+        let d2 = distanceTo(current[0], current[1]);
+
+        this.updateZoomTransform({
+          panX: m2.x - m1.x,
+          panY: m2.y - m1.y,
+          scale: d2 / d1,
+          originX,
+          originY,
+        })
+      }
+
+      this.events.emit({
+        type: 'applyZoomTransform',
+        currentIndex: this.idxCurrent,
+        transform: this.zoomTransform,
+      });
+
+      this.zoomed = Math.abs(this.zoomScale - 1.0) > 1e-5;
+    }
+  }
+
+  end(tracker: PointerTracker, pointer: Pointer): void {
+    if (tracker.currentPointers.length !== 0) {
+      return
+    }
+
+    console.info('No more active pointers.')
+
+    if (this.state === 'swiping') {
+      const targetIndex = this.swipeFlingTo
+        ? this.idxCurrent + this.swipeFlingTo
+        : this.indexOfSwipeX(this.swipeTranslateX);
+
+      this.idxCurrent = targetIndex;
+
+      this.events.emit({
+        type: 'animateSwipe',
+        transformX: this.swipeXOfIndex(targetIndex),
+      })
+    }
+
+    if (this.state === 'zooming') {
+      if(this.zoomed && this.zoomScale < 1.01) {
+        this.zoomed = false;
+        this.zoomTransform = identity();
+
+        this.events.emit({
+          type: 'applyZoomTransform',
+          currentIndex: this.idxCurrent,
+          transform: this.zoomTransform,
+        });
+      }
+
+      if (this.zoomed) {
+        console.info('Still zoomed right now.');
+      }
+    }
+
+    this.state = 'undecided';
+  }
+
+  transitionEnd(): void {
+    if (this.state === 'blocked') {
+      console.info('Transition ended, unblocking input')
+      this.state = 'undecided';
+    }
+
+    this.events.emit({
+      type: 'updateCurrent',
+      currentIndex: this.idxCurrent,
+    });
+
+    this.events.emit({
+      type: 'stopAnimation',
+    });
+  }
+
+  private get width(): number {
+    return window.innerWidth + 16;
+  }
+
+  private indexOfSwipeX(x: number): number {
+    return (-1 * (x - this.width / 2) / this.width) | 0;
+  }
+
+  private swipeXOfIndex(idx: number): number {
+    return idx * -1 * this.width;
+  }
+
+  private tryCommitToState(tracker: PointerTracker): TouchState | null {
+    const current = tracker.currentPointers;
+    const initial = tracker.startPointers;
+
+    if (this.zoomed || current.length === 2) {
+      // we can directly commit to more zooming
+      return this.state = 'zooming';
+    }
+
+    if (current.length === 1 && !this.zoomed) {
+      // we have one pointer. if it moved at least 16px on x axis, we have a swipe
+      const dx = current[0].clientX - initial[0].clientX;
+      if (Math.abs(dx) > 16) {
+        return this.state = 'swiping';
+      }
+    }
+
+    return null;
+  }
+
+  private get zoomScale(): number {
+    return this.zoomTransform.a;
+  }
+
+  private get zoomX(): number {
+    return this.zoomTransform.e;
+  }
+
+  private get zoomY(): number {
+    return this.zoomTransform.f;
+  }
+
+  private updateZoomTransform(opts: {
+    originX: number,
+    originY: number,
+    panX: number,
+    panY: number,
+    scale: number,
+  }) {
+    if (this.zoomScale * opts.scale < 1) {
+      opts.scale = 1 / this.zoomScale;
+    } else if (this.zoomScale > 12.0 && opts.scale > 1.0) {
+      opts.scale = 1.0;
+    }
+
+    this.zoomTransform = identity()
+      // Translate according to panning.
+      .translate(opts.panX, opts.panY)
+      // Scale about the origin.
+      .translate(opts.originX, opts.originY)
+      // Apply current translate
+      .translate(this.zoomX, this.zoomY)
+      .scale(opts.scale)
+      .translate(-opts.originX, -opts.originY)
+      // Apply current scale.
+      .scale(this.zoomScale);
+
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // aspect ratio of image
+    const aspect = this.currentAspectRatio;
+
+    let widthOfImage: number;
+    let heightOfImage: number;
+
+    if (width / height < aspect) {
+      widthOfImage = width;
+      heightOfImage = widthOfImage / aspect;
+    } else {
+      heightOfImage = height;
+      widthOfImage = heightOfImage * aspect;
+    }
+
+    // top left point of image in the child component, transformed to 'container' space
+    const tl = this.zoomTransform.transformPoint({
+      x: width / 2 - widthOfImage / 2,
+      y: height / 2 - heightOfImage / 2,
+    });
+
+    // bottom right point of image in the child component, transformed to 'container' space.
+    const br = this.zoomTransform.transformPoint({
+      x: width / 2 + widthOfImage / 2,
+      y: height / 2 + heightOfImage / 2,
+    });
+
+    if (br.x - tl.x > width) {
+      // image is width than screen
+      // do not allow for a black bar left
+      if (tl.x > 0) {
+        this.zoomTransform.e -= tl.x;
+      }
+
+      // do not allow for a black bar right
+      if (br.x < width) {
+        this.zoomTransform.e += width - br.x
+      }
+    } else {
+      // center horizontally
+      this.zoomTransform.e = (width - width * this.zoomScale) / 2;
+    }
+
+    if (br.y - tl.y > height) {
+      // image is higher than screen
+      // do not allow for a black bar on the top
+      if (tl.y > 0) {
+        this.zoomTransform.f -= tl.y;
+      }
+
+      // do not allow for a black bar on the bottom
+      if (br.y < height) {
+        this.zoomTransform.f += height - br.y
+      }
+    } else {
+      // center vertically
+      this.zoomTransform.f = (height - height * this.zoomScale) / 2;
+    }
+  }
+}
+
+function distanceTo(lhs: Pointer, rhs: Pointer): number {
+  const dx = lhs.clientX - rhs.clientX;
+  const dy = lhs.clientY - rhs.clientY;
+  return Math.sqrt(dx * dx + dy * dy)
+}
+
+type Point = { x: number, y: number };
+
+function midpoint(lhs: Pointer, rhs: Pointer): Point {
+  return {
+    x: (lhs.clientX + rhs.clientX) / 2,
+    y: (lhs.clientY + rhs.clientY) / 2,
+  }
+}
+
+function identity(): DOMMatrix {
+  return new DOMMatrix([1, 0, 0, 1, 0, 0]);
 }

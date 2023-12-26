@@ -12,6 +12,7 @@ use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
 
 use crate::pica::{MediaId, MediaInfo, MediaItem, MediaType};
+use crate::pica::scale::ImageType;
 
 impl sqlx::Type<Sqlite> for MediaType {
     fn type_info() -> <Sqlite as sqlx::Database>::TypeInfo {
@@ -56,6 +57,31 @@ impl<'r> sqlx::Decode<'r, Sqlite> for MediaId {
     fn decode(value: <Sqlite as HasValueRef<'r>>::ValueRef) -> Result<Self, BoxDynError> {
         let value = i64::decode(value)?;
         Ok(MediaId::from(value.to_be_bytes()))
+    }
+}
+
+impl sqlx::Type<Sqlite> for ImageType {
+    fn type_info() -> <Sqlite as sqlx::Database>::TypeInfo {
+        str::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, Sqlite> for ImageType {
+    fn encode_by_ref(&self, buf: &mut <Sqlite as HasArguments<'q>>::ArgumentBuffer) -> IsNull {
+        match self {
+            ImageType::Jpeg => "jpeg".encode_by_ref(buf),
+            ImageType::Avif => "avif".encode_by_ref(buf),
+        }
+    }
+}
+
+impl<'r> sqlx::Decode<'r, Sqlite> for ImageType {
+    fn decode(value: <Sqlite as HasValueRef<'r>>::ValueRef) -> Result<Self, BoxDynError> {
+        match String::decode(value)?.as_str() {
+            "avif" => Ok(Self::Avif),
+            "jpeg" => Ok(Self::Jpeg),
+            value => Err(format!("not valid: {:?}", value).into())
+        }
     }
 }
 
@@ -108,6 +134,16 @@ pub async fn store_media_item(tx: &mut Transaction<'_, Sqlite>, item: &MediaItem
     Ok(())
 }
 
+pub async fn media_mark_as_indexed(tx: &mut Transaction<'_, Sqlite>, item: MediaId, error: Option<String>) -> Result<()> {
+    sqlx::query("UPDATE pica_media SET indexing_done=TRUE, indexing_error=? WHERE id=?")
+        .bind(error)
+        .bind(item)
+        .execute(tx.deref_mut())
+        .await?;
+
+    Ok(())
+}
+
 impl From<MediaRow> for MediaItem {
     fn from(row: MediaRow) -> Self {
         let relpath = PathBuf::from(OsStr::from_bytes(&row.relpath));
@@ -141,7 +177,7 @@ pub async fn read_media_item(tx: &mut Transaction<'_, Sqlite>, id: MediaId) -> R
 }
 
 pub async fn read_media_items(tx: &mut Transaction<'_, Sqlite>) -> Result<Vec<MediaItem>> {
-    let rows: Vec<MediaRow> = sqlx::query_as("SELECT * FROM pica_media ORDER BY timestamp DESC")
+    let rows: Vec<MediaRow> = sqlx::query_as("SELECT * FROM pica_media WHERE indexing_success ORDER BY timestamp DESC")
         .fetch_all(tx.deref_mut())
         .await?;
 
@@ -149,8 +185,10 @@ pub async fn read_media_items(tx: &mut Transaction<'_, Sqlite>) -> Result<Vec<Me
     Ok(rows.into_iter().map(MediaItem::from).collect())
 }
 
-pub async fn list_media_ids(tx: &mut Transaction<'_, Sqlite>) -> Result<Vec<MediaId>> {
-    let ids: Vec<i64> = sqlx::query_scalar("SELECT id FROM pica_media")
+/// Returns a list of all media items that were indexed. This includes media items that have
+/// failed to index successfully.
+pub async fn list_media_indexed(tx: &mut Transaction<'_, Sqlite>) -> Result<Vec<MediaId>> {
+    let ids: Vec<i64> = sqlx::query_scalar("SELECT id FROM pica_media WHERE indexing_done")
         .fetch_all(tx.deref_mut())
         .await?;
 
@@ -161,11 +199,12 @@ pub async fn list_media_ids(tx: &mut Transaction<'_, Sqlite>) -> Result<Vec<Medi
     Ok(ids)
 }
 
-pub async fn store_image(tx: &mut Transaction<'_, Sqlite>, id: MediaId, size: u32, image: &[u8]) -> Result<()> {
-    sqlx::query("INSERT INTO pica_image (media, size, thumbnail) VALUES (?, ?, ?)")
+pub async fn store_image(tx: &mut Transaction<'_, Sqlite>, id: MediaId, size: u32, typ: &ImageType, content: &[u8]) -> Result<()> {
+    sqlx::query("INSERT INTO pica_image (media, size, type, content) VALUES (?, ?, ?, ?)")
         .bind(id)
         .bind(size)
-        .bind(image)
+        .bind(typ)
+        .bind(content)
         .execute(tx.deref_mut())
         .await?;
 
@@ -173,7 +212,7 @@ pub async fn store_image(tx: &mut Transaction<'_, Sqlite>, id: MediaId, size: u3
 }
 
 pub async fn load_image(tx: &mut Transaction<'_, Sqlite>, id: MediaId, size: u32) -> Result<Option<Vec<u8>>> {
-    let image = sqlx::query_scalar("SELECT thumbnail FROM pica_image WHERE media=? AND size=? AND thumbnail IS NOT NULL")
+    let image = sqlx::query_scalar("SELECT content FROM pica_image WHERE media=? AND size=? AND content IS NOT NULL")
         .bind(id)
         .bind(size)
         .fetch_optional(tx.deref_mut())

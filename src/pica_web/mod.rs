@@ -28,7 +28,7 @@ pub async fn serve(store: MediaStore, accessor: MediaAccessor) -> Result<()> {
         .route("/media/preview/sdr/:id/*path", get(handlers::media::handle_preview_sdr))
         .route("/media/preview/hdr/:id/*path", get(handlers::media::handle_preview_hdr))
         .route("/media/fullsize/:id/*path", get(handlers::media::handle_fullsize))
-        .merge(handlers::frontend::router())
+        .nest_service("/", handlers::frontend::frontend("./frontend/dist/pica/browser"))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;

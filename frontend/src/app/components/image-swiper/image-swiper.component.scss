@@ -5,26 +5,40 @@
 }
 
 .container {
+  --transformX: 0px;
+
   display: block;
-  touch-action: manipulation;
+  touch-action: none;
   will-change: transform;
 
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
 
   &.animate {
     transition: transform 166ms ease-out;
   }
+
+  transform: translateX(var(--transformX));
+  transform-origin: 0 0;
 }
 
 .child {
-  display: block;
+  --x: 0;
+  --y: 0;
+  --scale: 1;
+
+  display: grid;
+  place-items: center;
   width: 100vw;
-  height: 100vh;
+  height: 100%;
 
   position: absolute;
   top: 0;
-  left: calc(var(--index) * 100vw);
+  left: calc(var(--index) * (100vw + 16px));
+
+  will-change: transform;
+  transform: translate(var(--x), var(--y)) scale(var(--scale));
+  transform-origin: 0 0;
 
   overflow: hidden;
 }

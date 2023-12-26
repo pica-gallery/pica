@@ -1,5 +1,6 @@
 use std::ffi::OsStr;
-use std::fs::Metadata;
+use std::fs::{File, Metadata};
+use std::io::{BufReader, Read};
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -8,13 +9,13 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
+use exif::{In, Tag};
 use itertools::Itertools;
 use regex::Regex;
-use rexif::{ExifTag, TagValue};
 use tokio::sync::Mutex;
 use tokio::task::block_in_place;
 use tokio::time::sleep;
-use tracing::{debug, info, warn};
+use tracing::{debug, debug_span, info, Instrument, warn};
 use walkdir::WalkDir;
 
 use crate::pica::{db, MediaId, MediaInfo, MediaItem, MediaType};
@@ -55,7 +56,7 @@ impl Scanner {
                 }
             };
 
-            let path = item.path.clone();
+            let path = item.relpath.clone();
             if let Err(err) = self.add(item) {
                 warn!("Failed to enqueue scanned file {:?}: {:?}", path, err)
             }
@@ -154,25 +155,41 @@ impl Indexer {
                 }
             };
 
-            if let Err(err) = self.index_one(&item).await {
-                warn!("Failed to parse item {:?}: {:?}", item.path, err);
+            let task = self.index_one(&item).instrument(
+                debug_span!("Indexing", relpath=?item.relpath)
+            );
+
+            if let Err(err) = task.await {
+                warn!("Indexing failed: {:?}", err);
             }
         }
     }
 
     async fn index_one(&self, item: &ScanItem) -> Result<()> {
-        debug!("Indexing file: {:?}", item.relpath);
+        let err = self.index_one_inner(item).await.err().map(|err| err.to_string());
+
+        if let Some(err) = err.as_ref() {
+            warn!("Indexing failed for {:?}: {}", item.relpath, err);
+        }
+
+        debug!("Mark image as indexed");
+        let mut tx = self.db.begin().await?;
+        db::media_mark_as_indexed(&mut tx, item.id, err).await?;
+        tx.commit().await?;
+
+        Ok(())
+    }
+
+    async fn index_one_inner(&self, item: &ScanItem) -> Result<()> {
         let item = parse(item).await?;
 
-        debug!("Create thumbnails for: {:?}", item.relpath);
-        self.accessor.thumb(&item).await?;
-        self.accessor.preview(&item).await?;
-
-        // put item into database
-        debug!("Put media item {:?} into database: {:?}", item.id, item.relpath);
         let mut tx = self.db.begin().await?;
         db::store_media_item(&mut tx, &item).await?;
         tx.commit().await?;
+
+        debug!("Create thumbnails");
+        self.accessor.thumb(&item).await?;
+        self.accessor.preview(&item).await?;
 
         // mark as done in queue (TODO also handle errors correctly)
         self.queue.lock().await.done(item.id);
@@ -207,9 +224,23 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
         .with_guessed_format()?
         .into_dimensions()?;
 
+    let exif = match block_in_place(|| parse_exif(&path)) {
+        Ok(exif) => Some(exif),
+        Err(err) => {
+            warn!("Failed to parse exif data of {:?}: {:?}", path, err);
+            None
+        }
+    };
+
+    // if we have information about the orientation, rotate width + height
+    let (width, height) = match exif {
+        Some(ExifInfo { orientation: Orientation::Rotate, .. }) => (height, width),
+        _ => (width, height)
+    };
+
     let timestamp = match timestamp_from_filename(&name) {
         Some(ts) => ts,
-        None => match timestamp_from_exif(&path).await.ok().flatten() {
+        None => match exif.and_then(|e| e.timestamp) {
             Some(ts) => ts,
             None => timestamp_file_modified(&item.meta)?,
         }
@@ -232,10 +263,10 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
         other => bail!("unknown extension: {:?}", other),
     };
 
-    Ok(MediaItem { id, relpath: path, name, filesize, typ: media_type, info, hdr: false })
+    Ok(MediaItem { id, relpath: item.relpath.clone(), name, filesize, typ: media_type, info, hdr: false })
 }
 
-
+/*
 async fn timestamp_from_exif(path: &Path) -> Result<Option<DateTime<Utc>>> {
     let content = tokio::fs::read(path).await?;
     let (exif, _) = block_in_place(|| rexif::parse_buffer_quiet(&content));
@@ -249,6 +280,7 @@ async fn timestamp_from_exif(path: &Path) -> Result<Option<DateTime<Utc>>> {
 
     Ok(None)
 }
+*/
 
 fn timestamp_file_modified(metadata: &Metadata) -> Result<DateTime<Utc>> {
     let modified = metadata.modified().or_else(|_| metadata.created())?;
@@ -285,4 +317,43 @@ fn guess_timestamp(item: &ScanItem) -> Result<DateTime<Utc>> {
     }
 
     timestamp_file_modified(&item.meta)
+}
+
+enum Orientation {
+    Original,
+    Rotate,
+}
+
+struct ExifInfo {
+    orientation: Orientation,
+    timestamp: Option<DateTime<Utc>>,
+}
+
+fn parse_exif(path: impl AsRef<Path>) -> Result<ExifInfo> {
+    use exif;
+
+    let mut fp = BufReader::new(File::open(path)?);
+    let parsed = exif::Reader::new().read_from_container(&mut fp)?;
+
+    let timestamp = match parsed.get_field(Tag::DateTimeOriginal, In::PRIMARY) {
+        Some(tag) => {
+            match &tag.value {
+                exif::Value::Ascii(ascii_values) if !ascii_values.is_empty() => {
+                    let datestr = std::str::from_utf8(&ascii_values[0])?;
+                    Some(NaiveDateTime::parse_from_str(datestr, "%Y:%m:%d %H:%M:%S")?.and_utc())
+                }
+
+                _ => None,
+            }
+        }
+
+        _ => None,
+    };
+
+    let orientation = parsed.get_field(Tag::Orientation, In::PRIMARY)
+        .and_then(|f| f.value.get_uint(0))
+        .map(|tv| if tv >= 5 { Orientation::Rotate } else { Orientation::Original })
+        .unwrap_or(Orientation::Original);
+
+    Ok(ExifInfo { timestamp, orientation })
 }

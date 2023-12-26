@@ -37,14 +37,14 @@ impl MediaScaler {
         // run resize in a different task to not block the executor
         let bytes = spawn_blocking(move || resize(path, "avif", size)).await??;
 
-        let thumb = Image { typ: ImageType::AVIF, bytes };
+        let thumb = Image { typ: ImageType::Avif, bytes };
         Ok(thumb)
     }
 }
 
 pub enum ImageType {
-    JPEG,
-    AVIF,
+    Jpeg,
+    Avif,
 }
 
 pub struct Image {

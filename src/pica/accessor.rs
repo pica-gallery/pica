@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use itertools::Itertools;
 use sqlx::SqlitePool;
+use tracing::{debug_span, Instrument};
 
 use crate::pica::{db, MediaItem};
 use crate::pica::scale::MediaScaler;
@@ -26,12 +27,20 @@ impl MediaAccessor {
         Self { cache: cache.into(), scaler, sizes, root: root.into() }
     }
 
+    pub fn full(&self, item: &MediaItem) -> PathBuf {
+        self.root.join(&item.relpath)
+    }
+
     pub async fn thumb(&self, item: &MediaItem) -> Result<Vec<u8>> {
-        self.get_sdr(item, self.sizes.thumb).await
+        self.get_sdr(item, self.sizes.thumb)
+            .instrument(debug_span!("scale", size=self.sizes.thumb))
+            .await
     }
 
     pub async fn preview(&self, item: &MediaItem) -> Result<Vec<u8>> {
-        self.get_sdr(item, self.sizes.preview).await
+        self.get_sdr(item, self.sizes.preview)
+            .instrument(debug_span!("scale", size=self.sizes.preview))
+            .await
     }
 
     async fn get_sdr(&self, image: &MediaItem, size: u32) -> Result<Vec<u8>> {
@@ -47,7 +56,7 @@ impl MediaAccessor {
         let thumb = self.scaler.image(path, size).await?;
 
         let mut tx = self.cache.begin().await?;
-        db::store_image(&mut tx, image.id, size, &thumb.bytes).await?;
+        db::store_image(&mut tx, image.id, size, &thumb.typ, &thumb.bytes).await?;
         tx.commit().await?;
 
         Ok(thumb.bytes)

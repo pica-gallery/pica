@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, Input, signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, HostBinding, Input, signal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import type {MediaItem} from '../../service/gallery';
 import {ProgressBarComponent} from '../progressbar/progress-bar.component';
@@ -40,6 +40,11 @@ export class ImageViewComponent {
       this.loadedSubject.next(false);
       this.focusSignal.set(focus);
     }
+  }
+
+  @HostBinding('style.--aspect-ratio')
+  protected get aspectRatioValue(): number {
+    return this.media.width / this.media.height;
   }
 
   protected onImageLoad() {
