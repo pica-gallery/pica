@@ -1,21 +1,50 @@
+use std::path::Path;
+
+use axum::body::Body;
 use axum::handler::Handler;
-use axum::http::header::CACHE_CONTROL;
-use axum::http::HeaderValue;
-use axum::routing::{get_service, MethodRouter};
-use tower_http::services::{ServeDir, ServeFile};
-use tower_http::set_header::SetResponseHeaderLayer;
+use axum::http::{header, HeaderValue, StatusCode};
+use axum::response::{IntoResponse, Response};
+use axum::Router;
+use axum::routing::get;
+use include_dir::{Dir, include_dir};
+use tower_http::compression::CompressionLayer;
+use tower_http::compression::predicate::SizeAbove;
+use tracing::info;
 
-pub fn frontend(path: impl AsRef<std::path::Path>) -> MethodRouter {
-    let add_cache_control = SetResponseHeaderLayer::overriding(
-        CACHE_CONTROL,
-        HeaderValue::from_static("public, max-age=604800, immutable"),
-    );
+static FRONTEND: Dir = include_dir!("$CARGO_MANIFEST_DIR/frontend/dist/pica/browser/");
 
-    let index = ServeFile::new(path.as_ref().join("index.html")).precompressed_gzip();
+pub fn frontend() -> Router {
+    Router::new()
+        .fallback(get(serve))
+        .layer(CompressionLayer::new().compress_when(SizeAbove::new(1024)))
+}
 
-    let serve = ServeDir::new(path.as_ref())
-        .precompressed_gzip()
-        .not_found_service(index);
+async fn serve(req: axum::extract::Request) -> Response {
+    let path = req.uri().path();
+    info!("Serve frontend file: {:?}", path);
 
-    get_service(serve).layer(add_cache_control)
+    // strip leading / from the path
+    let path = path.strip_prefix("/").unwrap_or(path);
+
+    serve_file(path)
+        .or_else(|| serve_file("index.html"))
+        .unwrap_or_else(|| StatusCode::NOT_FOUND.into_response())
+}
+
+fn serve_file(path: impl AsRef<Path>) -> Option<Response> {
+    let file = FRONTEND.get_file(&path)?;
+
+    let content_type = mime_guess::from_path(path)
+        .first_raw()
+        .map(HeaderValue::from_static)
+        .unwrap_or_else(|| {
+            HeaderValue::from_str(mime::APPLICATION_OCTET_STREAM.as_ref()).unwrap()
+        });
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, content_type)
+        .header(header::CACHE_CONTROL, "public, max-age=604800, immutable")
+        .body(Body::from(file.contents()))
+        .ok()
 }

@@ -63,7 +63,7 @@ pub fn parse_exif(path: impl AsRef<Path>) -> anyhow::Result<Option<ExifInfo>> {
         .map(|f| parse_orientation(f.value.get_uint(0)))
         .unwrap_or(Orientation::Original);
 
-    Ok(ExifInfo { exif: parsed, timestamp, orientation })
+    Ok(Some(ExifInfo { exif: parsed, timestamp, orientation }))
 }
 
 fn parse_orientation(value: Option<u32>) -> Orientation {

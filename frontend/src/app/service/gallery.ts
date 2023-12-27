@@ -22,7 +22,7 @@ export class Gallery {
   // private readonly cache = new Map<string, Observable<Section>>();
 
   private readonly stream$ = this.apiService.stream().pipe(
-    map(convertStream),
+    map(stream => convertStream(stream, Daily)),
     shareReplay({bufferSize: 1, refCount: false}),
   )
 
@@ -51,7 +51,7 @@ export class Gallery {
   //}
 }
 
-function convertStream(stream: StreamTo): Stream {
+function convertStream(stream: StreamTo, grouping: GroupingStrategy): Stream {
   const items = stream.items.map(item => convertItem(item));
 
   items.sort((lhs, rhs) => {
@@ -62,9 +62,9 @@ function convertStream(stream: StreamTo): Stream {
 
   let section: Section | null = null;
   for (const item of items) {
-    if (section == null || !(partOfAlbumMonthlySection(section, item))) {
+    if (section == null || !(grouping.partOf(section, item))) {
       section = {
-        name: nameOfMonthlySection(item.timestamp),
+        name: grouping.nameOf(item.timestamp),
         timestamp: item.timestamp,
         items: []
       }
@@ -78,29 +78,52 @@ function convertStream(stream: StreamTo): Stream {
   return {items, sections};
 }
 
-function partOfAlbumDailySection(album: Section, image: MediaItem) {
-  return image.timestamp.getFullYear() === album.timestamp.getFullYear()
-    && image.timestamp.getMonth() === album.timestamp.getMonth()
-    && image.timestamp.getDate() === album.timestamp.getDate()
+export type GroupingStrategy = {
+  partOf(album: Section, image: MediaItem): boolean
+  nameOf(timestamp: Date): string,
 }
 
-function partOfAlbumMonthlySection(album: Section, image: MediaItem) {
-  return image.timestamp.getFullYear() === album.timestamp.getFullYear()
-    && image.timestamp.getMonth() === album.timestamp.getMonth()
+export const Daily: GroupingStrategy = {
+  partOf(album: Section, image: MediaItem) {
+    return image.timestamp.getFullYear() === album.timestamp.getFullYear()
+      && image.timestamp.getMonth() === album.timestamp.getMonth()
+      && image.timestamp.getDate() === album.timestamp.getDate()
+  },
+
+  nameOf(timestamp: Date) {
+    let result = "";
+
+    result = MONTHS[timestamp.getMonth()];
+    if (timestamp.getFullYear() !== YEAR) {
+      result = result + ', ' + timestamp.getFullYear();
+    }
+
+    result = timestamp.getDate() + ". " + result
+
+    return result
+  }
+}
+
+export const Monthly: GroupingStrategy = {
+  partOf(album: Section, image: MediaItem) {
+    return image.timestamp.getFullYear() === album.timestamp.getFullYear()
+      && image.timestamp.getMonth() === album.timestamp.getMonth()
+  },
+
+  nameOf(timestamp: Date) {
+    const month = MONTHS[timestamp.getMonth()];
+    if (timestamp.getFullYear() !== YEAR) {
+      return month + ', ' + timestamp.getFullYear();
+    }
+
+    return month
+  }
 }
 
 function convertItem(item: MediaItemTo): MediaItem {
   return {...item, urls: mediaUrlsOf(item)}
 }
 
-function nameOfMonthlySection(timestamp: Date): string {
-  const month = MONTHS[timestamp.getMonth()];
-  if (timestamp.getFullYear() !== YEAR) {
-    return month + ', ' + timestamp.getFullYear();
-  }
-
-  return month
-}
 
 const YEAR = new Date().getFullYear();
 

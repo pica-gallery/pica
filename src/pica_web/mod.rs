@@ -31,7 +31,7 @@ pub async fn serve(store: MediaStore, accessor: MediaAccessor, addr: impl ToSock
         .route("/media/preview/sdr/:id/*path", get(handlers::media::handle_preview_sdr))
         .route("/media/preview/hdr/:id/*path", get(handlers::media::handle_preview_hdr))
         .route("/media/fullsize/:id/*path", get(handlers::media::handle_fullsize))
-        .nest_service("/", handlers::frontend::frontend("./frontend/dist/pica/browser"))
+        .nest_service("/", handlers::frontend::frontend())
         .layer(TraceLayer::new_for_http()
             .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
             .on_response(DefaultOnResponse::new().level(Level::INFO))
