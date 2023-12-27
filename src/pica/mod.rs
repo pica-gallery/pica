@@ -16,6 +16,7 @@ pub mod accessor;
 pub mod store;
 pub mod db;
 pub mod queue;
+mod exif;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, From, AsRef)]
 #[derive(SerializeDisplay)]

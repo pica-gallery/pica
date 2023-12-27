@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
-use std::fs::{File, Metadata};
-use std::io::{BufReader, Read};
+use std::fs::Metadata;
+use std::io::Read;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -9,7 +9,6 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use exif::{In, Tag};
 use itertools::Itertools;
 use regex::Regex;
 use tokio::sync::Mutex;
@@ -17,9 +16,11 @@ use tokio::task::block_in_place;
 use tokio::time::sleep;
 use tracing::{debug, debug_span, Instrument, warn};
 use walkdir::WalkDir;
+use crate::pica;
 
 use crate::pica::{db, MediaId, MediaInfo, MediaItem, MediaType};
 use crate::pica::accessor::MediaAccessor;
+use crate::pica::exif::ExifInfo;
 use crate::pica::queue::ScanQueue;
 
 thread_local! {
@@ -241,7 +242,7 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
         .with_guessed_format()?
         .into_dimensions()?;
 
-    let exif = match block_in_place(|| parse_exif(&path)) {
+    let exif = match block_in_place(|| pica::exif::parse_exif(&path)) {
         Ok(exif) => Some(exif),
         Err(err) => {
             warn!("Failed to parse exif data of {:?}: {:?}", path, err);
@@ -250,8 +251,8 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
     };
 
     // if we have information about the orientation, rotate width + height
-    let (width, height) = match exif {
-        Some(ExifInfo { orientation: Orientation::Rotate, .. }) => (height, width),
+    let (width, height) = match &exif {
+        Some(ExifInfo { orientation, .. }) if orientation.transposed() => (height, width),
         _ => (width, height)
     };
 
@@ -334,43 +335,4 @@ fn guess_timestamp(item: &ScanItem) -> Result<DateTime<Utc>> {
     }
 
     timestamp_file_modified(&item.meta)
-}
-
-enum Orientation {
-    Original,
-    Rotate,
-}
-
-struct ExifInfo {
-    orientation: Orientation,
-    timestamp: Option<DateTime<Utc>>,
-}
-
-fn parse_exif(path: impl AsRef<Path>) -> Result<ExifInfo> {
-    use exif;
-
-    let mut fp = BufReader::new(File::open(path)?);
-    let parsed = exif::Reader::new().read_from_container(&mut fp)?;
-
-    let timestamp = match parsed.get_field(Tag::DateTimeOriginal, In::PRIMARY) {
-        Some(tag) => {
-            match &tag.value {
-                exif::Value::Ascii(ascii_values) if !ascii_values.is_empty() => {
-                    let datestr = std::str::from_utf8(&ascii_values[0])?;
-                    Some(NaiveDateTime::parse_from_str(datestr, "%Y:%m:%d %H:%M:%S")?.and_utc())
-                }
-
-                _ => None,
-            }
-        }
-
-        _ => None,
-    };
-
-    let orientation = parsed.get_field(Tag::Orientation, In::PRIMARY)
-        .and_then(|f| f.value.get_uint(0))
-        .map(|tv| if tv >= 5 { Orientation::Rotate } else { Orientation::Original })
-        .unwrap_or(Orientation::Original);
-
-    Ok(ExifInfo { timestamp, orientation })
 }

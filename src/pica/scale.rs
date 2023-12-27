@@ -5,10 +5,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use image::image_dimensions;
+use image::{image_dimensions, io};
+use image::imageops::FilterType;
 use tempfile::NamedTempFile;
 use tokio::sync::Semaphore;
-use tokio::task::spawn_blocking;
+use tokio::task::block_in_place;
+
+use crate::pica::exif::{Orientation, parse_exif};
 
 #[derive(Clone)]
 pub enum ImageType {
@@ -49,14 +52,21 @@ impl MediaScaler {
             .acquire_many(u32::try_from(memory).unwrap_or(u32::MAX))
             .await?;
 
-        let path = path.as_ref().to_owned();
-        let image_type = self.options.image_type.clone();
-
         // run resize in a different task to not block the executor
-        let bytes = spawn_blocking(move || resize(path, &image_type, size)).await??;
+        let bytes = self.resize(path.as_ref(), size).await?;
 
-        let thumb = Image { typ: ImageType::Avif, bytes };
+        let thumb = Image { typ: self.options.image_type.clone(), bytes };
         Ok(thumb)
+    }
+
+    async fn resize(&self, path: impl AsRef<Path>, size: u32) -> Result<Vec<u8>> {
+        block_in_place(|| {
+            if self.options.use_image_magick {
+                resize_imagemagick(path, &self.options.image_type, size)
+            } else {
+                resize_rust(path, &self.options.image_type, size)
+            }
+        })
     }
 }
 
@@ -65,7 +75,8 @@ pub struct Image {
     pub bytes: Vec<u8>,
 }
 
-fn resize(source: impl AsRef<Path>, format: &ImageType, size: u32) -> Result<Vec<u8>> {
+/// Resizes the image using image magick.
+fn resize_imagemagick(source: impl AsRef<Path>, format: &ImageType, size: u32) -> Result<Vec<u8>> {
     use std::process::Command;
 
     let format = match format {
@@ -100,4 +111,47 @@ fn resize(source: impl AsRef<Path>, format: &ImageType, size: u32) -> Result<Vec
     let bytes = fs::read(target)?;
 
     Ok(bytes)
+}
+
+fn resize_rust(source: impl AsRef<Path>, format: &ImageType, size: u32) -> Result<Vec<u8>> {
+    let rotate = parse_exif(source.as_ref())
+        .ok()
+        .map(|r| r.orientation);
+
+    let mut image = io::Reader::open(source)?.with_guessed_format()?.decode()?;
+
+    image = match rotate {
+        Some(Orientation::FlipH) => image.fliph(),
+        Some(Orientation::Rotate180) => image.rotate180(),
+        Some(Orientation::FlipHRotate180) => image.fliph().rotate180(),
+        Some(Orientation::FlipHRotate270) => image.fliph().rotate270(),
+        Some(Orientation::Rotate90) => image.rotate90(),
+        Some(Orientation::FlipHRotate90) => image.fliph().rotate90(),
+        Some(Orientation::Rotate270) => image.rotate270(),
+        _ => image,
+    };
+
+    let scaled = if (size >= 512) {
+        image.resize(size, size, FilterType::Gaussian)
+    } else {
+        image.thumbnail(size, size)
+    };
+
+    let mut writer = Vec::new();
+
+    match format {
+        ImageType::Jpeg => {
+            scaled.write_with_encoder(
+                image::codecs::jpeg::JpegEncoder::new_with_quality(&mut writer, 60)
+            )?;
+        }
+
+        ImageType::Avif => {
+            scaled.write_with_encoder(
+                image::codecs::avif::AvifEncoder::new_with_speed_quality(&mut writer, 10, 60)
+            )?;
+        }
+    };
+
+    Ok(writer)
 }
