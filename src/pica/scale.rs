@@ -116,6 +116,7 @@ fn resize_imagemagick(source: impl AsRef<Path>, format: &ImageType, size: u32) -
 fn resize_rust(source: impl AsRef<Path>, format: &ImageType, size: u32) -> Result<Vec<u8>> {
     let rotate = parse_exif(source.as_ref())
         .ok()
+        .flatten()
         .map(|r| r.orientation);
 
     let mut image = io::Reader::open(source)?.with_guessed_format()?.decode()?;

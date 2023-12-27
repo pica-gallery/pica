@@ -35,9 +35,14 @@ pub struct ExifInfo {
     pub timestamp: Option<DateTime<Utc>>,
 }
 
-pub fn parse_exif(path: impl AsRef<Path>) -> anyhow::Result<ExifInfo> {
+pub fn parse_exif(path: impl AsRef<Path>) -> anyhow::Result<Option<ExifInfo>> {
     let mut fp = BufReader::new(File::open(path)?);
-    let parsed = exif::Reader::new().read_from_container(&mut fp)?;
+
+    let parsed = match exif::Reader::new().read_from_container(&mut fp) {
+        Ok(data) => data,
+        Err(exif::Error::NotFound(_)) => return Ok(None),
+        Err(err) => return Err(err.into()),
+    };
 
     let timestamp = match parsed.get_field(Tag::DateTimeOriginal, In::PRIMARY) {
         Some(tag) => {

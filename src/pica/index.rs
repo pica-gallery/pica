@@ -243,7 +243,8 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
         .into_dimensions()?;
 
     let exif = match block_in_place(|| pica::exif::parse_exif(&path)) {
-        Ok(exif) => Some(exif),
+        Ok(Some(exif)) => Some(exif),
+        Ok(None) => None,
         Err(err) => {
             warn!("Failed to parse exif data of {:?}: {:?}", path, err);
             None
