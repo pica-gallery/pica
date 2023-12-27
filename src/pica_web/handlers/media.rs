@@ -47,7 +47,7 @@ pub async fn handle_preview_hdr(
 
 async fn handle_image_scaled(id: MediaId, state: AppState, image_type: ImageType) -> Result<Response, WebError> {
     let image = state.store.get(id)
-        .await?
+        .await
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
 
     let thumbnail = match image_type {
@@ -57,7 +57,7 @@ async fn handle_image_scaled(id: MediaId, state: AppState, image_type: ImageType
 
     let resp = Response::builder()
         .header(http::header::CONTENT_TYPE, "image/avif")
-        .header(http::header::CACHE_CONTROL, "immutable")
+        .header(http::header::CACHE_CONTROL, "public, max-age=80000, immutable")
         .body(axum::body::Body::from(thumbnail))?;
 
     Ok(resp)
@@ -71,7 +71,7 @@ pub async fn handle_fullsize(
     let id = MediaId::from_str(&id)?;
 
     let media = state.store.get(id)
-        .await?
+        .await
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
 
     debug!("Serve full image for {:?}", media.relpath);

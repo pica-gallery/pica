@@ -25,21 +25,16 @@ async fn main() -> Result<()> {
     let config = pica::config::load("./pica.config.yaml")?;
 
     info!("Open database");
-    let db = sqlx::sqlite::SqlitePool::connect(&config.database).await?;
+    let db = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect(&config.database)
+        .await?;
+
     sqlx::migrate!("./sql").run(&db).await?;
 
     let source = config.sources.first().ok_or_else(|| anyhow!("no sources defined"))?;
 
-    let mut queue = ScanQueue::default();
-
-    info!("Initialize queue with already indexed files");
-    pica::db::list_media_indexed(&mut db.begin().await?)
-        .await?
-        .into_iter().for_each(|id| queue.done(id));
-
-    info!("Starting with {} files already indexed", queue.done_len());
-
-    let queue = Arc::new(Mutex::new(queue));
+    let queue = Arc::new(Mutex::new(ScanQueue::default()));
 
     info!("Starting scanner");
     let scanner = Scanner::new(&source.path, queue.clone());
@@ -70,7 +65,7 @@ async fn main() -> Result<()> {
     // start four indexer queues
     info!("Starting {} indexers", config.indexer_threads.get());
     for _ in 0..config.indexer_threads.get() {
-        let indexer = Indexer::new(db.clone(), queue.clone(), (!config.lazy_thumbs).then(|| media.clone()));
+        let indexer = Indexer::new(db.clone(), queue.clone(), store.clone(), (!config.lazy_thumbs).then(|| media.clone()));
         tokio::task::spawn(indexer.run());
     }
 
@@ -80,7 +75,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn scanner_loop(scanner: Scanner, interval: Duration) {
+async fn scanner_loop(mut scanner: Scanner, interval: Duration) {
     loop {
         scanner.scan().await;
         sleep(interval).await;

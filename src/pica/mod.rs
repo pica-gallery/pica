@@ -5,6 +5,7 @@ use std::str::FromStr;
 use anyhow::ensure;
 use chrono::{DateTime, Utc};
 use derive_more::{AsRef, From, Into};
+use serde::{Deserialize, Serialize};
 use serde_with::SerializeDisplay;
 
 mod album;
@@ -90,7 +91,7 @@ pub struct MediaItem {
     pub hdr: bool,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, From, Into, sqlx::Type)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, From, Into, sqlx::Type)]
 #[sqlx(transparent)]
 pub struct AlbumId(u32);
 

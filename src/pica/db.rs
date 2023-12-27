@@ -134,16 +134,6 @@ pub async fn store_media_item(tx: &mut Transaction<'_, Sqlite>, item: &MediaItem
     Ok(())
 }
 
-pub async fn media_mark_as_indexed(tx: &mut Transaction<'_, Sqlite>, item: MediaId, error: Option<String>) -> Result<()> {
-    sqlx::query("UPDATE pica_media SET indexing_done=TRUE, indexing_error=? WHERE id=?")
-        .bind(error)
-        .bind(item)
-        .execute(tx.deref_mut())
-        .await?;
-
-    Ok(())
-}
-
 impl From<MediaRow> for MediaItem {
     fn from(row: MediaRow) -> Self {
         let relpath = PathBuf::from(OsStr::from_bytes(&row.relpath));
@@ -176,27 +166,14 @@ pub async fn read_media_item(tx: &mut Transaction<'_, Sqlite>, id: MediaId) -> R
     Ok(Some(row.into()))
 }
 
-pub async fn read_media_items(tx: &mut Transaction<'_, Sqlite>) -> Result<Vec<MediaItem>> {
-    let rows: Vec<MediaRow> = sqlx::query_as("SELECT * FROM pica_media WHERE indexing_success ORDER BY timestamp DESC")
-        .fetch_all(tx.deref_mut())
+pub async fn media_mark_as_error(tx: &mut Transaction<'_, Sqlite>, id: MediaId, error: &str) -> Result<()> {
+    sqlx::query("INSERT OR REPLACE INTO pica_media_error (id, error) VALUES (?, ?)")
+        .bind(id)
+        .bind(error)
+        .execute(tx.deref_mut())
         .await?;
 
-    // convert to vec
-    Ok(rows.into_iter().map(MediaItem::from).collect())
-}
-
-/// Returns a list of all media items that were indexed. This includes media items that have
-/// failed to index successfully.
-pub async fn list_media_indexed(tx: &mut Transaction<'_, Sqlite>) -> Result<Vec<MediaId>> {
-    let ids: Vec<i64> = sqlx::query_scalar("SELECT id FROM pica_media WHERE indexing_done")
-        .fetch_all(tx.deref_mut())
-        .await?;
-
-    let ids = ids.into_iter()
-        .map(|id| MediaId::from(id.to_be_bytes()))
-        .collect_vec();
-
-    Ok(ids)
+    Ok(())
 }
 
 pub async fn store_image(tx: &mut Transaction<'_, Sqlite>, id: MediaId, size: u32, typ: &ImageType, content: &[u8]) -> Result<()> {
@@ -261,6 +238,16 @@ pub async fn create_album(tx: &mut Transaction<'_, Sqlite>, album: CreateAblum<'
     Ok(album.into())
 }
 
+pub async fn album_add_media(tx: &mut Transaction<'_, Sqlite>, album: AlbumId, media: MediaId) -> Result<()> {
+    sqlx::query("INSERT OR IGNORE INTO pica_album_member (album, media) VALUES (?, ?)")
+        .bind(album)
+        .bind(media)
+        .execute(tx.deref_mut())
+        .await?;
+
+    Ok(())
+}
+
 pub async fn load_album_by_id(tx: &mut Transaction<'_, Sqlite>, id: AlbumId) -> Result<Album> {
     let album: AlbumRow = sqlx::query_as("SELECT * FROM pica_album WHERE id=?")
         .bind(id)
@@ -286,4 +273,13 @@ pub async fn load_albums_by_parent(tx: &mut Transaction<'_, Sqlite>, parent: Opt
         .await?;
 
     Ok(albums.into_iter().map(Album::from).collect())
+}
+
+pub async fn load_album_media(tx: &mut Transaction<'_, Sqlite>, album: AlbumId) -> Result<Vec<MediaItem>> {
+    let items: Vec<MediaRow> = sqlx::query_as("SELECT * FROM pica_media WHERE id IN (SELECT media FROM pica_album_member WHERE album=?)")
+        .bind(album)
+        .fetch_all(tx.deref_mut())
+        .await?;
+
+    Ok(items.into_iter().map(MediaItem::from).collect())
 }

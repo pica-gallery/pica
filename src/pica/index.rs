@@ -1,13 +1,12 @@
 use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fs::Metadata;
-use std::future::Future;
-use std::io::Read;
+use std::hash::Hash;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -17,7 +16,7 @@ use sqlx::{Sqlite, Transaction};
 use tokio::sync::Mutex;
 use tokio::task::block_in_place;
 use tokio::time::sleep;
-use tracing::{debug, debug_span, Instrument, warn};
+use tracing::{debug, debug_span, info, Instrument, warn};
 use walkdir::WalkDir;
 
 use crate::pica;
@@ -26,6 +25,7 @@ use crate::pica::accessor::MediaAccessor;
 use crate::pica::db::CreateAblum;
 use crate::pica::exif::ExifInfo;
 use crate::pica::queue::ScanQueue;
+use crate::pica::store::MediaStore;
 
 thread_local! {
     static RE_TIMESTAMP: Regex = Regex::new(r#"(20\d\d[01]\d[0123]\d)_?([012]\d[012345]\d[012345]\d)"#).unwrap();
@@ -36,6 +36,7 @@ pub struct ScanItem {
     pub path: PathBuf,
     pub relpath: PathBuf,
     pub meta: Metadata,
+    pub timestamp: DateTime<Utc>,
 }
 
 pub struct Scanner {
@@ -49,10 +50,9 @@ impl Scanner {
     }
 
     /// Runs scanning once and writes the files found to the scan queue
-    pub async fn scan(&self) {
-        debug!("Starting scan run for {:?}", self.root);
-
-        let mut new_count = 0;
+    pub async fn scan(&mut self) {
+        let start_time = Instant::now();
+        debug!("Starting scan in {:?}",  self.root);
 
         let mut iter = scan_iter(&self.root);
         while let Some(item) = block_in_place(|| iter.next()) {
@@ -64,24 +64,10 @@ impl Scanner {
                 }
             };
 
-            let path = item.relpath.clone();
-            match self.add(item).await {
-                Ok(true) => new_count += 1,
-
-                Err(err) => {
-                    warn!("Failed to enqueue scanned file {:?}: {:?}", path, err)
-                }
-
-                _ => (),
-            }
+            self.queue.lock().await.add(item);
         }
 
-        debug!("Scan found {} new files", new_count);
-    }
-
-    async fn add(&self, item: ScanItem) -> Result<bool> {
-        let timestamp = guess_timestamp(&item)?;
-        Ok(self.queue.lock().await.add(item, timestamp))
+        debug!("Scan finished in {:?}", Instant::now().duration_since(start_time));
     }
 }
 
@@ -105,12 +91,23 @@ fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
 
         // extract metadata and convert into scan items
         .map_ok(move |entry| -> Result<ScanItem> {
-            let relpath = entry.path().strip_prefix(root)
-                .with_context(|| entry.path().display().to_string())?
+            let ctx = || entry.path().display().to_string();
+
+            let relpath = entry.path()
+                .strip_prefix(root)
+                .with_context(ctx)?
                 .to_owned();
 
-            // hash the relative path into an id
-            let hash = sha1_smol::Sha1::from(relpath.as_os_str().as_bytes()).digest().bytes();
+            let meta = entry.metadata().with_context(ctx)?;
+            let timestamp = guess_timestamp(entry.path(), &meta).with_context(ctx)?;
+
+            // hash the relative path and file size into an id
+            let hash = {
+                let mut hasher = sha1_smol::Sha1::new();
+                hasher.update(relpath.as_os_str().as_bytes());
+                hasher.update(meta.size().to_be_bytes().as_slice());
+                hasher.digest().bytes()
+            };
 
             // build id from hash
             let mut bytes = [0_u8; 8];
@@ -120,12 +117,9 @@ fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
             Ok(
                 ScanItem {
                     id,
+                    meta,
+                    timestamp,
                     relpath,
-
-                    meta: entry
-                        .metadata()
-                        .with_context(|| entry.path().display().to_string())?,
-
                     path: entry.into_path(),
                 }
             )
@@ -153,20 +147,21 @@ pub struct Indexer {
     db: sqlx::sqlite::SqlitePool,
     queue: Arc<Mutex<ScanQueue>>,
     accessor: Option<MediaAccessor>,
+    store: MediaStore,
 }
 
 impl Indexer {
-    pub fn new(db: sqlx::sqlite::SqlitePool, queue: Arc<Mutex<ScanQueue>>, accessor: Option<MediaAccessor>) -> Self {
-        Self { db, queue, accessor }
+    pub fn new(db: sqlx::sqlite::SqlitePool, queue: Arc<Mutex<ScanQueue>>, store: MediaStore, accessor: Option<MediaAccessor>) -> Self {
+        Self { db, queue, accessor, store }
     }
 
     pub async fn run(self) {
         loop {
-            // must not be inlined into the match statement. This would keep the temporary lock alive
+            // must not be inlined into the match statement. This would keep the lock guard alive
             // for the expression, including the sleep.
-            let item = self.queue.lock().await.poll();
+            let polled_item = self.queue.lock().await.poll();
 
-            let item = match item {
+            let item = match polled_item {
                 Some(item) => item,
                 None => {
                     // no more data in queue, wait a moment before trying again
@@ -175,37 +170,59 @@ impl Indexer {
                 }
             };
 
-            let task = self.index_one(&item).instrument(
-                debug_span!("Indexing", relpath=?item.relpath)
-            );
+            let task = self
+                .index_one(&item)
+                .instrument(debug_span!("Indexing", relpath=?item.relpath));
 
             if let Err(err) = task.await {
-                warn!("Indexing failed: {:?}", err);
+                warn!("Indexing failed for {:?}: {:?}", item.relpath, err);
             }
         }
     }
 
     async fn index_one(&self, item: &ScanItem) -> Result<()> {
-        let err = self.index_one_inner(item).await.err().map(|err| err.to_string());
-
-        if let Some(err) = err.as_ref() {
-            warn!("Indexing failed for {:?}: {}", item.relpath, err);
+        // skip if the item is already index
+        let option = self.store.get(item.id).await;
+        if option.is_some() {
+            return Ok(());
         }
 
-        debug!("Mark image as indexed");
-        let mut tx = self.db.begin().await?;
-        db::media_mark_as_indexed(&mut tx, item.id, err).await?;
-        tx.commit().await?;
+        // TODO check the error cache first
+        let result = self.parse_item(item).await;
 
-        Ok(())
+        match result {
+            Ok(media) => {
+                // put the media item into the store
+                let count = self.store.add(media).await;
+                debug!("Added item to library, total items: {}", count);
+                Ok(())
+            }
+
+            Err(err) => {
+                let mut tx = self.db.begin().await?;
+                db::media_mark_as_error(&mut tx, item.id, &err.to_string()).await?;
+                tx.commit().await?;
+                Err(err)
+            }
+        }
     }
 
-    async fn index_one_inner(&self, item: &ScanItem) -> Result<()> {
+    async fn parse_item(&self, item: &ScanItem) -> Result<MediaItem> {
+        // check cache for an indexed version first
+        let cached = {
+            let mut tx = self.db.begin().await?;
+            db::read_media_item(&mut tx, item.id).await?
+        };
+
+        if let Some(media) = cached {
+            return Ok(media);
+        }
+
         let item = parse(item).await?;
 
+        // store the parsed item in the database
         let mut tx = self.db.begin().await?;
         db::store_media_item(&mut tx, &item).await?;
-        upsert_album_for_media_item(&mut tx, &item).await?;
         tx.commit().await?;
 
         if let Some(accessor) = &self.accessor {
@@ -214,10 +231,7 @@ impl Indexer {
             accessor.preview(&item).await?;
         }
 
-        // mark as done in queue (TODO also handle errors correctly)
-        self.queue.lock().await.done(item.id);
-
-        Ok(())
+        Ok(item)
     }
 }
 
@@ -226,15 +240,6 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
     let filesize = item.meta.size();
 
     let path = item.path.to_owned();
-
-    let id = {
-        // hash the relative path into an id
-        let hash = sha1_smol::Sha1::from(item.relpath.as_os_str().as_bytes()).digest().bytes();
-
-        let mut bytes = [0_u8; 8];
-        bytes.copy_from_slice(&hash[..8]);
-        MediaId::from(bytes)
-    };
 
     // take the file name and clear any invalid characters from it
     let name = path.file_name()
@@ -287,7 +292,7 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
         other => bail!("unknown extension: {:?}", other),
     };
 
-    Ok(MediaItem { id, relpath: item.relpath.clone(), name, filesize, typ: media_type, info, hdr: false })
+    Ok(MediaItem { id: item.id, relpath: item.relpath.clone(), name, filesize, typ: media_type, info, hdr: false })
 }
 
 /*
@@ -333,14 +338,14 @@ fn timestamp_from_filename(name: &str) -> Option<DateTime<Utc>> {
 }
 
 // Best effort guess for the file name of a scan item
-fn guess_timestamp(item: &ScanItem) -> Result<DateTime<Utc>> {
-    if let Some(name) = item.path.file_name().unwrap_or_default().to_str() {
+fn guess_timestamp(path: &Path, meta: &Metadata) -> Result<DateTime<Utc>> {
+    if let Some(name) = path.file_name().unwrap_or_default().to_str() {
         if let Some(timestamp) = timestamp_from_filename(name) {
             return Ok(timestamp);
         }
     }
 
-    timestamp_file_modified(&item.meta)
+    timestamp_file_modified(meta)
 }
 
 async fn upsert_album_for_media_item(tx: &mut Transaction<'_, Sqlite>, item: &MediaItem) -> Result<Album> {
