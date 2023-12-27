@@ -132,7 +132,7 @@ fn resize_rust(source: impl AsRef<Path>, format: &ImageType, size: u32) -> Resul
         _ => image,
     };
 
-    let scaled = if (size >= 512) {
+    let scaled = if size >= 512 {
         image.resize(size, size, FilterType::Gaussian)
     } else {
         image.thumbnail(size, size)

@@ -24,7 +24,7 @@ async fn serve(req: axum::extract::Request) -> Response {
     info!("Serve frontend file: {:?}", path);
 
     // strip leading / from the path
-    let path = path.strip_prefix("/").unwrap_or(path);
+    let path = path.strip_prefix('/').unwrap_or(path);
 
     serve_file(path)
         .or_else(|| serve_file("index.html"))

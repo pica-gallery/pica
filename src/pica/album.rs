@@ -1,12 +1,7 @@
-use std::collections::HashMap;
-use std::os::unix::prelude::OsStrExt;
-
-use itertools::Itertools;
-use regex::bytes::Regex;
-
 use crate::pica::{Album, MediaItem};
 
-pub fn by_directory(images: Vec<MediaItem>) -> Vec<Album> {
+pub fn by_directory(_images: Vec<MediaItem>) -> Vec<Album> {
+    /*
     let re_album = Regex::new(r#"20\d\d-[01]\d-[0123]\d "#).unwrap();
 
     let mut albums = HashMap::<String, Album>::new();
@@ -43,5 +38,6 @@ pub fn by_directory(images: Vec<MediaItem>) -> Vec<Album> {
         album.items.sort_by_key(|item| item.info.timestamp)
     }
 
-    albums
+*/
+    unimplemented!()
 }

@@ -1,5 +1,7 @@
+use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fs::Metadata;
+use std::future::Future;
 use std::io::Read;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::prelude::OsStrExt;
@@ -11,15 +13,17 @@ use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use itertools::Itertools;
 use regex::Regex;
+use sqlx::{Sqlite, Transaction};
 use tokio::sync::Mutex;
 use tokio::task::block_in_place;
 use tokio::time::sleep;
 use tracing::{debug, debug_span, Instrument, warn};
 use walkdir::WalkDir;
-use crate::pica;
 
-use crate::pica::{db, MediaId, MediaInfo, MediaItem, MediaType};
+use crate::pica;
+use crate::pica::{Album, AlbumId, db, MediaId, MediaInfo, MediaItem, MediaType};
 use crate::pica::accessor::MediaAccessor;
+use crate::pica::db::CreateAblum;
 use crate::pica::exif::ExifInfo;
 use crate::pica::queue::ScanQueue;
 
@@ -101,7 +105,7 @@ fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
 
         // extract metadata and convert into scan items
         .map_ok(move |entry| -> Result<ScanItem> {
-            let relpath = entry.path().strip_prefix(&root)
+            let relpath = entry.path().strip_prefix(root)
                 .with_context(|| entry.path().display().to_string())?
                 .to_owned();
 
@@ -201,6 +205,7 @@ impl Indexer {
 
         let mut tx = self.db.begin().await?;
         db::store_media_item(&mut tx, &item).await?;
+        upsert_album_for_media_item(&mut tx, &item).await?;
         tx.commit().await?;
 
         if let Some(accessor) = &self.accessor {
@@ -336,4 +341,48 @@ fn guess_timestamp(item: &ScanItem) -> Result<DateTime<Utc>> {
     }
 
     timestamp_file_modified(&item.meta)
+}
+
+async fn upsert_album_for_media_item(tx: &mut Transaction<'_, Sqlite>, item: &MediaItem) -> Result<Album> {
+    let Some(relpath) = item.relpath.parent() else {
+        bail!("no parent directory for {:?}", item.relpath)
+    };
+
+    let mut tail = None;
+    let mut missing_parent_paths = vec![];
+
+    for anchestor in relpath.ancestors() {
+        if let Some(album) = db::load_album_by_relpath(tx, anchestor).await? {
+            // we found a parent that has an album, use this one as the base
+            tail = Some(album);
+            break;
+        }
+
+        missing_parent_paths.push(anchestor);
+    }
+
+    for path in missing_parent_paths.iter().rev() {
+        let album = upsert_album_for_relpath_with_parent(tx, path, item.info.timestamp, tail.map(|a| a.id)).await?;
+
+        // create the next pending album using this album as a parent
+        tail = Some(album);
+    }
+
+    tail.ok_or_else(|| anyhow!("failed to create album for path {:?}", item.relpath))
+}
+
+async fn upsert_album_for_relpath_with_parent(tx: &mut Transaction<'_, Sqlite>, relpath: &Path, timestamp: DateTime<Utc>, parent: Option<AlbumId>) -> Result<Album> {
+    let name = relpath
+        .file_name()
+        .map(|name| name.to_string_lossy())
+        .unwrap_or(Cow::Borrowed("Filesystem"));
+
+    let create = CreateAblum {
+        name: name.as_ref(),
+        timestamp,
+        parent,
+        relpath: Some(relpath),
+    };
+
+    db::create_album(tx, create).await
 }

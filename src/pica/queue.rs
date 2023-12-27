@@ -50,6 +50,6 @@ impl ScanQueue {
     }
 
     pub fn done_len(&self) -> usize {
-        return self.state.len();
+        self.state.len()
     }
 }

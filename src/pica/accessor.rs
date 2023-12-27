@@ -24,7 +24,7 @@ pub struct Sizes {
 
 impl MediaAccessor {
     pub fn new(cache: SqlitePool, scaler: MediaScaler, sizes: Sizes, root: impl Into<PathBuf>) -> Self {
-        Self { cache: cache.into(), scaler, sizes, root: root.into() }
+        Self { cache, scaler, sizes, root: root.into() }
     }
 
     pub fn full(&self, item: &MediaItem) -> PathBuf {

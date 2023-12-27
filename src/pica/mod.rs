@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use anyhow::ensure;
 use chrono::{DateTime, Utc};
-use derive_more::{AsRef, From};
+use derive_more::{AsRef, From, Into};
 use serde_with::SerializeDisplay;
 
 mod album;
@@ -90,15 +90,16 @@ pub struct MediaItem {
     pub hdr: bool,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, From, Into, sqlx::Type)]
+#[sqlx(transparent)]
+pub struct AlbumId(u32);
+
 /// An [Album] can group multiple [MediaItem] under a common timestamp and name.
 #[derive(Clone, Debug)]
 pub struct Album {
+    pub id: AlbumId,
     pub name: String,
-    pub items: Vec<MediaItem>,
     pub timestamp: DateTime<Utc>,
-}
-
-/// Builds a list of album from the given media files.
-pub fn albums(images: Vec<MediaItem>) -> Vec<Album> {
-    album::by_directory(images)
+    pub relpath: Option<PathBuf>,
+    pub parent: Option<AlbumId>,
 }

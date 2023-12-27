@@ -3,7 +3,7 @@ use axum::Router;
 use axum::routing::get;
 use tokio::net::ToSocketAddrs;
 use tower_http::compression::CompressionLayer;
-use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
 

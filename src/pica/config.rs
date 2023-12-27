@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::num::{NonZeroU16, NonZeroU32, NonZeroU8};
+use std::num::{NonZeroU32, NonZeroU8};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
