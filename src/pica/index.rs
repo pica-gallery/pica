@@ -1,7 +1,6 @@
-use std::borrow::Cow;
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs::Metadata;
-use std::hash::Hash;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -12,19 +11,17 @@ use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use itertools::Itertools;
 use regex::Regex;
-use sqlx::{Sqlite, Transaction};
 use tokio::sync::Mutex;
 use tokio::task::block_in_place;
 use tokio::time::sleep;
-use tracing::{debug, debug_span, info, Instrument, warn};
+use tracing::{debug, debug_span, Instrument, warn};
 use walkdir::WalkDir;
 
 use crate::pica;
-use crate::pica::{Album, AlbumId, db, MediaId, MediaInfo, MediaItem, MediaType};
+use crate::pica::{db, MediaId, MediaInfo, MediaItem, MediaType};
 use crate::pica::accessor::MediaAccessor;
-use crate::pica::db::CreateAblum;
 use crate::pica::exif::ExifInfo;
-use crate::pica::queue::ScanQueue;
+use crate::pica::queue::{QueueItem, ScanQueue};
 use crate::pica::store::MediaStore;
 
 thread_local! {
@@ -35,24 +32,31 @@ pub struct ScanItem {
     pub id: MediaId,
     pub path: PathBuf,
     pub relpath: PathBuf,
-    pub meta: Metadata,
+
+    // filesize in bytes
+    pub filesize: u64,
+
+    // modified timestamp from metadata
     pub timestamp: DateTime<Utc>,
 }
 
 pub struct Scanner {
     root: PathBuf,
     queue: Arc<Mutex<ScanQueue>>,
+    known: HashSet<MediaId>,
 }
 
 impl Scanner {
     pub fn new(root: impl Into<PathBuf>, queue: Arc<Mutex<ScanQueue>>) -> Self {
-        Self { root: root.into(), queue }
+        Self { root: root.into(), queue, known: HashSet::new() }
     }
 
     /// Runs scanning once and writes the files found to the scan queue
     pub async fn scan(&mut self) {
         let start_time = Instant::now();
         debug!("Starting scan in {:?}",  self.root);
+
+        let mut seen = HashSet::new();
 
         let mut iter = scan_iter(&self.root);
         while let Some(item) = block_in_place(|| iter.next()) {
@@ -64,8 +68,19 @@ impl Scanner {
                 }
             };
 
-            self.queue.lock().await.add(item);
+            seen.insert(item.id);
+
+            if !self.known.contains(&item.id) {
+                self.queue.lock().await.add(item);
+            }
         }
+
+        // remove the ones that we did not see this time
+        let deleted = self.known.difference(&seen);
+        let mut queue = self.queue.lock().await;
+        deleted.for_each(|id| queue.remove(*id));
+
+        self.known = seen;
 
         debug!("Scan finished in {:?}", Instant::now().duration_since(start_time));
     }
@@ -99,7 +114,7 @@ fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
                 .to_owned();
 
             let meta = entry.metadata().with_context(ctx)?;
-            let timestamp = guess_timestamp(entry.path(), &meta).with_context(ctx)?;
+            let timestamp = timestamp_from_metadata(&meta).with_context(ctx)?;
 
             // hash the relative path and file size into an id
             let hash = {
@@ -117,9 +132,9 @@ fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
             Ok(
                 ScanItem {
                     id,
-                    meta,
                     timestamp,
                     relpath,
+                    filesize: meta.size(),
                     path: entry.into_path(),
                 }
             )
@@ -159,35 +174,42 @@ impl Indexer {
         loop {
             // must not be inlined into the match statement. This would keep the lock guard alive
             // for the expression, including the sleep.
-            let polled_item = self.queue.lock().await.poll();
+            let queued = self.queue.lock().await.poll();
 
-            let item = match polled_item {
-                Some(item) => item,
+            match queued {
+                Some(QueueItem::Add(item)) => {
+                    let task = self
+                        .index_one(&item)
+                        .instrument(debug_span!("Indexing", relpath=?item.relpath));
+
+                    if let Err(err) = task.await {
+                        warn!("Indexing failed for {:?}: {:?}", item.relpath, err);
+                    }
+                }
+
+                Some(QueueItem::Remove(item)) => {
+                    self.store.remove(item).await;
+                }
+
                 None => {
                     // no more data in queue, wait a moment before trying again
                     sleep(Duration::from_millis(100)).await;
                     continue;
                 }
             };
-
-            let task = self
-                .index_one(&item)
-                .instrument(debug_span!("Indexing", relpath=?item.relpath));
-
-            if let Err(err) = task.await {
-                warn!("Indexing failed for {:?}: {:?}", item.relpath, err);
-            }
         }
     }
 
     async fn index_one(&self, item: &ScanItem) -> Result<()> {
-        // skip if the item is already index
-        let option = self.store.get(item.id).await;
-        if option.is_some() {
-            return Ok(());
+        let existing_error = {
+            let mut tx = self.db.begin().await?;
+            db::media_get_error(&mut tx, item.id).await?
+        };
+
+        if let Some(err) = existing_error {
+            bail!("Indexing failed previously: {:?}", err)
         }
 
-        // TODO check the error cache first
         let result = self.parse_item(item).await;
 
         match result {
@@ -237,8 +259,6 @@ impl Indexer {
 
 /// Parses a [ScanItem] into a new [MediaItem]
 async fn parse(item: &ScanItem) -> Result<MediaItem> {
-    let filesize = item.meta.size();
-
     let path = item.path.to_owned();
 
     // take the file name and clear any invalid characters from it
@@ -267,13 +287,9 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
         _ => (width, height)
     };
 
-    let timestamp = match timestamp_from_filename(&name) {
-        Some(ts) => ts,
-        None => match exif.and_then(|e| e.timestamp) {
-            Some(ts) => ts,
-            None => timestamp_file_modified(&item.meta)?,
-        }
-    };
+    let timestamp = timestamp_from_path(&item.relpath)
+        .or_else(|| exif?.timestamp)
+        .unwrap_or(item.timestamp);
 
     let info = MediaInfo {
         timestamp,
@@ -292,37 +308,31 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
         other => bail!("unknown extension: {:?}", other),
     };
 
-    Ok(MediaItem { id: item.id, relpath: item.relpath.clone(), name, filesize, typ: media_type, info, hdr: false })
+    Ok(MediaItem {
+        name,
+        info,
+        id: item.id,
+        relpath: item.relpath.clone(),
+        filesize: item.filesize,
+        typ: media_type,
+        hdr: false,
+    })
 }
 
-/*
-async fn timestamp_from_exif(path: &Path) -> Result<Option<DateTime<Utc>>> {
-    let content = tokio::fs::read(path).await?;
-    let (exif, _) = block_in_place(|| rexif::parse_buffer_quiet(&content));
-
-    if let Some(e) = exif?.entries.iter().find(|e| e.tag == ExifTag::DateTimeOriginal) {
-        if let TagValue::Ascii(datestr) = &e.value {
-            let date = NaiveDateTime::parse_from_str(datestr, "%Y:%m:%d %H:%M:%S")?.and_utc();
-            return Ok(Some(date));
-        }
-    }
-
-    Ok(None)
-}
-*/
-
-fn timestamp_file_modified(metadata: &Metadata) -> Result<DateTime<Utc>> {
+fn timestamp_from_metadata(metadata: &Metadata) -> Result<DateTime<Utc>> {
     let modified = metadata.modified().or_else(|_| metadata.created())?;
     let epoch_seconds = modified.duration_since(SystemTime::UNIX_EPOCH)?.as_secs();
 
-    Ok(
-        NaiveDateTime::from_timestamp_opt(epoch_seconds as i64, 0)
-            .ok_or_else(|| anyhow!("invalid unix timestamp {:?}", epoch_seconds))?
-            .and_utc()
-    )
+    let timestamp = NaiveDateTime::from_timestamp_opt(epoch_seconds as i64, 0)
+        .ok_or_else(|| anyhow!("invalid unix timestamp {:?}", epoch_seconds))?
+        .and_utc();
+
+    Ok(timestamp)
 }
 
-fn timestamp_from_filename(name: &str) -> Option<DateTime<Utc>> {
+fn timestamp_from_path(path: &Path) -> Option<DateTime<Utc>> {
+    let name = path.file_name()?.to_str()?;
+
     RE_TIMESTAMP.with(|re| {
         if let Some(m) = re.captures(name) {
             let date = m.get(1)?.as_str();
@@ -335,59 +345,4 @@ fn timestamp_from_filename(name: &str) -> Option<DateTime<Utc>> {
 
         None
     })
-}
-
-// Best effort guess for the file name of a scan item
-fn guess_timestamp(path: &Path, meta: &Metadata) -> Result<DateTime<Utc>> {
-    if let Some(name) = path.file_name().unwrap_or_default().to_str() {
-        if let Some(timestamp) = timestamp_from_filename(name) {
-            return Ok(timestamp);
-        }
-    }
-
-    timestamp_file_modified(meta)
-}
-
-async fn upsert_album_for_media_item(tx: &mut Transaction<'_, Sqlite>, item: &MediaItem) -> Result<Album> {
-    let Some(relpath) = item.relpath.parent() else {
-        bail!("no parent directory for {:?}", item.relpath)
-    };
-
-    let mut tail = None;
-    let mut missing_parent_paths = vec![];
-
-    for anchestor in relpath.ancestors() {
-        if let Some(album) = db::load_album_by_relpath(tx, anchestor).await? {
-            // we found a parent that has an album, use this one as the base
-            tail = Some(album);
-            break;
-        }
-
-        missing_parent_paths.push(anchestor);
-    }
-
-    for path in missing_parent_paths.iter().rev() {
-        let album = upsert_album_for_relpath_with_parent(tx, path, item.info.timestamp, tail.map(|a| a.id)).await?;
-
-        // create the next pending album using this album as a parent
-        tail = Some(album);
-    }
-
-    tail.ok_or_else(|| anyhow!("failed to create album for path {:?}", item.relpath))
-}
-
-async fn upsert_album_for_relpath_with_parent(tx: &mut Transaction<'_, Sqlite>, relpath: &Path, timestamp: DateTime<Utc>, parent: Option<AlbumId>) -> Result<Album> {
-    let name = relpath
-        .file_name()
-        .map(|name| name.to_string_lossy())
-        .unwrap_or(Cow::Borrowed("Filesystem"));
-
-    let create = CreateAblum {
-        name: name.as_ref(),
-        timestamp,
-        parent,
-        relpath: Some(relpath),
-    };
-
-    db::create_album(tx, create).await
 }

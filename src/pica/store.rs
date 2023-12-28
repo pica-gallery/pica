@@ -20,6 +20,7 @@ pub struct MediaStore {
     state: Arc<RwLock<MediaItemsState>>,
 }
 
+
 impl MediaStore {
     pub fn new(db: SqlitePool) -> Self {
         let items = MediaItemsState { items: HashMap::new() };
@@ -32,7 +33,12 @@ impl MediaStore {
         state.items.insert(item.id, item);
         state.items.len()
     }
-
+    
+    pub async fn remove(&self, id: MediaId) {
+        let mut state = self.state.write().await;
+        state.items.remove(&id);
+    }
+    
     pub async fn get(&self, id: MediaId) -> Option<MediaItem> {
         let state = self.state.read().await;
         state.items.get(&id).cloned()

@@ -1,0 +1,75 @@
+use sqlx::Sqlite;
+use sqlx::database::{HasArguments, HasValueRef};
+use sqlx::encode::IsNull;
+use sqlx::error::BoxDynError;
+
+use crate::pica::{MediaId, MediaType};
+use crate::pica::scale::ImageType;
+
+impl sqlx::Type<Sqlite> for MediaType {
+    fn type_info() -> <Sqlite as sqlx::Database>::TypeInfo {
+        str::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, Sqlite> for MediaType {
+    fn encode_by_ref(&self, buf: &mut <Sqlite as HasArguments<'q>>::ArgumentBuffer) -> IsNull {
+        self.as_str().encode_by_ref(buf)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, Sqlite> for MediaType {
+    fn decode(value: <Sqlite as HasValueRef<'r>>::ValueRef) -> Result<Self, BoxDynError> {
+        match String::decode(value)?.as_str() {
+            "image" => Ok(MediaType::Image),
+            "video" => Ok(MediaType::Video),
+            value => Err(format!("not valid: {:?}", value).into())
+        }
+    }
+}
+
+impl sqlx::Type<Sqlite> for MediaId {
+    fn type_info() -> <Sqlite as sqlx::Database>::TypeInfo {
+        i64::type_info()
+    }
+
+    fn compatible(ty: &<Sqlite as sqlx::Database>::TypeInfo) -> bool {
+        i64::compatible(ty)
+    }
+}
+
+impl<'q> sqlx::Encode<'q, Sqlite> for MediaId {
+    fn encode_by_ref(&self, buf: &mut <Sqlite as HasArguments<'q>>::ArgumentBuffer) -> IsNull {
+        let value = i64::from_be_bytes(self.0);
+        value.encode(buf)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, Sqlite> for MediaId {
+    fn decode(value: <Sqlite as HasValueRef<'r>>::ValueRef) -> Result<Self, BoxDynError> {
+        let value = i64::decode(value)?;
+        Ok(MediaId::from(value.to_be_bytes()))
+    }
+}
+
+impl sqlx::Type<Sqlite> for ImageType {
+    fn type_info() -> <Sqlite as sqlx::Database>::TypeInfo {
+        str::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, Sqlite> for ImageType {
+    fn encode_by_ref(&self, buf: &mut <Sqlite as HasArguments<'q>>::ArgumentBuffer) -> IsNull {
+        self.mime_type().encode_by_ref(buf)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, Sqlite> for ImageType {
+    fn decode(value: <Sqlite as HasValueRef<'r>>::ValueRef) -> Result<Self, BoxDynError> {
+        match String::decode(value)?.as_str() {
+            "image/avif" => Ok(Self::Avif),
+            "image/jpeg" => Ok(Self::Jpeg),
+            value => Err(format!("not valid: {:?}", value).into())
+        }
+    }
+}

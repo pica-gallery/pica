@@ -53,8 +53,7 @@ CREATE TABLE pica_image
     bytesize INT4 GENERATED ALWAYS AS (LENGTH(content)),
 
     -- image type of the image.
-    type     text NOT NULL
-        CHECK (type IN ('jpeg', 'avif')),
+    type     text NOT NULL,
 
     -- the error that occurred when generating the thumbnail
     error    text,

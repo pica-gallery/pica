@@ -13,10 +13,24 @@ use tokio::task::block_in_place;
 
 use crate::pica::exif::{Orientation, parse_exif};
 
+pub struct Image {
+    pub typ: ImageType,
+    pub blob: Vec<u8>,
+}
+
 #[derive(Clone)]
 pub enum ImageType {
     Jpeg,
     Avif,
+}
+
+impl ImageType {
+    pub fn mime_type(&self) -> &'static str {
+        match self {
+            ImageType::Jpeg => "image/jpeg",
+            ImageType::Avif => "image/avif",
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -55,7 +69,7 @@ impl MediaScaler {
         // run resize in a different task to not block the executor
         let bytes = self.resize(path.as_ref(), size).await?;
 
-        let thumb = Image { typ: self.options.image_type.clone(), bytes };
+        let thumb = Image { typ: self.options.image_type.clone(), blob: bytes };
         Ok(thumb)
     }
 
@@ -68,11 +82,6 @@ impl MediaScaler {
             }
         })
     }
-}
-
-pub struct Image {
-    pub typ: ImageType,
-    pub bytes: Vec<u8>,
 }
 
 /// Resizes the image using image magick.

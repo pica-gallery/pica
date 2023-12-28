@@ -46,19 +46,18 @@ pub async fn handle_preview_hdr(
 }
 
 async fn handle_image_scaled(id: MediaId, state: AppState, image_type: ImageType) -> Result<Response, WebError> {
-    let image = state.store.get(id)
-        .await
+    let media = state.store.get(id).await
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
 
-    let thumbnail = match image_type {
-        ImageType::Thumbnail => state.accessor.thumb(&image).await?,
-        ImageType::Preview => state.accessor.preview(&image).await?,
+    let image = match image_type {
+        ImageType::Thumbnail => state.accessor.thumb(&media).await?,
+        ImageType::Preview => state.accessor.preview(&media).await?,
     };
 
     let resp = Response::builder()
-        .header(http::header::CONTENT_TYPE, "image/avif")
-        .header(http::header::CACHE_CONTROL, "public, max-age=80000, immutable")
-        .body(axum::body::Body::from(thumbnail))?;
+        .header(http::header::CONTENT_TYPE, image.typ.mime_type())
+        .header(http::header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+        .body(axum::body::Body::from(image.blob))?;
 
     Ok(resp)
 }
@@ -70,23 +69,28 @@ pub async fn handle_fullsize(
 ) -> Result<Response, WebError> {
     let id = MediaId::from_str(&id)?;
 
-    let media = state.store.get(id)
-        .await
+    let media = state.store.get(id).await
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
 
     debug!("Serve full image for {:?}", media.relpath);
 
-    let mime = Mime::from_str("image/jpeg").unwrap();
+    // guess mime from the media path
+    let mime = mime_guess::from_path(&media.relpath)
+        .first_or(Mime::from_str("image/jpeg")?);
 
+    // serve file to response
     let path = state.accessor.full(&media);
     let mut resp = ServeFile::new_with_mime(&path, &mime)
         .oneshot(request)
         .await?;
 
-    resp.headers_mut().insert(
-        http::header::CACHE_CONTROL,
-        HeaderValue::from_static("immutable"),
-    );
+    //  on success inject cache header into response
+    if resp.status().is_success() {
+        resp.headers_mut().insert(
+            http::header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=31536000, immutable"),
+        );
+    }
 
     Ok(resp.into_response())
 }

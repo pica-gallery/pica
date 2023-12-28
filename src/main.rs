@@ -1,4 +1,4 @@
-use std::num::{NonZeroU64};
+use std::num::NonZeroU64;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -8,7 +8,7 @@ use tokio::time::sleep;
 use tracing::info;
 
 use crate::pica::{accessor, scale};
-use crate::pica::accessor::MediaAccessor;
+use crate::pica::accessor::{MediaAccessor, Storage};
 use crate::pica::config::ImageCodecConfig;
 use crate::pica::index::{Indexer, Scanner};
 use crate::pica::queue::ScanQueue;
@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
 
     info!("Open database");
     let db = sqlx::sqlite::SqlitePoolOptions::new()
-        .max_connections(1)
+        .max_connections(8)
         .connect(&config.database)
         .await?;
 
@@ -58,9 +58,12 @@ async fn main() -> Result<()> {
         },
     };
 
+    // put images into some extra storage space
+    let storage = Storage::new(db.clone());
+
     let store = MediaStore::new(db.clone());
     let scaler = MediaScaler::new(scaler_options);
-    let media = MediaAccessor::new(db.clone(), scaler, sizes, &source.path);
+    let media = MediaAccessor::new(storage, scaler, sizes, &source.path);
 
     // start four indexer queues
     info!("Starting {} indexers", config.indexer_threads.get());
