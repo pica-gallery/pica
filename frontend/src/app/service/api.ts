@@ -27,6 +27,7 @@ const fAlbum = object({
   timestamp: fTimestamp,
   relpath: nullable(string()),
   items: array(fMediaItem),
+  cover: fMediaItem,
 })
 
 export type StreamTo = TypeOf<typeof fStream>;

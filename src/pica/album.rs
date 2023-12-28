@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -7,7 +8,7 @@ use itertools::Itertools;
 use crate::pica::{Album, AlbumId, MediaItem};
 
 pub fn by_directory(items: &[MediaItem]) -> Vec<Album<'_>> {
-    // let re_album = regex::bytes::Regex::new(r#"20\d\d-[01]\d-[0123]\d "#).unwrap();
+    let re_album = regex::bytes::Regex::new(r#"Sony|staging|20\d\d-[01]\d-[0123]\d "#).unwrap();
 
     let mut albums = HashMap::<&Path, Album>::new();
 
@@ -21,21 +22,31 @@ pub fn by_directory(items: &[MediaItem]) -> Vec<Album<'_>> {
             continue;
         };
 
-        let name = parent.file_name()
+        let relpath = parent.ancestors().find(|path| {
+            let name = path.file_name().map(|path| path.as_bytes());
+            name.map(|name| re_album.is_match_at(name, 0)).unwrap_or_default()
+        });
+
+        let Some(relpath) = relpath else {
+            continue;
+        };
+
+        let name = relpath.file_name()
             .and_then(|f| f.to_str())
             .unwrap_or("Unknown");
 
-        let album = albums.entry(&parent).or_insert_with_key(|_relpath| {
+        let album = albums.entry(&relpath).or_insert_with_key(|_relpath| {
             Album {
-                id: album_id_for_relpath(&parent),
+                id: album_id_for_relpath(&relpath),
                 name: name.to_owned(),
                 timestamp: item.info.timestamp,
-                relpath: Some(parent.into()),
+                relpath: Some(relpath.into()),
                 items: Vec::new(),
+                cover: &item,
             }
         });
 
-        album.timestamp = album.timestamp.min(item.info.timestamp);
+        album.timestamp = album.timestamp.max(item.info.timestamp);
         album.items.push(item);
     }
 
@@ -44,9 +55,10 @@ pub fn by_directory(items: &[MediaItem]) -> Vec<Album<'_>> {
         .sorted_unstable_by_key(|a| a.timestamp)
         .collect_vec();
 
-    // sort items within all albums by time
+    // sort items within all albums by time, descending
     for album in &mut albums {
-        album.items.sort_by_key(|item| item.info.timestamp)
+        album.items.sort_by_key(|item| Reverse(item.info.timestamp));
+        album.cover = album.items[0];
     }
 
     albums

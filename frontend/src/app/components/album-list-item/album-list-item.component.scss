@@ -1,0 +1,29 @@
+:host {
+  display: block;
+}
+
+.thumb {
+  display: block;
+  aspect-ratio: 1;
+  width: 100%;
+
+  object-fit: cover;
+  background: #eeeeee;
+
+  border-radius: 8px;
+}
+
+.info {
+  padding-top: 8px;
+
+  .title {
+    font-weight: bold;
+    line-height: 24px;
+  }
+
+  .subtitle {
+    opacity: 0.75;
+    font-size: 14px;
+    line-height: 24px;
+  }
+}

@@ -1,5 +1,13 @@
 import {Injectable} from '@angular/core';
-import {type AlbumTo, ApiService, type MediaItemTo, type MediaUrls, mediaUrlsOf, type StreamTo} from './api';
+import {
+  type AlbumId,
+  type AlbumTo,
+  ApiService,
+  type MediaItemTo,
+  type MediaUrls,
+  mediaUrlsOf,
+  type StreamTo
+} from './api';
 import {map, Observable, shareReplay} from 'rxjs';
 
 export type MediaItem = MediaItemTo & {
@@ -18,10 +26,12 @@ export type Section = {
 }
 
 export type Album = {
+  id: AlbumId,
   name: string,
   timestamp: Date,
   relpath: string | null,
   items: MediaItem[],
+  cover: MediaItem,
 }
 
 @Injectable({providedIn: 'root'})
@@ -73,10 +83,12 @@ function convertAlbums(albums: AlbumTo[]): Album[] {
 
 function convertAlbum(album: AlbumTo): Album {
   return {
+    id: album.id,
     name: album.name,
     relpath: album.relpath,
     timestamp: album.timestamp,
     items: album.items.map(item => convertItem(item)),
+    cover: convertItem(album.cover),
   }
 }
 

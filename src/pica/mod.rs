@@ -145,4 +145,7 @@ pub struct Album<'a> {
 
     // a copy of the media items in this album
     pub items: Vec<&'a MediaItem>,
+    
+    // the albums preview image
+    pub cover: &'a MediaItem,
 }

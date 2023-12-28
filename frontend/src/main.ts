@@ -1,7 +1,7 @@
 import {bootstrapApplication} from '@angular/platform-browser';
 import {AppComponent} from './app/app.component';
 import {provideHttpClient} from '@angular/common/http';
-import {provideRouter, type Route, withComponentInputBinding} from '@angular/router';
+import {provideRouter, type Route, withComponentInputBinding, withInMemoryScrolling} from '@angular/router';
 
 const routes: Route[] = [
   {
@@ -38,7 +38,7 @@ void bootstrapApplication(AppComponent, {
     provideHttpClient(),
     provideRouter(routes,
       withComponentInputBinding(),
-      // withInMemoryScrolling({scrollPositionRestoration: 'enabled'}),
+      withInMemoryScrolling({scrollPositionRestoration: 'enabled'}),
     ),
   ]
 })

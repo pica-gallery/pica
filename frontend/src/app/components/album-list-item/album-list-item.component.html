@@ -1,0 +1,11 @@
+<img [src]="album.cover.urls.thumb" loading="lazy" decoding="async" class="thumb">
+
+<div class="info">
+  <div class="title">
+    {{ album.name }}
+  </div>
+
+  <div class="subtitle">
+    {{ album.timestamp|date:'shortDate' }}
+  </div>
+</div>

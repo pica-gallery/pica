@@ -40,6 +40,7 @@ struct AlbumView<'a> {
     items: Vec<MediaItemView<'a>>,
     timestamp: DateTime<Utc>,
     relpath: Option<&'a std::path::Path>,
+    cover: MediaItemView<'a>,
 }
 
 impl<'a, 'b: 'a> From<&'b Album<'a>> for AlbumView<'a> {
@@ -56,6 +57,7 @@ impl<'a> AlbumView<'a> {
             items: album.items.iter().take(n).copied().map(MediaItemView::from).collect(),
             timestamp: album.timestamp,
             relpath: album.relpath.as_deref(),
+            cover: album.cover.into(),
         }
     }
 }
@@ -85,7 +87,7 @@ pub async fn handle_albums_get(state: State<AppState>) -> Result<Response, WebEr
 
     let albums = albums
         .iter()
-        .map(|al| AlbumView::from_album(al, 4))
+        .map(|al| AlbumView::from_album(al, 0))
         .collect_vec();
 
     Ok(Json(albums).into_response())

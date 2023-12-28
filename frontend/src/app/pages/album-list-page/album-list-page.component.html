@@ -1,1 +1,7 @@
-<p>album-list-page works!</p>
+@if (albums(); as albums) {
+
+  <app-album-list [albums]="albums"/>
+
+} @else {
+  Loading&hellip;
+}

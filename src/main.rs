@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
     // put images into some extra storage space
     let storage = Storage::new(db.clone());
 
-    let store = MediaStore::new(db.clone());
+    let store = MediaStore::empty();
     let scaler = MediaScaler::new(scaler_options);
     let media = MediaAccessor::new(storage, scaler, sizes, &source.path);
 

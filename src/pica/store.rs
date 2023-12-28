@@ -14,17 +14,15 @@ struct MediaItemsState {
 
 #[derive(Clone)]
 pub struct MediaStore {
-    db: SqlitePool,
-
     // the current set of all media items.
     state: Arc<RwLock<MediaItemsState>>,
 }
 
 
 impl MediaStore {
-    pub fn new(db: SqlitePool) -> Self {
+    pub fn empty() -> Self {
         let items = MediaItemsState { items: HashMap::new() };
-        Self { db, state: Arc::new(RwLock::new(items)) }
+        Self { state: Arc::new(RwLock::new(items)) }
     }
 
     /// Adds a new item to the media store.

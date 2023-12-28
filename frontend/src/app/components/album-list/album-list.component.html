@@ -1,0 +1,8 @@
+<cdk-virtual-scroll-viewport autosize scrollWindow class="viewport">
+  <div class="row" *cdkVirtualFor="let row of rows()">
+    @for(item of row; track item) {
+      <app-album-list-item [album]="item"/>
+    }
+  </div>
+</cdk-virtual-scroll-viewport>
+
