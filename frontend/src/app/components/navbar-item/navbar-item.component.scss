@@ -1,0 +1,35 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+
+  box-sizing: border-box;
+  height: 80px;
+
+  padding-top: 12px;
+  padding-bottom: 16px;
+
+  min-width: 48px;
+}
+
+.indicator {
+  display: grid;
+  place-items: center;
+
+  width: 64px;
+  height: 32px;
+  border-radius: 16px;
+}
+
+:host.active {
+  .indicator {
+    background: antiquewhite;
+  }
+}
+
+.label {
+  font-size: 14px;
+  line-height: 16px;
+}
+

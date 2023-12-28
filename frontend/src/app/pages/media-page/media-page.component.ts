@@ -3,9 +3,9 @@ import {Gallery, type MediaItem} from '../../service/gallery';
 import {map} from 'rxjs';
 import {AsyncPipe} from '@angular/common';
 import {ImageSwiperComponent} from '../../components/image-swiper/image-swiper.component';
-import {Router} from '@angular/router';
 import type {MediaId} from '../../service/api';
 import {IconComponent} from '../../components/icon/icon.component';
+import {NavigationService} from '../../service/navigation';
 
 @Component({
   selector: 'app-media-page',
@@ -16,8 +16,6 @@ import {IconComponent} from '../../components/icon/icon.component';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MediaPageComponent {
-  private readonly router = inject(Router);
-
   protected readonly currentItem = signal<MediaItem | null>(null);
 
   protected readonly items$ = inject(Gallery).stream().pipe(
@@ -27,15 +25,18 @@ export class MediaPageComponent {
   @Input()
   public mediaId!: MediaId;
 
+  constructor(private readonly navigationService: NavigationService) {
+  }
+
   protected close() {
-    // use history back to get rid of the current history entry.
-    window.history.back();
+    // drop the open media from url
+    void this.navigationService.clearMediaViewer();
   }
 
   protected itemChanged(item: MediaItem) {
     this.currentItem.set(item);
 
     // replace url, but let back still go to the previous page
-    void this.router.navigate(['/stream/', item.id], {replaceUrl: true});
+    void this.navigationService.mediaViewer(item.id, true);
   }
 }

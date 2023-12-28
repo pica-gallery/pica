@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import {ApiService, type MediaItemTo, type MediaUrls, mediaUrlsOf, type StreamTo} from './api';
+import {type AlbumTo, ApiService, type MediaItemTo, type MediaUrls, mediaUrlsOf, type StreamTo} from './api';
 import {map, Observable, shareReplay} from 'rxjs';
 
 export type MediaItem = MediaItemTo & {
@@ -17,6 +17,13 @@ export type Section = {
   items: MediaItem[],
 }
 
+export type Album = {
+  name: string,
+  timestamp: Date,
+  relpath: string | null,
+  items: MediaItem[],
+}
+
 @Injectable({providedIn: 'root'})
 export class Gallery {
   // private readonly cache = new Map<string, Observable<Section>>();
@@ -26,11 +33,20 @@ export class Gallery {
     shareReplay({bufferSize: 1, refCount: false}),
   )
 
+  private readonly albums$ = this.apiService.albums().pipe(
+    map(albums => convertAlbums(albums)),
+    shareReplay({bufferSize: 1, refCount: false}),
+  )
+
   constructor(private readonly apiService: ApiService) {
   }
 
   public stream(): Observable<Stream> {
     return this.stream$;
+  }
+
+  public albums(): Observable<Album[]> {
+    return this.albums$;
   }
 
   //public album(albumId: string): Observable<Album> {
@@ -49,6 +65,19 @@ export class Gallery {
 //
   //  return stream$;
   //}
+}
+
+function convertAlbums(albums: AlbumTo[]): Album[] {
+  return albums.map(al => convertAlbum(al));
+}
+
+function convertAlbum(album: AlbumTo): Album {
+  return {
+    name: album.name,
+    relpath: album.relpath,
+    timestamp: album.timestamp,
+    items: album.items.map(item => convertItem(item)),
+  }
 }
 
 function convertStream(stream: StreamTo, grouping: GroupingStrategy): Stream {
@@ -91,14 +120,14 @@ export const Daily: GroupingStrategy = {
   },
 
   nameOf(timestamp: Date) {
-    let result = "";
+    let result = '';
 
     result = MONTHS[timestamp.getMonth()];
     if (timestamp.getFullYear() !== YEAR) {
       result = result + ', ' + timestamp.getFullYear();
     }
 
-    result = timestamp.getDate() + ". " + result
+    result = timestamp.getDate() + '. ' + result
 
     return result
   }

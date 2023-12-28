@@ -1,9 +1,26 @@
 import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
-import {mdiAlertCircle, mdiArrowLeft, mdiDownload} from '@mdi/js'
+import {
+  mdiArrowLeft,
+  mdiDownload,
+  mdiFolderImage,
+  mdiFolderOutline,
+  mdiImage,
+  mdiImageOutline,
+  mdiImageSearch,
+  mdiImageSearchOutline,
+  mdiInformationOutline, mdiMagnify
+} from '@mdi/js'
 
 export type IconName =
+  | 'unknown'
   | 'arrow-left'
   | 'download'
+  | 'image'
+  | 'image-outline'
+  | 'albums'
+  | 'albums-outline'
+  | 'search'
+  | 'search-outline'
 
 @Component({
   selector: 'app-icon',
@@ -14,8 +31,8 @@ export type IconName =
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class IconComponent {
-  @Input()
-  public name!: IconName;
+  @Input({required: true})
+  public name: IconName = 'unknown';
 
   protected get path(): string {
     switch (this.name) {
@@ -25,8 +42,26 @@ export class IconComponent {
       case 'download':
         return mdiDownload;
 
-      default:
-        return mdiAlertCircle;
+      case 'image':
+        return mdiImage;
+
+      case 'image-outline':
+        return mdiImageOutline;
+
+      case 'albums':
+        return mdiFolderImage;
+
+      case 'albums-outline':
+        return mdiFolderOutline;
+
+      case 'search':
+        return mdiMagnify;
+
+      case 'search-outline':
+        return mdiMagnify;
+
+      case 'unknown':
+        return mdiInformationOutline;
     }
   }
 }
