@@ -1,12 +1,13 @@
 use std::fmt::{Debug, Display, Formatter};
+use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::ensure;
 use chrono::{DateTime, Utc};
-use derive_more::{AsRef, From, Into};
 use serde::{Deserialize, Serialize};
-use serde_with::SerializeDisplay;
+use serde_with::{DeserializeFromStr, SerializeDisplay};
 
 mod album;
 pub mod index;
@@ -19,23 +20,54 @@ pub mod db;
 pub mod queue;
 mod exif;
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, From, AsRef)]
-#[derive(SerializeDisplay)]
-pub struct MediaId([u8; 8]);
+ pub use album::by_directory;
 
+#[derive(SerializeDisplay, DeserializeFromStr)]
+pub struct Id<T> {
+    _marker: PhantomData<fn(&T)>,
+    value: [u8; 8],
+}
 
 /// A unique identifier of a media item.
 /// A ImageId should be stable independently of the location of the media item in question.
-impl MediaId {
+impl<T> Id<T> {
     pub fn as_bytes(&self) -> &[u8] {
-        &self.0[..]
+        &self.value[..]
     }
 }
 
-impl FromStr for MediaId {
+impl<T> Clone for Id<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Copy for Id<T> {}
+
+impl<T> Hash for Id<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.value.hash(state)
+    }
+}
+
+impl<T> PartialEq for Id<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl<T> Eq for Id<T> {}
+
+impl<T> From<[u8; 8]> for Id<T> {
+    fn from(value: [u8; 8]) -> Self {
+        Self { value, _marker: PhantomData }
+    }
+}
+
+impl<T> FromStr for Id<T> {
     type Err = anyhow::Error;
 
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         ensure!(s.len() == 16, "expected hex string of length 16, got {}", s.len());
 
         let mut bytes = [0; 8];
@@ -45,17 +77,19 @@ impl FromStr for MediaId {
     }
 }
 
-impl Debug for MediaId {
+impl<T> Debug for Id<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ImageId({})", self)
+        write!(f, "Id({})", self)
     }
 }
 
-impl Display for MediaId {
+impl<T> Display for Id<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&hex::encode(self.0))
+        f.write_str(&hex::encode(self.value))
     }
 }
+
+pub type MediaId = Id<MediaItem>;
 
 #[derive(Clone, Debug)]
 pub enum MediaType {
@@ -91,16 +125,24 @@ pub struct MediaItem {
     pub hdr: bool,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, From, Into, sqlx::Type)]
-#[sqlx(transparent)]
-pub struct AlbumId(u32);
+pub type AlbumId = Id<Album<'static>>;
 
-/// An [Album] can group multiple [MediaItem] under a common timestamp and name.
 #[derive(Clone, Debug)]
-pub struct Album {
+pub struct AlbumInfo {
     pub id: AlbumId,
     pub name: String,
     pub timestamp: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Album<'a> {
+    pub id: AlbumId,
+    pub name: String,
+    pub timestamp: DateTime<Utc>,
+
+    // the album has a relpath if it is based on the file system
     pub relpath: Option<PathBuf>,
-    pub parent: Option<AlbumId>,
+
+    // a copy of the media items in this album
+    pub items: Vec<&'a MediaItem>,
 }

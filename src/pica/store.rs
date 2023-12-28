@@ -33,12 +33,12 @@ impl MediaStore {
         state.items.insert(item.id, item);
         state.items.len()
     }
-    
+
     pub async fn remove(&self, id: MediaId) {
         let mut state = self.state.write().await;
         state.items.remove(&id);
     }
-    
+
     pub async fn get(&self, id: MediaId) -> Option<MediaItem> {
         let state = self.state.read().await;
         state.items.get(&id).cloned()
@@ -47,18 +47,6 @@ impl MediaStore {
     pub async fn items(&self) -> Vec<MediaItem> {
         let state = self.state.read().await;
         state.items.values().cloned().collect_vec()
-    }
-
-    pub async fn album(&self, id: AlbumId) -> Result<(Album, Vec<MediaItem>)> {
-        let mut tx = self.db.begin().await?;
-        let album = db::load_album_by_id(&mut tx, id).await?;
-        let media = db::load_album_media(&mut tx, id).await?;
-        Ok((album, media))
-    }
-
-    pub async fn album_children(&self, parent_id: Option<AlbumId>) -> Result<Vec<Album>> {
-        let mut tx = self.db.begin().await?;
-        db::load_albums_by_parent(&mut tx, parent_id).await
     }
 }
 

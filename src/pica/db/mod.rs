@@ -1,14 +1,13 @@
 use std::ffi::OsStr;
 use std::ops::DerefMut;
 use std::os::unix::ffi::OsStrExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use sqlx::{FromRow, Sqlite, Transaction};
 
-
-use crate::pica::{Album, AlbumId, MediaId, MediaInfo, MediaItem, MediaType};
+use crate::pica::{MediaId, MediaInfo, MediaItem, MediaType};
 
 mod types;
 pub mod image;
@@ -94,7 +93,7 @@ pub async fn media_get_error(tx: &mut Transaction<'_, Sqlite>, id: MediaId) -> R
     Ok(has_error)
 }
 
-
+/*
 #[derive(FromRow)]
 struct AlbumRow {
     pub id: AlbumId,
@@ -104,7 +103,7 @@ struct AlbumRow {
     pub parent: Option<AlbumId>,
 }
 
-impl From<AlbumRow> for Album {
+impl From<AlbumRow> for AlbumInfo {
     fn from(value: AlbumRow) -> Self {
         Self {
             id: value.id,
@@ -180,3 +179,4 @@ pub async fn load_album_media(tx: &mut Transaction<'_, Sqlite>, album: AlbumId) 
 
     Ok(items.into_iter().map(MediaItem::from).collect())
 }
+*/

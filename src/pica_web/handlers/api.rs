@@ -1,13 +1,13 @@
 use std::cmp::Reverse;
 
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::Json;
 use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use serde::Serialize;
 
-use crate::pica::{AlbumId, MediaId, MediaItem};
+use crate::pica::{Album, AlbumId, by_directory, MediaId, MediaItem};
 use crate::pica_web::AppState;
 use crate::pica_web::handlers::WebError;
 
@@ -39,7 +39,25 @@ struct AlbumView<'a> {
     name: &'a str,
     items: Vec<MediaItemView<'a>>,
     timestamp: DateTime<Utc>,
-    parent: Option<AlbumId>,
+    relpath: Option<&'a std::path::Path>,
+}
+
+impl<'a, 'b: 'a> From<&'b Album<'a>> for AlbumView<'a> {
+    fn from(value: &'b Album<'a>) -> Self {
+        Self::from_album(value, usize::MAX)
+    }
+}
+
+impl<'a> AlbumView<'a> {
+    fn from_album<'b: 'a>(album: &'b Album<'a>, n: usize) -> AlbumView<'a> {
+        Self {
+            id: album.id,
+            name: &album.name,
+            items: album.items.iter().take(n).copied().map(MediaItemView::from).collect(),
+            timestamp: album.timestamp,
+            relpath: album.relpath.as_deref(),
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -61,34 +79,14 @@ pub async fn handle_stream_get(state: State<AppState>) -> Result<Response, WebEr
     Ok(Json(stream).into_response())
 }
 
-pub async fn handle_album_children_get(Path(parent_id): Path<AlbumId>, state: State<AppState>) -> Result<Response, WebError> {
-    let albums = state.store.album_children(Some(parent_id)).await?;
+pub async fn handle_albums_get(state: State<AppState>) -> Result<Response, WebError> {
+    let images = state.store.items().await;
+    let albums = by_directory(&images);
 
-    let albums = albums.iter()
-        .map(|album| {
-            AlbumView {
-                id: album.id,
-                name: &album.name,
-                timestamp: album.timestamp,
-                parent: album.parent,
-                items: vec![],
-            }
-        })
+    let albums = albums
+        .iter()
+        .map(|al| AlbumView::from_album(al, 4))
         .collect_vec();
 
     Ok(Json(albums).into_response())
-}
-
-pub async fn handle_album_get(Path(id): Path<AlbumId>, state: State<AppState>) -> Result<Response, WebError> {
-    let (album, items) = state.store.album(id).await?;
-
-    let album = AlbumView {
-        id: album.id,
-        name: &album.name,
-        timestamp: album.timestamp,
-        parent: album.parent,
-        items: items.iter().map(MediaItemView::from).collect(),
-    };
-
-    Ok(Json(album).into_response())
 }

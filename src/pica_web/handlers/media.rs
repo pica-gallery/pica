@@ -12,7 +12,7 @@ use tower::ServiceExt;
 use tower_http::services::ServeFile;
 use tracing::debug;
 
-use crate::pica::MediaId;
+use crate::pica::{MediaId, MediaItem};
 use crate::pica_web::AppState;
 use crate::pica_web::handlers::WebError;
 
@@ -22,26 +22,23 @@ enum ImageType {
 }
 
 pub async fn handle_thumbnail(
-    Path((id, _)): Path<(String, String)>,
+    Path((id, _)): Path<(MediaId, String)>,
     State(state): State<AppState>,
 ) -> Result<Response, WebError> {
-    let id = MediaId::from_str(&id)?;
     handle_image_scaled(id, state, ImageType::Thumbnail).await
 }
 
 pub async fn handle_preview_sdr(
-    Path((id, _)): Path<(String, String)>,
+    Path((id, _)): Path<(MediaId, String)>,
     State(state): State<AppState>,
 ) -> Result<Response, WebError> {
-    let id = MediaId::from_str(&id)?;
     handle_image_scaled(id, state, ImageType::Preview).await
 }
 
 pub async fn handle_preview_hdr(
-    Path((id, _)): Path<(String, String)>,
+    Path((id, _)): Path<(MediaId, String)>,
     State(state): State<AppState>,
 ) -> Result<Response, WebError> {
-    let id = MediaId::from_str(&id)?;
     handle_image_scaled(id, state, ImageType::Preview).await
 }
 
@@ -63,11 +60,10 @@ async fn handle_image_scaled(id: MediaId, state: AppState, image_type: ImageType
 }
 
 pub async fn handle_fullsize(
-    Path((id, _)): Path<(String, String)>,
+    Path((id, _)): Path<(MediaId, String)>,
     state: State<AppState>,
     request: Request<Body>,
 ) -> Result<Response, WebError> {
-    let id = MediaId::from_str(&id)?;
 
     let media = state.store.get(id).await
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
