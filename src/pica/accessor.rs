@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use itertools::Itertools;
 use sqlx::SqlitePool;
-use tokio::task::block_in_place;
+
 use tracing::{debug_span, Instrument};
 
 use crate::pica::{db, MediaId, MediaItem};
