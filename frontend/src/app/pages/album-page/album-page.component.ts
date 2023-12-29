@@ -6,6 +6,7 @@ import {map, type Observable} from 'rxjs';
 import {AsyncPipe} from '@angular/common';
 import {AlbumComponent} from '../../components/album/album.component';
 import {NavigationService} from '../../service/navigation';
+import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
 
 function convertToSections(album: Album): Section[] {
   return [{
@@ -18,7 +19,7 @@ function convertToSections(album: Album): Section[] {
 @Component({
   selector: 'app-album-page',
   standalone: true,
-  imports: [RouterOutlet, AsyncPipe, AlbumComponent],
+  imports: [RouterOutlet, AsyncPipe, AlbumComponent, BusyFullComponent],
   templateUrl: './album-page.component.html',
   styleUrls: ['./album-page.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush

@@ -1,1 +1,5 @@
-<app-album [sections]="items()" (mediaClicked)="mediaClicked($event)"/>
+@if(sections(); as sections) {
+  <app-album [sections]="sections" (mediaClicked)="mediaClicked($event)"/>
+} @else {
+  <app-busy-full/>
+}

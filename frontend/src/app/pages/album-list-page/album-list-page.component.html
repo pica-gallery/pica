@@ -1,7 +1,5 @@
 @if (albums(); as albums) {
-
   <app-album-list [albums]="albums"/>
-
 } @else {
-  Loading&hellip;
+  <app-busy-full/>
 }
