@@ -15,6 +15,7 @@ import {NgStyle} from '@angular/common';
 import {ScrollingModule} from '@angular/cdk-experimental/scrolling';
 import {AlbumListRowComponent} from '../album-list-row/album-list-row.component';
 import {MyAutoSizeVirtualScroll} from '../../directives/auto-size-scrolling.directive';
+import {ListViewComponent} from '../list-view/list-view.component';
 
 @Component({
   selector: 'app-album-list',
@@ -27,6 +28,7 @@ import {MyAutoSizeVirtualScroll} from '../../directives/auto-size-scrolling.dire
     AlbumListRowComponent,
     CdkVirtualForOf,
     MyAutoSizeVirtualScroll,
+    ListViewComponent,
   ],
   templateUrl: './album-list.component.html',
   styleUrl: './album-list.component.scss',
@@ -49,9 +51,11 @@ export class AlbumListComponent {
       return rhs.timestamp.getTime() - lhs.timestamp.getTime();
     })
 
+    let rowId = 0;
+
     return {
       columnCount,
-      rows: chunksOf(albums, columnCount)
+      rows: chunksOf(albums, columnCount).map((albums, idx) => ({id: idx, albums}))
     };
   });
 
@@ -62,3 +66,4 @@ export class AlbumListComponent {
     this.albumsSignal.set(albums);
   }
 }
+

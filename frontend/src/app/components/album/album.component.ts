@@ -22,6 +22,8 @@ import {chunksOf, columnCountSignal} from '../../util';
 import {AlbumRowComponent} from '../album-row/album-row.component';
 import {ScrollingModule} from '@angular/cdk-experimental/scrolling';
 import {MyAutoSizeVirtualScroll} from '../../directives/auto-size-scrolling.directive';
+import {AlbumListComponent} from '../album-list/album-list.component';
+import {ListViewComponent} from '../list-view/list-view.component';
 
 
 type SectionHeader = {
@@ -31,8 +33,8 @@ type SectionHeader = {
 }
 
 type RowState =
-  | { type: 'header', header: SectionHeader }
-  | { type: 'row', items: MediaItem[], columns: number }
+  | { id: string, type: 'header', header: SectionHeader }
+  | { id: string, type: 'row', items: MediaItem[], columns: number }
 
 @Component({
   selector: 'app-album',
@@ -47,6 +49,8 @@ type RowState =
     ScrollingModule,
     CdkVirtualScrollableWindow,
     MyAutoSizeVirtualScroll,
+    AlbumListComponent,
+    ListViewComponent,
   ],
   templateUrl: './album.component.html',
   styleUrls: ['./album.component.scss'],
@@ -72,26 +76,35 @@ export class AlbumComponent {
       return null;
     }
 
-    return sections.flatMap(section => this.convertSection(section, columns));
+    let rowIdx = 0;
+
+    function convertSection(section: Section, columnCount: number): RowState[] {
+      const rows: RowState[] = [];
+
+      rows.push({
+        id: 'row' + ++rowIdx,
+
+        type: 'header', header: {
+          name: section.name,
+          timestamp: section.timestamp,
+          mediaCount: section.items.length,
+        },
+      });
+
+      rows.push(...chunksOf(section.items, columnCount).map(chunk => {
+        return {
+          id: 'row' + ++rowIdx,
+          type: 'row',
+          items: chunk,
+          columns: columnCount,
+        } as const;
+      }))
+
+      return rows;
+    }
+
+    return sections.flatMap(section => convertSection(section, columns));
   });
 
   protected readonly trackByIndex = (idx: number) => idx;
-
-  private convertSection(section: Section, columnCount: number): RowState[] {
-    const rows: RowState[] = [];
-
-    rows.push({
-      type: 'header', header: {
-        name: section.name,
-        timestamp: section.timestamp,
-        mediaCount: section.items.length,
-      },
-    });
-
-    rows.push(...chunksOf(section.items, columnCount).map(chunk => {
-      return {type: 'row', items: chunk, columns: columnCount} as const;
-    }))
-
-    return rows;
-  }
 }

@@ -1,0 +1,25 @@
+:host {
+  display: block;
+  overflow: hidden;
+  touch-action: none;
+}
+
+:host > .canvas {
+  position: relative;
+  will-change: transform;
+  transform: translateY(var(--offset-y, 0px));
+}
+
+:host > .canvas ::ng-deep {
+  > * {
+    position: absolute;
+    left: 0;
+    width: 100%;
+
+    visibility: hidden;
+  }
+
+  > .layouted {
+    visibility: visible;
+  }
+}

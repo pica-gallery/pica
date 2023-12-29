@@ -1,17 +1,19 @@
 @if (rows(); as rows) {
-  <cdk-virtual-scroll-viewport my-autosize scrollWindow class="viewport">
-    <div class="row" *cdkVirtualFor="let item of rows; trackBy: trackByIndex">
-      @switch (item.type) {
-        @case ("header") {
-          <div class="title">
-            <h1>{{ item.header.name }}</h1>
-            <div class="info">{{ item.header.mediaCount }} images, {{ item.header.timestamp|date:'shortDate' }}</div>
-          </div>
+  <app-list-view [items]="rows">
+    <ng-template let-item>
+      <div class="row">
+        @switch (item.type) {
+          @case ("header") {
+            <div class="title">
+              <h1>{{ item.header.name }}</h1>
+              <div class="info">{{ item.header.mediaCount }} images, {{ item.header.timestamp|date:'shortDate' }}</div>
+            </div>
+          }
+          @case ("row") {
+            <app-album-row [items]="item.items" (mediaClicked)="mediaClicked.emit($event)" [columns]="item.columns"/>
+          }
         }
-        @case ("row") {
-          <app-album-row [items]="item.items" (mediaClicked)="mediaClicked.emit($event)" [columns]="item.columns"/>
-        }
-      }
-    </div>
-  </cdk-virtual-scroll-viewport>
+      </div>
+    </ng-template>
+  </app-list-view>
 }

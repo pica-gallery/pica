@@ -37,7 +37,7 @@ async fn serve(req: axum::extract::Request) -> Response {
 }
 
 async fn serve_index() -> Response {
-    build_response("index.html", "public, max-age=3600")
+    build_response("index.html", CACHE_CONTROL_INDEX)
         .unwrap_or_else(|| StatusCode::NOT_FOUND.into_response())
 }
 
