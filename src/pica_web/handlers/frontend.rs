@@ -13,8 +13,12 @@ use tracing::info;
 
 static FRONTEND: Dir = include_dir!("$CARGO_MANIFEST_DIR/frontend/dist/pica/browser/");
 
+const CACHE_CONTROL_INDEX: &str = "public, max-age=3600";
+const CACHE_CONTROL_IMMUTABLE: &str = "public, max-age=31536000, immutable";
+
 pub fn frontend() -> Router {
     Router::new()
+        .route("/", get(serve_index))
         .fallback(get(serve))
         .layer(CompressionLayer::new().compress_when(SizeAbove::new(1024)))
 }
@@ -26,12 +30,18 @@ async fn serve(req: axum::extract::Request) -> Response {
     // strip leading / from the path
     let path = path.strip_prefix('/').unwrap_or(path);
 
-    serve_file(path)
-        .or_else(|| serve_file("index.html"))
+    match build_response(path, CACHE_CONTROL_IMMUTABLE) {
+        Some(resp) => resp,
+        None => serve_index().await,
+    }
+}
+
+async fn serve_index() -> Response {
+    build_response("index.html", "public, max-age=3600")
         .unwrap_or_else(|| StatusCode::NOT_FOUND.into_response())
 }
 
-fn serve_file(path: impl AsRef<Path>) -> Option<Response> {
+fn build_response(path: impl AsRef<Path>, cache_control: &str) -> Option<Response> {
     let file = FRONTEND.get_file(&path)?;
 
     let content_type = mime_guess::from_path(path)
@@ -44,7 +54,7 @@ fn serve_file(path: impl AsRef<Path>) -> Option<Response> {
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, content_type)
-        .header(header::CACHE_CONTROL, "public, max-age=604800, immutable")
+        .header(header::CACHE_CONTROL, cache_control)
         .body(Body::from(file.contents()))
         .ok()
 }
