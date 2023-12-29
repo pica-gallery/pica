@@ -1,2 +1,3 @@
 export * from './rxjs'
-export * from './element-size'
+export * from './sizes'
+export * from './arrays'

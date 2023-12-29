@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use chrono::Utc;
-use sqlx::{FromRow, Sqlite, Transaction};
+use sqlx::{Sqlite, Transaction};
 
 use crate::pica::{MediaId, MediaInfo, MediaItem, MediaType};
 

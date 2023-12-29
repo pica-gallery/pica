@@ -1,28 +1,34 @@
-import {ChangeDetectionStrategy, Component, computed, Input, signal} from '@angular/core';
-import type {Album} from '../../service/gallery';
-import {AlbumListItemComponent} from '../album-list-item/album-list-item.component';
-import {AlbumRowComponent} from '../album-row/album-row.component';
 import {
-  CdkFixedSizeVirtualScroll,
-  CdkVirtualForOf,
-  CdkVirtualScrollableWindow,
-  CdkVirtualScrollViewport
-} from '@angular/cdk/scrolling';
-import {DatePipe} from '@angular/common';
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  ElementRef,
+  inject,
+  Input,
+  NgZone,
+  signal,
+  type TrackByFunction
+} from '@angular/core';
+import type {Album} from '../../service/gallery';
+import {toSignal} from '@angular/core/rxjs-interop';
+import {chunksOf, columnCount$} from '../../util';
+import {CdkVirtualForOf, CdkVirtualScrollableWindow, CdkVirtualScrollViewport} from '@angular/cdk/scrolling';
+import {NgStyle} from '@angular/common';
 import {ScrollingModule} from '@angular/cdk-experimental/scrolling';
+import {AlbumListRowComponent} from '../album-list-row/album-list-row.component';
+import {MyAutoSizeVirtualScroll} from '../../directives/auto-size-scrolling.directive';
 
 @Component({
   selector: 'app-album-list',
   standalone: true,
   imports: [
-    AlbumListItemComponent,
-    AlbumRowComponent,
-    CdkFixedSizeVirtualScroll,
-    CdkVirtualForOf,
     CdkVirtualScrollViewport,
+    NgStyle,
+    ScrollingModule,
     CdkVirtualScrollableWindow,
-    DatePipe,
-    ScrollingModule
+    AlbumListRowComponent,
+    CdkVirtualForOf,
+    MyAutoSizeVirtualScroll,
   ],
   templateUrl: './album-list.component.html',
   styleUrl: './album-list.component.scss',
@@ -31,23 +37,27 @@ import {ScrollingModule} from '@angular/cdk-experimental/scrolling';
 export class AlbumListComponent {
   private readonly albumsSignal = signal<Album[]>([]);
 
-  protected readonly rows = computed(() => {
-    const columnCount = 2;
-    const rows = [];
+  protected readonly columnCount = toSignal(
+    columnCount$(inject(ElementRef).nativeElement, inject(NgZone), 300),
+  );
 
-    const rest = [...this.albumsSignal()];
+  protected readonly rows = computed(() => {
+    const albums = [...this.albumsSignal()];
 
     // sort albums by time desc
-    rest.sort((lhs, rhs) => {
+    albums.sort((lhs, rhs) => {
       return rhs.timestamp.getTime() - lhs.timestamp.getTime();
     })
 
-    while (rest.length > 0) {
-      rows.push(rest.splice(0, columnCount));
-    }
+    const columnCount = this.columnCount() || 2;
 
-    return rows;
+    return {
+      columnCount,
+      rows: chunksOf(albums, columnCount)
+    };
   });
+
+  trackByIndex: TrackByFunction<Album[]> = (idx: number) => idx;
 
   @Input()
   set albums(albums: Album[]) {

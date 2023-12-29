@@ -35,14 +35,14 @@ pub fn by_directory(items: &[MediaItem]) -> Vec<Album<'_>> {
             .and_then(|f| f.to_str())
             .unwrap_or("Unknown");
 
-        let album = albums.entry(&relpath).or_insert_with_key(|_relpath| {
+        let album = albums.entry(relpath).or_insert_with_key(|_relpath| {
             Album {
-                id: album_id_for_relpath(&relpath),
+                id: album_id_for_relpath(relpath),
                 name: name.to_owned(),
                 timestamp: item.info.timestamp,
                 relpath: Some(relpath.into()),
                 items: Vec::new(),
-                cover: &item,
+                cover: item,
             }
         });
 

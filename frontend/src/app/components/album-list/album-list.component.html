@@ -1,8 +1,10 @@
-<cdk-virtual-scroll-viewport autosize scrollWindow class="viewport">
-  <div class="row" *cdkVirtualFor="let row of rows()">
-    @for(item of row; track item) {
-      <app-album-list-item [album]="item"/>
-    }
-  </div>
-</cdk-virtual-scroll-viewport>
+@if (rows(); as state) {
+  <cdk-virtual-scroll-viewport
+    my-autosize scrollWindow class="viewport"
+    [ngStyle]="{'--column-count': state.columnCount}">
 
+    <app-album-list-row
+      *cdkVirtualFor="let row of state.rows; trackBy: trackByIndex"
+      [items]="row"/>
+  </cdk-virtual-scroll-viewport>
+}

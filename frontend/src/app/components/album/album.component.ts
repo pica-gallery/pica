@@ -19,8 +19,7 @@ import {
   CdkVirtualScrollableWindow,
   CdkVirtualScrollViewport
 } from '@angular/cdk/scrolling';
-import {distinctUntilChanged, map} from 'rxjs';
-import {enterNgZone, observeElementSize, type Size} from '../../util';
+import {chunksOf, columnCount$} from '../../util';
 import {AlbumRowComponent} from '../album-row/album-row.component';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {ScrollingModule} from '@angular/cdk-experimental/scrolling';
@@ -61,20 +60,12 @@ export class AlbumComponent {
     this.sectionsSignal.set(sections);
   }
 
-  protected readonly columnCount = toSignal(
-    observeElementSize(inject(ElementRef).nativeElement).pipe(
-      map((screenSize: Size): number => Math.ceil(screenSize.width / 120)),
-      distinctUntilChanged(),
-      enterNgZone(inject(NgZone)),
-    ),
+  private readonly columnCount = toSignal(
+    columnCount$(inject(ElementRef).nativeElement, inject(NgZone), 120),
   );
 
   protected readonly rows = computed(() => {
-    const columns = this.columnCount();
-    if (columns == null) {
-      return []
-    }
-
+    const columns = this.columnCount() ?? 4;
     return this.sectionsSignal().flatMap(section => this.convertSection(section, columns));
   });
 
@@ -92,12 +83,10 @@ export class AlbumComponent {
       },
     });
 
-    const mediaItems = [...section.items];
-    while (mediaItems.length > 0) {
-      const chunk = mediaItems.splice(0, columnCount)
-      rows.push({type: 'row', items: chunk, columns: columnCount});
-    }
+    rows.push(...chunksOf(section.items, columnCount).map(chunk => {
+      return {type: 'row', items: chunk, columns: columnCount} as const;
+    }))
 
-    return rows
+    return rows;
   }
 }

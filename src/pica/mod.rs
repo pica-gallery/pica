@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use anyhow::ensure;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 
 mod album;

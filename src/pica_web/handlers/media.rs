@@ -12,7 +12,7 @@ use tower::ServiceExt;
 use tower_http::services::ServeFile;
 use tracing::debug;
 
-use crate::pica::{MediaId, MediaItem};
+use crate::pica::{MediaId};
 use crate::pica_web::AppState;
 use crate::pica_web::handlers::WebError;
 

@@ -141,6 +141,9 @@ fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
         })
 
         .flatten_ok()
+
+        // filter out what looks like crap
+        .filter_ok(|item| item.filesize > 256)
 }
 
 fn file_is_hidden(name: &OsStr) -> bool {

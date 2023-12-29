@@ -16,6 +16,6 @@ import {map} from 'rxjs';
 })
 export class AlbumListPageComponent {
   private readonly gallery = inject(Gallery);
-  protected readonly albums = toSignal(this.gallery.albums().pipe(map(albums => albums.slice(0, 1500))));
+  protected readonly albums = toSignal(this.gallery.albums());
 
 }

@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use anyhow::Result;
+
 use itertools::Itertools;
-use sqlx::SqlitePool;
+
 use tokio::sync::RwLock;
 
-use crate::pica::{Album, AlbumId, db, MediaId, MediaItem};
+use crate::pica::{MediaId, MediaItem};
 
 struct MediaItemsState {
     items: HashMap<MediaId, MediaItem>,
