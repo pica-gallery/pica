@@ -6,7 +6,6 @@ import {
   EventEmitter,
   inject,
   Input,
-  NgZone,
   Output,
   signal
 } from '@angular/core';
@@ -19,10 +18,10 @@ import {
   CdkVirtualScrollableWindow,
   CdkVirtualScrollViewport
 } from '@angular/cdk/scrolling';
-import {chunksOf, columnCount$} from '../../util';
+import {chunksOf, columnCountSignal} from '../../util';
 import {AlbumRowComponent} from '../album-row/album-row.component';
-import {toSignal} from '@angular/core/rxjs-interop';
 import {ScrollingModule} from '@angular/cdk-experimental/scrolling';
+import {MyAutoSizeVirtualScroll} from '../../directives/auto-size-scrolling.directive';
 
 
 type SectionHeader = {
@@ -47,30 +46,36 @@ type RowState =
     GridComponent,
     ScrollingModule,
     CdkVirtualScrollableWindow,
+    MyAutoSizeVirtualScroll,
   ],
   templateUrl: './album.component.html',
   styleUrls: ['./album.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AlbumComponent {
-  private readonly sectionsSignal = signal<Section[]>([]);
+  private readonly sectionsSignal = signal<Section[] | null>(null);
 
   @Input()
   public set sections(sections: Section[]) {
     this.sectionsSignal.set(sections);
   }
 
-  private readonly columnCount = toSignal(
-    columnCount$(inject(ElementRef).nativeElement, inject(NgZone), 120),
-  );
-
-  protected readonly rows = computed(() => {
-    const columns = this.columnCount() ?? 4;
-    return this.sectionsSignal().flatMap(section => this.convertSection(section, columns));
-  });
-
   @Output()
   readonly mediaClicked = new EventEmitter<MediaItem>();
+
+  private readonly columnCount = columnCountSignal(inject(ElementRef).nativeElement, 120);
+
+  protected readonly rows = computed(() => {
+    const columns = this.columnCount();
+    const sections = this.sectionsSignal();
+    if (!columns || !sections) {
+      return null;
+    }
+
+    return sections.flatMap(section => this.convertSection(section, columns));
+  });
+
+  protected readonly trackByIndex = (idx: number) => idx;
 
   private convertSection(section: Section, columnCount: number): RowState[] {
     const rows: RowState[] = [];

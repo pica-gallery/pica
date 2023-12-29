@@ -1,0 +1,3 @@
+@if (sections$|async; as sections) {
+  <app-album [sections]="sections" (mediaClicked)="mediaClicked($event)"></app-album>
+}

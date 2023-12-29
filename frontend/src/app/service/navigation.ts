@@ -1,6 +1,6 @@
 import {Injectable} from '@angular/core';
 import {Router} from '@angular/router';
-import type {MediaId} from './api';
+import type {AlbumId, MediaId} from './api';
 
 @Injectable({providedIn: 'root'})
 export class NavigationService {
@@ -25,5 +25,14 @@ export class NavigationService {
         media: null
       }
     }])
+  }
+
+  public async openAlbum(id: AlbumId) {
+    await this.router.navigate([
+      '/albums', id,
+      {
+        outlets: {media: null}
+      }
+    ])
   }
 }

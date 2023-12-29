@@ -5,13 +5,11 @@ import {
   ElementRef,
   inject,
   Input,
-  NgZone,
   signal,
   type TrackByFunction
 } from '@angular/core';
 import type {Album} from '../../service/gallery';
-import {toSignal} from '@angular/core/rxjs-interop';
-import {chunksOf, columnCount$} from '../../util';
+import {chunksOf, columnCountSignal} from '../../util';
 import {CdkVirtualForOf, CdkVirtualScrollableWindow, CdkVirtualScrollViewport} from '@angular/cdk/scrolling';
 import {NgStyle} from '@angular/common';
 import {ScrollingModule} from '@angular/cdk-experimental/scrolling';
@@ -35,21 +33,21 @@ import {MyAutoSizeVirtualScroll} from '../../directives/auto-size-scrolling.dire
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AlbumListComponent {
-  private readonly albumsSignal = signal<Album[]>([]);
+  private readonly albumsSignal = signal<Album[] | undefined>(undefined);
+  protected readonly columnCount = columnCountSignal(inject(ElementRef).nativeElement, 300);
 
-  protected readonly columnCount = toSignal(
-    columnCount$(inject(ElementRef).nativeElement, inject(NgZone), 300),
-  );
+  protected readonly state = computed(() => {
+    let albums = this.albumsSignal();
+    const columnCount = this.columnCount();
 
-  protected readonly rows = computed(() => {
-    const albums = [...this.albumsSignal()];
+    if (!albums || !columnCount) {
+      return null;
+    }
 
     // sort albums by time desc
-    albums.sort((lhs, rhs) => {
+    albums = [...albums].sort((lhs, rhs) => {
       return rhs.timestamp.getTime() - lhs.timestamp.getTime();
     })
-
-    const columnCount = this.columnCount() || 2;
 
     return {
       columnCount,

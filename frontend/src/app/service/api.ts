@@ -51,6 +51,14 @@ export class ApiService {
       map(resp => array(fAlbum).parse(resp)),
     )
   }
+
+  public album(albumId: AlbumId): Observable<AlbumTo> {
+    const url = '/api/albums/' + encodeURIComponent(albumId);
+
+    return this.httpClient.get<unknown>(url).pipe(
+      map(resp => fAlbum.parse(resp)),
+    )
+  }
 }
 
 export type MediaUrls = {

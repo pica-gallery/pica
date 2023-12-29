@@ -1,4 +1,4 @@
-@if (rows(); as state) {
+@if (state(); as state) {
   <cdk-virtual-scroll-viewport
     my-autosize scrollWindow class="viewport"
     [ngStyle]="{'--column-count': state.columnCount}">

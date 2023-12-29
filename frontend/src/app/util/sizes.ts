@@ -1,6 +1,7 @@
-import {distinctUntilChanged, map, Observable, tap} from 'rxjs';
-import {NgZone} from '@angular/core';
+import {distinctUntilChanged, filter, map, Observable} from 'rxjs';
+import {inject, NgZone, type Signal} from '@angular/core';
 import {enterNgZone} from './rxjs';
+import {toSignal} from '@angular/core/rxjs-interop';
 
 export type Size = { width: number, height: number };
 
@@ -22,8 +23,20 @@ export function observeElementSize(el: Element): Observable<Size> {
 
 export function columnCount$(element: HTMLElement, ngZone: NgZone, maxColumnSize: number): Observable<number> {
   return observeElementSize(element).pipe(
-    map((screenSize: Size): number => Math.max(1, Math.ceil(screenSize.width / maxColumnSize))),
+    filter(sizes => sizes.width > 0),
+    map((screenSize: Size): number => columnCount(screenSize.width, maxColumnSize)),
     distinctUntilChanged(),
     enterNgZone(ngZone),
   );
+}
+
+function columnCount(width: number, maxColumnSize: number): number {
+  return Math.max(1, Math.ceil(width / maxColumnSize))
+}
+
+/**
+ * @warn Must be called in an injection context.
+ */
+export function columnCountSignal(element: HTMLElement, maxColumnSize: number): Signal<number | undefined> {
+  return toSignal(columnCount$(element, inject(NgZone), maxColumnSize))
 }

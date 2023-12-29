@@ -36,7 +36,7 @@ export type Album = {
 
 @Injectable({providedIn: 'root'})
 export class Gallery {
-  // private readonly cache = new Map<string, Observable<Section>>();
+  private readonly cache = new Map<string, Observable<Album>>();
 
   private readonly stream$ = this.apiService.stream().pipe(
     map(stream => convertStream(stream, Daily)),
@@ -59,22 +59,21 @@ export class Gallery {
     return this.albums$;
   }
 
-  //public album(albumId: string): Observable<Album> {
-  //  const cached$ = this.cache.get(albumId);
-  //  if (cached$ != null) {
-  //    return cached$
-  //  }
-//
-  //  const stream$ = this.apiService.stream().pipe(
-  //    map(stream => convertStream(stream)),
-  //    shareReplay(1),
-  //    take(1),
-  //  )
-//
-  //  this.cache.set(albumId, stream$);
-//
-  //  return stream$;
-  //}
+  public album(albumId: string): Observable<Album> {
+    const cached$ = this.cache.get(albumId);
+    if (cached$ != null) {
+      return cached$
+    }
+
+    const album$ = this.apiService.album(albumId).pipe(
+      map(stream => convertAlbum(stream)),
+      shareReplay(1),
+    )
+
+    this.cache.set(albumId, album$);
+
+    return album$;
+  }
 }
 
 function convertAlbums(albums: AlbumTo[]): Album[] {

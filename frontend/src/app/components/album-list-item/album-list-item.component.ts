@@ -1,6 +1,7 @@
-import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
+import {ChangeDetectionStrategy, Component, HostListener, inject, Input} from '@angular/core';
 import type {Album} from '../../service/gallery';
 import {DatePipe} from '@angular/common';
+import {NavigationService} from '../../service/navigation';
 
 @Component({
   selector: 'app-album-list-item',
@@ -13,6 +14,13 @@ import {DatePipe} from '@angular/common';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AlbumListItemComponent {
+  private readonly navigationService = inject(NavigationService);
+
   @Input() album!: Album;
 
+
+  @HostListener('click')
+  protected onClick() {
+    void this.navigationService.openAlbum(this.album.id);
+  }
 }

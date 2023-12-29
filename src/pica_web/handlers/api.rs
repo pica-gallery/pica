@@ -1,6 +1,7 @@
 use std::cmp::Reverse;
 
-use axum::extract::State;
+use anyhow::anyhow;
+use axum::extract::{Path, State};
 use axum::Json;
 use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
@@ -91,4 +92,15 @@ pub async fn handle_albums_get(state: State<AppState>) -> Result<Response, WebEr
         .collect_vec();
 
     Ok(Json(albums).into_response())
+}
+
+pub async fn handle_album_get(Path(id): Path<AlbumId>, state: State<AppState>) -> Result<Response, WebError> {
+    let images = state.store.items().await;
+    let albums = by_directory(&images);
+
+    let album = albums.iter().find(|a| a.id == id)
+        .ok_or_else(|| anyhow!("no album found for id {:?}", id))?;
+
+    let view = AlbumView::from(album);
+    Ok(Json(view).into_response())
 }

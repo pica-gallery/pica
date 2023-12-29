@@ -1,7 +1,7 @@
 import {bootstrapApplication} from '@angular/platform-browser';
 import {AppComponent} from './app/app.component';
 import {provideHttpClient} from '@angular/common/http';
-import {provideRouter, type Route, withComponentInputBinding, withInMemoryScrolling} from '@angular/router';
+import {provideRouter, type Route, withComponentInputBinding} from '@angular/router';
 
 const routes: Route[] = [
   {
@@ -18,6 +18,11 @@ const routes: Route[] = [
     path: 'albums',
     pathMatch: 'full',
     loadComponent: () => import('./app/pages/album-list-page/album-list-page.component').then(m => m.AlbumListPageComponent),
+  },
+  {
+    path: 'albums/:albumId',
+    pathMatch: 'full',
+    loadComponent: () => import('./app/pages/album-page/album-page.component').then(m => m.AlbumPageComponent),
   },
   {
     path: 'search',
@@ -38,7 +43,7 @@ void bootstrapApplication(AppComponent, {
     provideHttpClient(),
     provideRouter(routes,
       withComponentInputBinding(),
-      withInMemoryScrolling({scrollPositionRestoration: 'enabled'}),
+      // withInMemoryScrolling({scrollPositionRestoration: 'enabled'}),
     ),
   ]
 })

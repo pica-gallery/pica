@@ -1,11 +1,12 @@
 import {ChangeDetectionStrategy, Component, inject, Input, signal} from '@angular/core';
 import {Gallery, type MediaItem} from '../../service/gallery';
-import {map} from 'rxjs';
+import {map, type Observable} from 'rxjs';
 import {AsyncPipe} from '@angular/common';
 import {ImageSwiperComponent} from '../../components/image-swiper/image-swiper.component';
-import type {MediaId} from '../../service/api';
+import type {AlbumId, MediaId} from '../../service/api';
 import {IconComponent} from '../../components/icon/icon.component';
 import {NavigationService} from '../../service/navigation';
+import {ActivatedRoute, ActivatedRouteSnapshot} from '@angular/router';
 
 @Component({
   selector: 'app-media-page',
@@ -18,14 +19,30 @@ import {NavigationService} from '../../service/navigation';
 export class MediaPageComponent {
   protected readonly currentItem = signal<MediaItem | null>(null);
 
-  protected readonly items$ = inject(Gallery).stream().pipe(
-    map(stream => stream.items),
-  )
-
   @Input()
   public mediaId!: MediaId;
 
-  constructor(private readonly navigationService: NavigationService) {
+  protected readonly items$: Observable<MediaItem[]>;
+
+  constructor(
+    private readonly navigationService: NavigationService,
+    routeSnapshot: ActivatedRoute,
+  ) {
+    let albumId: AlbumId | null = null;
+
+    for (const child of routeSnapshot.root.children) {
+      if (child.outlet === 'primary') {
+        const value = child.snapshot.params['albumId'] as unknown;
+        if (typeof value === 'string') {
+          albumId = value as AlbumId;
+        }
+      }
+    }
+
+    const gallery = inject(Gallery);
+    this.items$ = albumId
+      ? gallery.album(albumId).pipe(map(alb => alb.items))
+      : gallery.stream().pipe(map(stream => stream.items));
   }
 
   protected close() {
