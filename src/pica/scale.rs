@@ -1,15 +1,15 @@
 use std::ffi::OsString;
 use std::fs;
 use std::num::NonZeroU64;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use image::{image_dimensions, io};
 use image::imageops::FilterType;
+use sqlx::__rt::spawn_blocking;
 use tempfile::NamedTempFile;
 use tokio::sync::Semaphore;
-use tokio::task::block_in_place;
 
 use crate::pica::exif::{Orientation, parse_exif};
 
@@ -74,13 +74,19 @@ impl MediaScaler {
     }
 
     async fn resize(&self, path: impl AsRef<Path>, size: u32) -> Result<Vec<u8>> {
-        block_in_place(|| {
-            if self.options.use_image_magick {
-                resize_imagemagick(path, &self.options.image_type, size)
+        let path = PathBuf::from(path.as_ref());
+        let format = self.options.image_type.clone();
+        let use_image_magick = self.options.use_image_magick;
+
+        let task = move || {
+            if use_image_magick {
+                resize_imagemagick(&path, &format, size)
             } else {
-                resize_rust(path, &self.options.image_type, size)
+                resize_rust(&path, &format, size)
             }
-        })
+        };
+        
+        spawn_blocking(task).await
     }
 }
 
