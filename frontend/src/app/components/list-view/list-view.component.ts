@@ -12,6 +12,7 @@ import {
   Input,
   NgZone,
   type OnChanges,
+  type OnDestroy,
   type SimpleChanges,
   type Type,
   ViewChild
@@ -30,10 +31,10 @@ export type ListItem = {
 type Child = {
   node: HTMLElement,
   ref: ComponentRef<unknown>,
+  index: number,
   height: number | null,
   top: number | null,
   dirty: boolean,
-  index: number,
   subscription: Subscription | null,
 }
 
@@ -56,7 +57,7 @@ function removeInplace(children: Child[], child: Child) {
   styleUrl: './list-view.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ListViewComponent implements AfterViewInit, OnChanges {
+export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   private readonly injector = inject(EnvironmentInjector);
   private readonly applicationRef = inject(ApplicationRef);
   private readonly ngZone = inject(NgZone);
@@ -81,6 +82,8 @@ export class ListViewComponent implements AfterViewInit, OnChanges {
   private schedule = new AnimationSchedule();
 
   private readonly observer = new ResizeObserver(entries => this.resizeObserver(entries));
+
+  private readonly cache = new Map<Type<unknown>, Child[]>();
 
   @Input({required: true})
   public items!: ListItem[]
@@ -164,7 +167,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges {
       if (item == null || item.component !== child.ref.componentType) {
         debug('Need to get rid of child at', child.index);
         this.detachChild(child);
-        this.destroyChild(child);
+        this.cacheChild(child);
         continue;
       }
 
@@ -174,6 +177,13 @@ export class ListViewComponent implements AfterViewInit, OnChanges {
     }
 
     this.updateContent();
+  }
+
+  ngOnDestroy(): void {
+    debug('Destroy cached nodes')
+    for (const child of [...this.cache.values()].flat()) {
+      this.destroyChild(child);
+    }
   }
 
   private animate(dt: number) {
@@ -216,9 +226,8 @@ export class ListViewComponent implements AfterViewInit, OnChanges {
     // only keep a few elements above the window
     for (const child of [...this.children]) {
       if (child.index < this.firstVisible - 3 || child.index > this.firstVisible + amountToShow) {
-        debug('Remove child', child.index);
         this.detachChild(child);
-        this.destroyChild(child);
+        this.cacheChild(child);
       }
     }
 
@@ -240,14 +249,24 @@ export class ListViewComponent implements AfterViewInit, OnChanges {
 
       this.ngZone.runTask(() => {
         // create the child and insert it into the view at the right place
-        const child = this.createChild(item, index);
+        const child = this.cachedChild(item, index) ?? this.createChild(item, index);
         this.bindInputsOutputs(child, item);
         this.attachChild(child);
       });
     }
 
+    // we might have placed new children into the dom,
+    // so we might need to re-layout again
     this.layout();
 
+    // with the most recent positional data we can limit scrolling now
+    this.limitScrolling();
+
+    // apply transform
+    this.canvas.nativeElement.style.setProperty('--offset-y', (-this.offsetY) + 'px');
+  }
+
+  private limitScrolling() {
     if (this.children.length) {
       const last = this.children[this.children.length - 1];
       if (last.top != null && last.height) {
@@ -263,9 +282,6 @@ export class ListViewComponent implements AfterViewInit, OnChanges {
     } else {
       this.offsetY = 0;
     }
-
-    // apply transform
-    this.canvas.nativeElement.style.setProperty('--offset-y', (-this.offsetY) + 'px');
   }
 
   private layout() {
@@ -275,7 +291,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges {
       return lhs.index - rhs.index;
     })
 
-    if (this.children.every(child => !child.dirty)) {
+    if (!this.children.some(child => child.dirty && child.height != null)) {
       // layout is clean, no need to do anything
       return;
     }
@@ -340,8 +356,6 @@ export class ListViewComponent implements AfterViewInit, OnChanges {
       environmentInjector: this.injector,
     })
 
-    node.append(ref.location.nativeElement);
-
     return {
       node,
       ref,
@@ -354,6 +368,8 @@ export class ListViewComponent implements AfterViewInit, OnChanges {
   }
 
   private attachChild(child: Child): void {
+    child.node.append(child.ref.location.nativeElement);
+
     this.canvas.nativeElement.append(child.node);
     this.applicationRef.attachView(child.ref.hostView);
     this.observer.observe(child.node, {box: 'border-box'});
@@ -361,15 +377,55 @@ export class ListViewComponent implements AfterViewInit, OnChanges {
   }
 
   private detachChild(child: Child) {
+    debug('Detaching child', child.index);
     removeInplace(this.children, child);
-    child.node.classList.remove('layouted')
+
+    child.subscription?.unsubscribe()
+
+    child.top = null;
+    child.height = null;
+    child.dirty = false;
+    child.subscription = null;
+
     this.observer.unobserve(child.node);
     this.applicationRef.detachView(child.ref.hostView);
     this.canvas.nativeElement.removeChild(child.node);
+
+    child.node.classList.remove('layouted')
   }
 
   private destroyChild(child: Child) {
+    debug('Destrying child', child.index);
     child.ref.destroy();
+    child.node.innerHTML = '';
+  }
+
+  private cacheChild(child: Child) {
+    let cache = this.cache.get(child.ref.componentType);
+    if (cache == null) {
+      this.cache.set(child.ref.componentType, cache = []);
+    }
+
+    if (cache.length >= 4) {
+      // we have enough items in the cache, remove this one.
+      this.destroyChild(child);
+      return;
+    }
+
+    debug('Put child into cache', child.index)
+    cache.push(child);
+  }
+
+  private cachedChild(item: ListItem, idx: number): Child | null {
+    const child = this.cache.get(item.component)?.pop();
+    if (child == null) {
+      return null;
+    }
+
+    child.index = idx;
+
+    debug('Returning child from cache:', child.index);
+    return child;
   }
 
   private resizeObserver(entries: ResizeObserverEntry[]) {
@@ -495,7 +551,7 @@ class VelocityTracker {
   public track(position: number) {
     this.items.push({time: performance.now(), position})
 
-    if (this.items.length > 3) {
+    if (this.items.length > 2) {
       this.items.shift();
     }
   }
@@ -505,7 +561,6 @@ class VelocityTracker {
       return null;
     }
 
-    const oldest = this.items[0];
     const prev = this.items[this.items.length - 2];
     const recent = this.items[this.items.length - 1];
 
@@ -519,7 +574,7 @@ class VelocityTracker {
       return null;
     }
 
-    return 1000 * (recent.position - oldest.position) / (recent.time - oldest.time)
+    return 1000 * (recent.position - prev.position) / (recent.time - prev.time)
   }
 
   public clear() {
