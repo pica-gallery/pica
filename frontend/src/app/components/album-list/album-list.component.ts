@@ -15,7 +15,8 @@ import {NgStyle} from '@angular/common';
 import {ScrollingModule} from '@angular/cdk-experimental/scrolling';
 import {AlbumListRowComponent} from '../album-list-row/album-list-row.component';
 import {MyAutoSizeVirtualScroll} from '../../directives/auto-size-scrolling.directive';
-import {ListViewComponent} from '../list-view/list-view.component';
+import {type ListItem, ListViewComponent} from '../list-view/list-view.component';
+import {AlbumListHeaderComponent} from '../album-list-header/album-list-header.component';
 
 @Component({
   selector: 'app-album-list',
@@ -51,12 +52,22 @@ export class AlbumListComponent {
       return rhs.timestamp.getTime() - lhs.timestamp.getTime();
     })
 
-    let rowId = 0;
+    const rows: ListItem[] = [];
 
-    return {
-      columnCount,
-      rows: chunksOf(albums, columnCount).map((albums, idx) => ({id: idx, albums}))
-    };
+    rows.push({
+      component: AlbumListHeaderComponent,
+    })
+
+    rows.push(
+      ...chunksOf(albums, columnCount).map((albums: Album[], idx: number): ListItem => {
+        return {
+          component: AlbumListRowComponent,
+          inputs: {items: albums},
+        };
+      }),
+    );
+
+    return {columnCount, rows};
   });
 
   trackByIndex: TrackByFunction<Album[]> = (idx: number) => idx;

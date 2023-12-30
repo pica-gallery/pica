@@ -1,7 +1,6 @@
 @if (state(); as state) {
-  <app-list-view [items]="state.rows" [ngStyle]="{'--column-count': state.columnCount}">
-    <ng-template let-row>
-      <app-album-list-row [items]="row.albums"/>
-    </ng-template>
-  </app-list-view>
+  <app-list-view
+    [minHeight]="200"
+    [items]="state.rows"
+    [ngStyle]="{'--column-count': state.columnCount}"/>
 }

@@ -3,32 +3,49 @@ import {
   ApplicationRef,
   ChangeDetectionStrategy,
   Component,
-  ContentChild,
+  ComponentRef,
+  createComponent,
   ElementRef,
+  EnvironmentInjector,
+  EventEmitter,
   inject,
   Input,
   NgZone,
-  TemplateRef,
-  ViewChild,
-  ViewRef
+  type OnChanges,
+  type SimpleChanges,
+  type Type,
+  ViewChild
 } from '@angular/core';
 import {enterNgZone, observeElementSize} from '../../util';
-import {distinctUntilChanged, filter, map} from 'rxjs';
+import {distinctUntilChanged, filter, map, Subscription} from 'rxjs';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import PointerTracker from 'pointer-tracker';
 
-type Item = {
-  id: unknown,
+export type ListItem = {
+  component: Type<unknown>,
+  inputs?: Record<string, unknown>,
+  outputs?: Record<string, (value: any) => void>,
 }
 
 type Child = {
-  id: unknown,
   node: HTMLElement,
-  ref: ViewRef,
+  ref: ComponentRef<unknown>,
   height: number | null,
   top: number | null,
   dirty: boolean,
   index: number,
+  subscription: Subscription | null,
+}
+
+function debug(...args: any[]) {
+  console.debug(...args);
+}
+
+function removeInplace(children: Child[], child: Child) {
+  const idx = children.findIndex(ch => ch === child);
+  if (idx >= 0) {
+    children.splice(idx, 1);
+  }
 }
 
 @Component({
@@ -39,7 +56,8 @@ type Child = {
   styleUrl: './list-view.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ListViewComponent implements AfterViewInit {
+export class ListViewComponent implements AfterViewInit, OnChanges {
+  private readonly injector = inject(EnvironmentInjector);
   private readonly applicationRef = inject(ApplicationRef);
   private readonly ngZone = inject(NgZone);
 
@@ -47,9 +65,6 @@ export class ListViewComponent implements AfterViewInit {
 
   @ViewChild('Canvas')
   protected canvas!: ElementRef<HTMLElement>;
-
-  @ContentChild(TemplateRef)
-  private readonly rowTemplate!: TemplateRef<unknown>
 
   // the index of the first visible item
   protected firstVisible: number = 0;
@@ -62,16 +77,16 @@ export class ListViewComponent implements AfterViewInit {
   protected lastRootHeight = 0;
   protected children: Child[] = [];
 
-  private flingSpeed: number = 0;
-  private flingRAF: number | null = null;
+  private fling = new FlingVelocity(0);
+  private schedule = new AnimationSchedule();
 
   private readonly observer = new ResizeObserver(entries => this.resizeObserver(entries));
 
   @Input({required: true})
-  public items!: Item[]
+  public items!: ListItem[]
 
   @Input()
-  public minHeight = 100;
+  public minHeight = 50;
 
   constructor() {
     observeElementSize(this.root.nativeElement)
@@ -87,28 +102,41 @@ export class ListViewComponent implements AfterViewInit {
 
   ngAfterViewInit() {
     this.ngZone.runOutsideAngular(() => {
-      let dy = 0;
+      const velocityTracker = new VelocityTracker();
 
       const tracker: PointerTracker = new PointerTracker(this.root.nativeElement, {
         start: () => {
-          // stop flinging now
-          this.fling(0);
-          dy = 0;
+          // accept as a new pointer only if this is the first one.
+          if (tracker.currentPointers.length > 0) {
+            return false;
+          }
 
-          return tracker.currentPointers.length == 0;
+          // stop any active fling now
+          this.fling.velocity = 0;
+
+          return true;
         },
 
         move: previousPointers => {
-          const prev = previousPointers[0];
-          dy = prev.pageY - tracker.currentPointers[0].pageY;
+          const prevY = previousPointers[0].pageY;
+          const currY = tracker.currentPointers[0].pageY;
+
+          const dy = prevY - currY;
           this.offsetY += dy;
           this.updateContent();
+
+          velocityTracker.track(currY);
         },
 
         end: () => {
-          if (Math.abs(dy) >= 1) {
-            this.fling(2*dy);
+          const velocity = velocityTracker.get();
+          if (velocity && Math.abs(velocity) >= 1) {
+            debug('Starting fling with velocity of', velocity);
+            this.fling.velocity = velocity;
+            this.schedule.schedule('fling', dt => this.animate(dt));
           }
+
+          velocityTracker.clear();
         }
       })
 
@@ -119,38 +147,54 @@ export class ListViewComponent implements AfterViewInit {
     });
   }
 
-  protected fling(speed: number) {
-    this.flingSpeed = speed;
+  ngOnChanges(changes: SimpleChanges) {
+    console.info('Changes', changes);
 
-    if (speed != 0 && this.flingRAF == null) {
-      const callback = () => {
-        this.flingRAF = null;
-        this.animate();
-      };
-
-      this.flingRAF = this.ngZone.runOutsideAngular(() => requestAnimationFrame(callback));
+    const change = changes['items'];
+    if (!change || change.firstChange) {
+      return;
     }
 
-    if (speed == 0 && this.flingRAF != null) {
-      cancelAnimationFrame(this.flingRAF);
-      this.flingRAF = null;
+    const items = change.currentValue as ListItem[];
+
+    for (const child of [...this.children]) {
+      const item = items[child.index];
+
+      // child is not compatible or not needed anymore, remove it now
+      if (item == null || item.component !== child.ref.componentType) {
+        debug('Need to get rid of child at', child.index);
+        this.detachChild(child);
+        this.destroyChild(child);
+        continue;
+      }
+
+      // child is compatible, update input and outputs now
+      debug('Can rebind child at ', child.index);
+      this.bindInputsOutputs(child, item);
     }
+
+    this.updateContent();
   }
 
-  private animate() {
-    let newSpeed = Math.abs(this.flingSpeed) < 1 ? 0 : this.flingSpeed * 0.95;
-    this.fling(newSpeed);
-
-    this.offsetY += newSpeed;
+  private animate(dt: number) {
+    this.fling.update(dt);
+    this.offsetY -= this.fling.velocity * dt;
     this.updateContent();
+
+    if (!this.fling.stopped) {
+      this.schedule.schedule('fling', dt => this.animate(dt));
+    }
   }
 
   protected updateContent(height: number = this.lastRootHeight) {
     this.lastRootHeight = height;
 
-    const amountToShow = Math.ceil(height / this.minHeight);
-    // console.debug('Want to show %d items', amountToShow);
+    // ensure layout is fine first. We need to do this to
+    // be able to use top + height in the code below
+    this.layout();
 
+    // find the first child that is currently at least partially visible according to
+    // our layout data.
     const firstVisibleChild = this.children.find(child => {
       return child.top != null
         && child.height != null
@@ -161,18 +205,19 @@ export class ListViewComponent implements AfterViewInit {
       const firstVisibleIdx = firstVisibleChild.index;
 
       if (this.firstVisible !== firstVisibleIdx) {
-        console.info('First visible is now', firstVisibleIdx);
+        debug('First visible is now', firstVisibleIdx);
         this.firstVisible = Math.max(0, firstVisibleIdx);
         this.firstTop = firstVisibleChild.top!;
       }
     }
 
+    const amountToShow = Math.ceil(height / this.minHeight);
+
     // only keep a few elements above the window
     for (const child of [...this.children]) {
       if (child.index < this.firstVisible - 3 || child.index > this.firstVisible + amountToShow) {
-        console.info('Remove child', child.index);
-        this.children = this.children.filter(ch => ch !== child);
-        this.canvas.nativeElement.removeChild(child.node);
+        debug('Remove child', child.index);
+        this.detachChild(child);
         this.destroyChild(child);
       }
     }
@@ -187,18 +232,18 @@ export class ListViewComponent implements AfterViewInit {
         continue;
       }
 
-      let child = this.children.find(child => child.id === item.id);
+      let child = this.children.find(child => child.index === index);
       if (child != null) {
         // the child already exists, nothing to do here
         continue;
       }
 
-      console.info('Create child', index);
-
-      // create the child and insert it into the view at the right place
-      child = this.createChild(item, index);
-      this.children.push(child);
-      this.canvas.nativeElement.append(child.node);
+      this.ngZone.runTask(() => {
+        // create the child and insert it into the view at the right place
+        const child = this.createChild(item, index);
+        this.bindInputsOutputs(child, item);
+        this.attachChild(child);
+      });
     }
 
     this.layout();
@@ -230,19 +275,29 @@ export class ListViewComponent implements AfterViewInit {
       return lhs.index - rhs.index;
     })
 
+    if (this.children.every(child => !child.dirty)) {
+      // layout is clean, no need to do anything
+      return;
+    }
+
+    // layout all children that are (at least partially) below the anchor
+    // from top to bottom
     for (const child of this.children) {
       if (child.height == null) {
+        // no known height for this child,
+        // we can not layout it right now
         continue;
       }
 
       if (child.index >= this.firstVisible) {
         if (child.top == null) {
+          // first layout, make it visible
           child.node.classList.add('layouted');
         }
 
-        child.dirty = false;
         child.top = top;
         child.node.style.top = top + 'px';
+        child.dirty = false;
 
         top += child.height;
       }
@@ -250,60 +305,224 @@ export class ListViewComponent implements AfterViewInit {
 
     top = this.firstTop;
 
-    // layout the children above the anchor
-    for (const child of [...this.children].reverse()) {
+    // layout the children above the anchor in reverse,
+    // setting their top position based on the next node in the list.
+    for (let i = this.children.length - 1; i >= 0; i--) {
+      const child = this.children[i];
+
       if (child.height == null) {
+        // no known height for this child,
+        // we can not layout it right now
         continue;
       }
 
       if (child.index < this.firstVisible) {
         if (child.top == null) {
+          // first layout, make it visible
           child.node.classList.add('layouted');
         }
 
         top -= child.height;
 
-        child.dirty = false;
         child.top = top;
         child.node.style.top = top + 'px';
+        child.dirty = false;
       }
     }
   }
 
-  private createChild(item: Item, idx: number): Child {
-    return this.ngZone.run(() => {
-      const ref = this.rowTemplate.createEmbeddedView({$implicit: item})
-      this.applicationRef.attachView(ref);
+  private createChild(item: ListItem, idx: number): Child {
+    debug('Create child', idx);
 
-      const node = document.createElement('div');
-      node.append(...ref.rootNodes);
+    const node = document.createElement('div');
 
-      this.observer.observe(node, {box: 'border-box'});
+    const ref = createComponent(item.component, {
+      environmentInjector: this.injector,
+    })
 
-      return {id: item.id, node, top: null, height: null, dirty: false, index: idx, ref}
-    });
+    node.append(ref.location.nativeElement);
+
+    return {
+      node,
+      ref,
+      top: null,
+      height: null,
+      dirty: false,
+      index: idx,
+      subscription: null,
+    }
+  }
+
+  private attachChild(child: Child): void {
+    this.canvas.nativeElement.append(child.node);
+    this.applicationRef.attachView(child.ref.hostView);
+    this.observer.observe(child.node, {box: 'border-box'});
+    this.children.push(child);
+  }
+
+  private detachChild(child: Child) {
+    removeInplace(this.children, child);
+    child.node.classList.remove('layouted')
+    this.observer.unobserve(child.node);
+    this.applicationRef.detachView(child.ref.hostView);
+    this.canvas.nativeElement.removeChild(child.node);
   }
 
   private destroyChild(child: Child) {
-    this.observer.unobserve(child.node);
     child.ref.destroy();
   }
 
   private resizeObserver(entries: ResizeObserverEntry[]) {
     for (const entry of entries) {
+      // get the child by matching it via the resized node
       const child = this.children.find(child => child.node === entry.target);
       if (child == null) {
         continue;
       }
 
+      // get the new height of the child
       const height = entry.borderBoxSize[0].blockSize;
-      if (child.height != height && height > 0) {
-        console.info('Got size for child', child.index);
+
+      // only mark the child dirty if it has changed to our previous value.
+      if (child.height != height) {
+        if (height === 0) {
+          console.warn('Got zero size for child', child);
+        }
+
         child.height = height;
         child.dirty = true;
       }
     }
 
-    requestAnimationFrame(() => this.layout());
+    this.schedule.schedule('layout', () => this.layout());
+  }
+
+  private bindInputsOutputs(child: Child, item: ListItem) {
+    if (item.inputs) {
+      for (const [key, value] of Object.entries(item.inputs)) {
+        child.ref.setInput(key, value)
+      }
+    }
+
+    child.subscription?.unsubscribe();
+
+    if (item.outputs) {
+      child.subscription = new Subscription();
+
+      for (const [key, value] of Object.entries(item.outputs)) {
+        const output = (child.ref.instance as any)[key];
+
+        if (output instanceof EventEmitter) {
+          child.subscription.add(
+            output.subscribe(event => value(event))
+          );
+        }
+      }
+    }
+  }
+}
+
+class FlingVelocity {
+  constructor(public velocity: number, private readonly friction: number = -4.2) {
+  }
+
+  get stopped(): boolean {
+    return this.isAtEquilibrium();
+  }
+
+  public update(dt: number) {
+    // more friction when already slow down
+    const friction = this.friction - 2 * (1 - Math.min(1, Math.abs(this.velocity) / 100));
+
+    const v1 = this.velocity * Math.exp(dt * friction)
+    const v2 = this.velocity - Math.sign(this.velocity) * 4000 * dt;
+
+    // interpolate between linear slowdown above 2000px/s and friction below 4000px/s
+    const f = Math.min(1, Math.max(0, Math.abs(this.velocity) - 2000) / 2000);
+    this.velocity = f * v2 + (1 - f) * v1;
+
+    if (this.isAtEquilibrium()) {
+      this.velocity = 0;
+    }
+  }
+
+  private isAtEquilibrium(): boolean {
+    return Math.abs(this.velocity) < 0.5;
+  }
+}
+
+type AnimationHandler = (dt: number) => void;
+
+class AnimationSchedule {
+  private handlers = new Map<string, AnimationHandler>();
+
+  private rafId: number | null = null;
+
+  public schedule(id: string, handler: AnimationHandler) {
+    this.handlers.set(id, handler);
+
+    if (this.rafId == null) {
+      const lastTime = performance.now();
+
+      this.rafId = requestAnimationFrame(() => {
+        const dt: number = (performance.now() - lastTime) / 1000;
+        this.dispatch(dt)
+      });
+    }
+  }
+
+  private dispatch(dt: number) {
+    const handlers = [...this.handlers.values()];
+
+    // cleanup this animation cycle
+    this.rafId = null;
+    this.handlers.clear();
+
+    for (const handler of handlers) {
+      handler(dt);
+    }
+  }
+}
+
+type VelocityItem = {
+  time: number,
+  position: number,
+}
+
+class VelocityTracker {
+  private readonly items: VelocityItem[] = [];
+
+  public track(position: number) {
+    this.items.push({time: performance.now(), position})
+
+    if (this.items.length > 3) {
+      this.items.shift();
+    }
+  }
+
+  public get(): number | null {
+    if (this.items.length < 2) {
+      return null;
+    }
+
+    const oldest = this.items[0];
+    const prev = this.items[this.items.length - 2];
+    const recent = this.items[this.items.length - 1];
+
+    // no movement since the last measurement
+    if (performance.now() - recent.time > 100) {
+      return null;
+    }
+
+    // almost no movement between the last two measurements
+    if (prev && Math.abs(recent.position - prev.position) < 2) {
+      return null;
+    }
+
+    return 1000 * (recent.position - oldest.position) / (recent.time - oldest.time)
+  }
+
+  public clear() {
+    this.items.splice(0);
   }
 }

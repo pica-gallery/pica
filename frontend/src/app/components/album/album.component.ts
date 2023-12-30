@@ -7,7 +7,8 @@ import {
   inject,
   Input,
   Output,
-  signal
+  signal,
+  type Type
 } from '@angular/core';
 import {DatePipe} from '@angular/common';
 import {GridComponent} from '../grid/grid.component';
@@ -23,18 +24,25 @@ import {AlbumRowComponent} from '../album-row/album-row.component';
 import {ScrollingModule} from '@angular/cdk-experimental/scrolling';
 import {MyAutoSizeVirtualScroll} from '../../directives/auto-size-scrolling.directive';
 import {AlbumListComponent} from '../album-list/album-list.component';
-import {ListViewComponent} from '../list-view/list-view.component';
+import {type ListItem, ListViewComponent} from '../list-view/list-view.component';
+import {type SectionHeader, SectionHeaderComponent} from '../section-title/section-header.component';
 
-
-type SectionHeader = {
-  name: string,
-  timestamp: Date,
-  mediaCount: number,
+type SectionHeaderListItem = ListItem & {
+  type: 'header',
+  component: Type<SectionHeaderComponent>,
+  inputs: { header: SectionHeader },
 }
 
-type RowState =
-  | { id: string, type: 'header', header: SectionHeader }
-  | { id: string, type: 'row', items: MediaItem[], columns: number }
+type ThumbnailsListItem = ListItem & {
+  type: 'thumbs',
+  component: Type<AlbumRowComponent>,
+  inputs: { items: MediaItem[], columns: number },
+  outputs: { mediaClicked: (item: MediaItem) => void },
+}
+
+type RowListItem =
+  | SectionHeaderListItem
+  | ThumbnailsListItem
 
 @Component({
   selector: 'app-album',
@@ -69,35 +77,40 @@ export class AlbumComponent {
 
   private readonly columnCount = columnCountSignal(inject(ElementRef).nativeElement, 120);
 
-  protected readonly rows = computed(() => {
+  protected readonly items = computed(() => {
     const columns = this.columnCount();
     const sections = this.sectionsSignal();
     if (!columns || !sections) {
       return null;
     }
 
-    let rowIdx = 0;
-
-    function convertSection(section: Section, columnCount: number): RowState[] {
-      const rows: RowState[] = [];
+    const convertSection = (section: Section, columnCount: number): RowListItem[] => {
+      const rows: RowListItem[] = [];
 
       rows.push({
-        id: 'row' + ++rowIdx,
-
-        type: 'header', header: {
-          name: section.name,
-          timestamp: section.timestamp,
-          mediaCount: section.items.length,
-        },
+        type: 'header',
+        component: SectionHeaderComponent,
+        inputs: {
+          header: {
+            name: section.name,
+            timestamp: section.timestamp,
+            mediaCount: section.items.length,
+          }
+        }
       });
 
-      rows.push(...chunksOf(section.items, columnCount).map(chunk => {
+      rows.push(...chunksOf(section.items, columnCount).map((chunk): ThumbnailsListItem => {
         return {
-          id: 'row' + ++rowIdx,
-          type: 'row',
-          items: chunk,
-          columns: columnCount,
-        } as const;
+          type: 'thumbs',
+          component: AlbumRowComponent,
+          inputs: {
+            items: chunk,
+            columns: columnCount,
+          },
+          outputs: {
+            mediaClicked: value => this.mediaClicked.emit(value),
+          }
+        };
       }))
 
       return rows;
@@ -105,6 +118,4 @@ export class AlbumComponent {
 
     return sections.flatMap(section => convertSection(section, columns));
   });
-
-  protected readonly trackByIndex = (idx: number) => idx;
 }
