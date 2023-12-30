@@ -11,6 +11,7 @@ import {
   inject,
   Input,
   NgZone,
+  numberAttribute,
   type OnChanges,
   type OnDestroy,
   type SimpleChanges,
@@ -88,8 +89,23 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input({required: true})
   public items!: ListItem[]
 
-  @Input()
-  public minHeight = 50;
+  /**
+   * Number of items to prepare above and below the scroll window
+   */
+  @Input({transform: numberAttribute})
+  public bufferSize: number = 3;
+
+  /**
+   * Minimum number of items to instantiate
+   */
+  @Input({transform: numberAttribute})
+  public minWindowSize: number = 10;
+
+  /**
+   * Number of detached views to store per component.
+   */
+  @Input({transform: numberAttribute})
+  public perComponentCacheSize: number = 10;
 
   constructor() {
     observeElementSize(this.root.nativeElement)
@@ -203,38 +219,51 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     // be able to use top + height in the code below
     this.layout();
 
-    // find the first child that is currently at least partially visible according to
-    // our layout data.
-    const firstVisibleChild = this.children.find(child => {
-      return child.top != null
-        && child.height != null
-        && child.top <= this.offsetY && this.offsetY < child.top + child.height
-    })
+    // find all visible children
+    const visibleChildren = this.children.filter(child => {
+      return child.top != null && child.height != null
+        && child.top + child.height > this.offsetY
+        && child.top < this.offsetY + height
+    });
 
-    if (firstVisibleChild) {
-      const firstVisibleIdx = firstVisibleChild.index;
+    if (visibleChildren.length) {
+      const firstVisibleIdx = visibleChildren[0].index;
 
       if (this.firstVisible !== firstVisibleIdx) {
         debug('First visible is now', firstVisibleIdx);
         this.firstVisible = Math.max(0, firstVisibleIdx);
-        this.firstTop = firstVisibleChild.top!;
+        this.firstTop = visibleChildren[0].top!;
       }
     }
 
-    const amountToShow = Math.ceil(height / this.minHeight);
+    // check how many nodes we're currently showing and how space they use
+    const heightOfVisibleChildren = visibleChildren.reduce((acc, ch) => acc + (ch.height ?? 0), 0);
+
+    if (heightOfVisibleChildren < height) {
+      debug('Visible children count:', visibleChildren.length)
+      debug('Height of visible children is not enough, need to add more children');
+
+      this.schedule.schedule('updateContent', () => this.updateContent());
+    }
+
+    // add two more children to the already visible children
+    const amountToShow = visibleChildren.length + this.bufferSize;
+
+    const minIndexToShow = this.firstVisible - this.bufferSize;
+    const maxIndexToShow = this.firstVisible + visibleChildren.length + this.bufferSize - 1;
 
     // only keep a few elements above the window
     for (const child of [...this.children]) {
-      if (child.index < this.firstVisible - 3 || child.index > this.firstVisible + amountToShow) {
-        this.detachChild(child);
-        this.cacheChild(child);
+      if (child.top != null && child.height != null) {
+        if (child.index < minIndexToShow || child.index > maxIndexToShow) {
+          this.detachChild(child);
+          this.cacheChild(child);
+        }
       }
     }
 
     // fill elements starting at the first one to show
-    for (let i = -3; i < amountToShow; i++) {
-      const index = i + this.firstVisible;
-
+    for (let index = minIndexToShow; index <= maxIndexToShow; index++) {
       const item = this.items[index];
       if (item == null) {
         // no such item, stop here
@@ -267,20 +296,41 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private limitScrolling() {
-    if (this.children.length) {
-      const last = this.children[this.children.length - 1];
-      if (last.top != null && last.height) {
-        if (this.offsetY + this.lastRootHeight > last.top + last.height) {
+    if (!this.children.length) {
+      this.offsetY = 0;
+    }
+
+    // it looks like someone scrolled so fast that no child is visible
+    // anymore. In this case we just reset scrolling.
+    const hasVisibleChildren = this.children.some(child => {
+      return child.top != null && child.height != null
+        && child.top + child.height > this.offsetY
+        && child.top < this.offsetY + this.lastRootHeight
+    });
+
+    if (!hasVisibleChildren) {
+      this.offsetY = this.children[0]?.top ?? 0;
+      this.fling.velocity = 0;
+    }
+
+    const last = this.children[this.children.length - 1];
+    if (last.top != null && last.height != null && last.index === this.items.length - 1) {
+      if (this.offsetY + this.lastRootHeight > last.top + last.height) {
+        if (last.top + last.height < this.lastRootHeight) {
+          // we do not have enough nodes to span the full scrolling area,
+          // we anchor the top.
+          this.offsetY = 0;
+
+        } else {
+          // all good, stop scrolling at the bottom of the screen.
           this.offsetY = last.top + last.height - this.lastRootHeight
         }
       }
+    }
 
-      const first = this.children[0];
-      if (first.top != null && this.offsetY < first.top) {
-        this.offsetY = first.top;
-      }
-    } else {
-      this.offsetY = 0;
+    const first = this.children[0];
+    if (first.top != null && this.offsetY < first.top && first.index === 0) {
+      this.offsetY = first.top;
     }
   }
 
@@ -369,8 +419,12 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   private attachChild(child: Child): void {
     child.node.append(child.ref.location.nativeElement);
+    child.node.dataset['index'] = child.index.toString();
 
-    this.canvas.nativeElement.append(child.node);
+    // check for the previous child
+    const next = this.children.find(ch => ch.index === child.index + 1);
+    this.canvas.nativeElement.insertBefore(child.node, next?.node ?? null);
+
     this.applicationRef.attachView(child.ref.hostView);
     this.observer.observe(child.node, {box: 'border-box'});
     this.children.push(child);
@@ -395,7 +449,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private destroyChild(child: Child) {
-    debug('Destrying child', child.index);
+    debug('Destroying child', child.index);
     child.ref.destroy();
     child.node.innerHTML = '';
   }
@@ -406,7 +460,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       this.cache.set(child.ref.componentType, cache = []);
     }
 
-    if (cache.length >= 4) {
+    if (cache.length >= this.perComponentCacheSize) {
       // we have enough items in the cache, remove this one.
       this.destroyChild(child);
       return;
@@ -479,7 +533,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 }
 
 class FlingVelocity {
-  constructor(public velocity: number, private readonly friction: number = -4.2) {
+  constructor(public velocity: number, private readonly friction: number = -1.8) {
   }
 
   get stopped(): boolean {
@@ -488,14 +542,8 @@ class FlingVelocity {
 
   public update(dt: number) {
     // more friction when already slow down
-    const friction = this.friction - 2 * (1 - Math.min(1, Math.abs(this.velocity) / 100));
-
-    const v1 = this.velocity * Math.exp(dt * friction)
-    const v2 = this.velocity - Math.sign(this.velocity) * 4000 * dt;
-
-    // interpolate between linear slowdown above 2000px/s and friction below 4000px/s
-    const f = Math.min(1, Math.max(0, Math.abs(this.velocity) - 2000) / 2000);
-    this.velocity = f * v2 + (1 - f) * v1;
+    const friction = this.friction - 4 * (1 - Math.min(1, Math.abs(this.velocity) / 100));
+    this.velocity = this.velocity * Math.exp(dt * friction);
 
     if (this.isAtEquilibrium()) {
       this.velocity = 0;
