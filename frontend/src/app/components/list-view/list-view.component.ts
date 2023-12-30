@@ -227,6 +227,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     });
 
     if (visibleChildren.length) {
+      // estimate the first visible index
       const firstVisibleIdx = visibleChildren[0].index;
 
       if (this.firstVisible !== firstVisibleIdx) {
@@ -234,6 +235,9 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.firstVisible = Math.max(0, firstVisibleIdx);
         this.firstTop = visibleChildren[0].top!;
       }
+    } else {
+      this.firstTop = 0;
+      this.firstVisible = 0;
     }
 
     // check how many nodes we're currently showing and how space they use
@@ -246,21 +250,12 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       this.schedule.schedule('updateContent', () => this.updateContent());
     }
 
-    // add two more children to the already visible children
-    const amountToShow = visibleChildren.length + this.bufferSize;
-
+    // calculate the indices we want to show
     const minIndexToShow = this.firstVisible - this.bufferSize;
     const maxIndexToShow = this.firstVisible + visibleChildren.length + this.bufferSize - 1;
 
     // only keep a few elements above the window
-    for (const child of [...this.children]) {
-      if (child.top != null && child.height != null) {
-        if (child.index < minIndexToShow || child.index > maxIndexToShow) {
-          this.detachChild(child);
-          this.cacheChild(child);
-        }
-      }
-    }
+    this.cleanupChildrenOutsideOf(minIndexToShow, maxIndexToShow);
 
     // fill elements starting at the first one to show
     for (let index = minIndexToShow; index <= maxIndexToShow; index++) {
@@ -293,6 +288,17 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     // apply transform
     this.canvas.nativeElement.style.setProperty('--offset-y', (-this.offsetY) + 'px');
+  }
+
+  private cleanupChildrenOutsideOf(minIndexToShow: number, maxIndexToShow: number) {
+    for (const child of [...this.children]) {
+      if (child.top != null && child.height != null) {
+        if (child.index < minIndexToShow || child.index > maxIndexToShow) {
+          this.detachChild(child);
+          this.cacheChild(child);
+        }
+      }
+    }
   }
 
   private limitScrolling() {
