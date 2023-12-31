@@ -5,8 +5,9 @@ import {
   ElementRef,
   inject,
   Input,
+  type OnDestroy,
   signal,
-  type TrackByFunction
+  ViewChild
 } from '@angular/core';
 import type {Album} from '../../service/gallery';
 import {chunksOf, columnCountSignal} from '../../util';
@@ -35,9 +36,12 @@ import {AlbumListHeaderComponent} from '../album-list-header/album-list-header.c
   styleUrl: './album-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class AlbumListComponent {
+export class AlbumListComponent implements OnDestroy {
   private readonly albumsSignal = signal<Album[] | undefined>(undefined);
   protected readonly columnCount = columnCountSignal(inject(ElementRef).nativeElement, 300);
+
+  @ViewChild('ListView', {static: false})
+  protected listView: ListViewComponent | null = null;
 
   protected readonly state = computed(() => {
     let albums = this.albumsSignal();
@@ -67,14 +71,22 @@ export class AlbumListComponent {
       }),
     );
 
-    return {columnCount, rows};
+    const initialScroll = firstVisible != null
+      ? [firstVisible, 0] as [number, number]
+      : null;
+    return {columnCount, rows, initialScroll};
   });
-
-  trackByIndex: TrackByFunction<Album[]> = (idx: number) => idx;
 
   @Input()
   set albums(albums: Album[]) {
     this.albumsSignal.set(albums);
   }
+
+  ngOnDestroy() {
+    if (this.listView) {
+      firstVisible = this.listView.firstVisible;
+    }
+  }
 }
 
+let firstVisible: number;

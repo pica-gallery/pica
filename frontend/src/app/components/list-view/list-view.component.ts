@@ -18,7 +18,7 @@ import {
   type Type,
   ViewChild
 } from '@angular/core';
-import {enterNgZone, observeElementSize} from '../../util';
+import {observeElementSize} from '../../util';
 import {distinctUntilChanged, filter, map, Subscription} from 'rxjs';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import PointerTracker from 'pointer-tracker';
@@ -40,7 +40,7 @@ type Child = {
 }
 
 function debug(...args: any[]) {
-  console.debug(...args);
+  // console.debug(...args);
 }
 
 function removeInplace(children: Child[], child: Child) {
@@ -68,11 +68,11 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   @ViewChild('Canvas')
   protected canvas!: ElementRef<HTMLElement>;
 
-  // the index of the first visible item
-  protected firstVisible: number = 0;
+  @Input()
+  public initialScroll: [number, number] | null = null
 
-  // top position of the first visible item
-  protected firstTop: number = 0;
+  // the index of the first visible item
+  public firstVisible: number = 0;
 
   protected offsetY: number = 0;
 
@@ -82,7 +82,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   private fling = new FlingVelocity(0);
   private schedule = new AnimationSchedule();
 
-  private readonly observer = new ResizeObserver(entries => this.resizeObserver(entries));
+  private readonly observer = new ResizeObserver(entries => this.resizeObserverCallback(entries));
 
   private readonly cache = new Map<Type<unknown>, Child[]>();
 
@@ -114,12 +114,15 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         filter(height => height > 0),
         distinctUntilChanged(),
         takeUntilDestroyed(),
-        enterNgZone(this.ngZone),
       )
       .subscribe(height => this.updateContent(height));
   }
 
   ngAfterViewInit() {
+    if (this.initialScroll) {
+      this.firstVisible = this.initialScroll[0];
+    }
+
     this.ngZone.runOutsideAngular(() => {
       const velocityTracker = new VelocityTracker();
 
@@ -167,7 +170,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    console.info('Changes', changes);
+    debug('Changes', changes);
 
     const change = changes['items'];
     if (!change || change.firstChange) {
@@ -196,6 +199,9 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.schedule.destroy();
+    this.observer.disconnect();
+
     debug('Destroy cached nodes')
     for (const child of [...this.cache.values()].flat()) {
       this.destroyChild(child);
@@ -232,21 +238,18 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
       if (this.firstVisible !== firstVisibleIdx) {
         debug('First visible is now', firstVisibleIdx);
-        this.firstVisible = Math.max(0, firstVisibleIdx);
-        this.firstTop = visibleChildren[0].top!;
+        this.firstVisible = firstVisibleIdx;
       }
-    } else {
-      this.firstTop = 0;
-      this.firstVisible = 0;
     }
 
     // check how many nodes we're currently showing and how space they use
     const heightOfVisibleChildren = visibleChildren.reduce((acc, ch) => acc + (ch.height ?? 0), 0);
 
-    if (heightOfVisibleChildren < height) {
+    if (heightOfVisibleChildren < height && this.items.length) {
       debug('Visible children count:', visibleChildren.length)
       debug('Height of visible children is not enough, need to add more children');
 
+      // schedule another layout pass in the next frame to add more items
       this.schedule.schedule('updateContent', () => this.updateContent());
     }
 
@@ -320,7 +323,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
 
     const last = this.children[this.children.length - 1];
-    if (last.top != null && last.height != null && last.index === this.items.length - 1) {
+    if (last?.top != null && last.height != null && last.index === this.items.length - 1) {
       if (this.offsetY + this.lastRootHeight > last.top + last.height) {
         if (last.top + last.height < this.lastRootHeight) {
           // we do not have enough nodes to span the full scrolling area,
@@ -341,7 +344,12 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private layout() {
-    let top = this.firstTop;
+    const firstVisibleItem = this.children.find(child => child.index === this.firstVisible);
+    if (firstVisibleItem == null) {
+      return;
+    }
+
+    let top = firstVisibleItem.top ?? 0;
 
     this.children.sort((lhs, rhs) => {
       return lhs.index - rhs.index;
@@ -375,7 +383,9 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       }
     }
 
-    top = this.firstTop;
+    // start again for the invisible item before the first visible one,
+    // but this time in reverse
+    top = firstVisibleItem.top ?? 0;
 
     // layout the children above the anchor in reverse,
     // setting their top position based on the next node in the list.
@@ -488,7 +498,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     return child;
   }
 
-  private resizeObserver(entries: ResizeObserverEntry[]) {
+  private resizeObserverCallback(entries: ResizeObserverEntry[]) {
     for (const entry of entries) {
       // get the child by matching it via the resized node
       const child = this.children.find(child => child.node === entry.target);
@@ -510,7 +520,8 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       }
     }
 
-    this.schedule.schedule('layout', () => this.layout());
+    // trigger a re-layout
+    this.updateContent();
   }
 
   private bindInputsOutputs(child: Child, item: ListItem) {
@@ -578,6 +589,15 @@ class AnimationSchedule {
         const dt: number = (performance.now() - lastTime) / 1000;
         this.dispatch(dt)
       });
+    }
+  }
+
+  public destroy() {
+    this.handlers.clear();
+
+    if (this.rafId) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
     }
   }
 

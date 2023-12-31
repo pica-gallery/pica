@@ -1,5 +1,7 @@
 @if (state(); as state) {
   <app-list-view
+    #ListView
     [items]="state.rows"
+    [initialScroll]="state.initialScroll"
     [ngStyle]="{'--column-count': state.columnCount}"/>
 }
