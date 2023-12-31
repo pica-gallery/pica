@@ -1,13 +1,12 @@
 import {
+  booleanAttribute,
   ChangeDetectionStrategy,
   Component,
   computed,
   ElementRef,
   inject,
   Input,
-  type OnDestroy,
-  signal,
-  ViewChild
+  signal
 } from '@angular/core';
 import type {Album} from '../../service/gallery';
 import {chunksOf, columnCountSignal} from '../../util';
@@ -36,12 +35,10 @@ import {AlbumListHeaderComponent} from '../album-list-header/album-list-header.c
   styleUrl: './album-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class AlbumListComponent implements OnDestroy {
+export class AlbumListComponent {
   private readonly albumsSignal = signal<Album[] | undefined>(undefined);
+  private readonly showHeaderSignal = signal(true);
   protected readonly columnCount = columnCountSignal(inject(ElementRef).nativeElement, 300);
-
-  @ViewChild('ListView', {static: false})
-  protected listView: ListViewComponent | null = null;
 
   protected readonly state = computed(() => {
     let albums = this.albumsSignal();
@@ -58,12 +55,14 @@ export class AlbumListComponent implements OnDestroy {
 
     const rows: ListItem[] = [];
 
-    rows.push({
-      component: AlbumListHeaderComponent,
-    })
+    if (this.showHeaderSignal()) {
+      rows.push({
+        component: AlbumListHeaderComponent,
+      })
+    }
 
     rows.push(
-      ...chunksOf(albums, columnCount).map((albums: Album[], idx: number): ListItem => {
+      ...chunksOf(albums, columnCount).map((albums: Album[]): ListItem => {
         return {
           component: AlbumListRowComponent,
           inputs: {items: albums},
@@ -74,6 +73,7 @@ export class AlbumListComponent implements OnDestroy {
     const initialScroll = firstVisible != null
       ? firstVisible
       : null;
+
     return {columnCount, rows, initialScroll};
   });
 
@@ -82,10 +82,9 @@ export class AlbumListComponent implements OnDestroy {
     this.albumsSignal.set(albums);
   }
 
-  ngOnDestroy() {
-    if (this.listView) {
-      firstVisible = this.listView.firstVisible;
-    }
+  @Input({transform: booleanAttribute})
+  set showHeader(show: boolean) {
+    this.showHeaderSignal.set(show);
   }
 }
 

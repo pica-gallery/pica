@@ -1,1 +1,10 @@
-<app-list-view [items]="items()" bufferSize="6" [initialIndex]="20"></app-list-view>
+<div class="search">
+  <app-search-input (searchTermChanged)="searchTermChanged($event)"/>
+</div>
+
+@if (results(); as results) {
+  <app-album-list showHeader="false" [albums]="results"/>
+} @else {
+  <app-busy-full/>
+}
+

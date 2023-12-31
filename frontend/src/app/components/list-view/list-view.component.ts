@@ -39,7 +39,7 @@ type Child = {
 }
 
 function debug(...args: any[]) {
-  // console.debug(...args);
+  console.debug(...args);
 }
 
 function removeInplace(children: Child[], child: Child) {
@@ -74,9 +74,9 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   public firstVisible: number = 0;
 
   protected lastRootHeight = 0;
-  protected children: Child[] = [];
+  protected readonly children: Child[] = [];
 
-  private schedule = new AnimationSchedule();
+  private readonly schedule = new AnimationSchedule();
 
   private readonly observer = new ResizeObserver(entries => this.resizeObserverCallback(entries));
   private readonly cache = new Map<Type<unknown>, Child[]>();

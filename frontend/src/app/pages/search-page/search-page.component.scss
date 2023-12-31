@@ -1,8 +1,13 @@
 :host {
-  display: block;
-  height: 100%;
+  display: flex;
+  height: calc(100dvh - 80px);
+  flex-direction: column;
 }
 
-app-list-view {
-  height: 100%;
+.search {
+  padding: 16px;
+}
+
+app-album-list {
+  height: calc(100dvh - 80px - 86px);
 }

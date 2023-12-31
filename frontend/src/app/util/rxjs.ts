@@ -1,7 +1,15 @@
-import type { NgZone } from '@angular/core';
-import type { MonoTypeOperatorFunction, Observable, Subscriber } from 'rxjs';
-import { createOperatorSubscriber } from 'rxjs/internal/operators/OperatorSubscriber';
-import { operate } from 'rxjs/internal/util/lift';
+import type {NgZone} from '@angular/core';
+import {
+  filter,
+  map,
+  type MonoTypeOperatorFunction,
+  type Observable,
+  type OperatorFunction,
+  pipe,
+  type Subscriber
+} from 'rxjs';
+import {createOperatorSubscriber} from 'rxjs/internal/operators/OperatorSubscriber';
+import {operate} from 'rxjs/internal/util/lift';
 
 /**
  * Runs all downstream notifications within the given zone.
@@ -35,4 +43,9 @@ export function enterNgZone<T>(ngZone: NgZone): MonoTypeOperatorFunction<T> {
 
     source.subscribe(createOperatorSubscriber(subscriber, onNext, onComplete, onError));
   });
+}
+
+
+export function filterNotNull<T>(): OperatorFunction<T | null | undefined, T> {
+  return pipe(filter(val => val != null), map(val => val!));
 }

@@ -1,6 +1,5 @@
 @if (state(); as state) {
   <app-list-view
-    #ListView
     [items]="state.rows"
     [bufferSize]="4"
     [initialIndex]="state.initialScroll"
