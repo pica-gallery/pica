@@ -68,7 +68,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   protected canvas!: ElementRef<HTMLElement>;
 
   @Input()
-  public initialScroll: [number, number] | null = null
+  public initialIndex: number | null = null;
 
   // the index of the first visible item
   public firstVisible: number = 0;
@@ -81,7 +81,6 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   private readonly observer = new ResizeObserver(entries => this.resizeObserverCallback(entries));
   private readonly cache = new Map<Type<unknown>, Child[]>();
 
-  private minTop: number = 0;
   private maxTop: number = 0;
 
   @Input({required: true})
@@ -127,8 +126,8 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   ngAfterViewInit() {
-    if (this.initialScroll) {
-      this.firstVisible = this.initialScroll[0];
+    if (this.initialIndex) {
+      this.firstVisible = this.initialIndex;
     }
 
     this.offsetY = 0;
@@ -251,18 +250,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     // so we might need to re-layout again
     this.layout();
 
-    const minTop = this.children[0]?.top != null && this.children[0].top;
-    if (minTop !== false && minTop < 0) {
-      // check if we layout some content outside of the canvas (negative y position)
-      // amount of space we need to add to the top
-      const newSpace = -minTop;
-
-      debug('Layouted children outside of container, adjust offset+scrolling by', newSpace);
-
-      this.offsetChildrenBy(newSpace);
-      this.offsetY += newSpace;
-    }
-
+    // calculate new height for the canvas based on the now layouted children
     this.updateCanvasSize();
   }
 
@@ -295,22 +283,32 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
   }
 
+  private anchorChild(): Child | null {
+    return this.children.find(child => child.top != null && child.top >= this.offsetY)
+      ?? this.children.find(child => child.index === this.firstVisible)
+      ?? null;
+  }
+
   private layout() {
-    const firstVisibleItem = this.children.find(child => child.index === this.firstVisible);
-    if (firstVisibleItem == null) {
+    if (this.children.length === 0) {
       return;
     }
-
-    let top = firstVisibleItem.top ?? 0;
 
     this.children.sort((lhs, rhs) => {
       return lhs.index - rhs.index;
     })
 
+    const anchorChild = this.anchorChild();
+    if (anchorChild == null) {
+      return;
+    }
+
     if (!this.children.some(child => child.dirty && child.height != null)) {
       // layout is clean, no need to do anything
       return;
     }
+
+    let top = anchorChild.top ?? 0;
 
     // layout all children that are (at least partially) below the anchor
     // from top to bottom
@@ -321,7 +319,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         continue;
       }
 
-      if (child.index >= this.firstVisible) {
+      if (child.index >= anchorChild.index) {
         if (child.top == null) {
           // first layout, make it visible
           child.node.classList.add('layouted');
@@ -337,7 +335,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     // start again for the invisible item before the first visible one,
     // but this time in reverse
-    top = firstVisibleItem.top ?? 0;
+    top = anchorChild.top ?? 0;
 
     // layout the children above the anchor in reverse,
     // setting their top position based on the next node in the list.
@@ -350,7 +348,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         continue;
       }
 
-      if (child.index < this.firstVisible) {
+      if (child.index < anchorChild.index) {
         if (child.top == null) {
           // first layout, make it visible
           child.node.classList.add('layouted');
@@ -363,6 +361,29 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         child.dirty = false;
       }
     }
+
+    // fix scroll offset if we've layouted children to the outside of the scroll container.
+    const firstChild = this.children.find(child => child.top != null);
+    if (firstChild?.top != null) {
+      if (firstChild.index === 0 && firstChild.top > 0) {
+        debug('Anchor not at zero, fixing this now.');
+
+        const removedSpace = firstChild.top;
+        this.offsetChildrenBy(-removedSpace);
+        this.offsetY -= removedSpace;
+
+      } else if (firstChild.top < 0) {
+        // if we have layouted some content "before" the container, we need to correct all children
+        // again to move them out of the container area. We also need to offset the current scroll
+        // by the same amount.
+        const newSpace = -top;
+
+        debug('Put children outside of container, adjust offset+scroll by', newSpace);
+
+        this.offsetChildrenBy(newSpace);
+        this.offsetY += newSpace;
+      }
+    }
   }
 
   private updateCanvasSize() {
@@ -371,16 +392,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       return;
     }
 
-    const firstChild = this.children[0];
     const lastChild = this.children[this.children.length - 1];
-
-    if (firstChild != null && firstChild.top != null && firstChild.height != null) {
-      if (firstChild.index === 0) {
-        this.minTop = firstChild.top;
-      } else {
-        this.minTop = Math.min(this.minTop, firstChild.top);
-      }
-    }
 
     if (lastChild != null && lastChild.top != null && lastChild.height != null) {
       if (lastChild.index === this.items.length - 1) {
@@ -393,7 +405,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       }
     }
 
-    this.canvas.nativeElement.style.height = (this.maxTop - this.minTop) + 'px';
+    this.canvas.nativeElement.style.height = this.maxTop + 'px';
   }
 
   private offsetChildrenBy(y: number) {

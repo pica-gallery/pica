@@ -72,7 +72,7 @@ export class AlbumListComponent implements OnDestroy {
     );
 
     const initialScroll = firstVisible != null
-      ? [firstVisible, 0] as [number, number]
+      ? firstVisible
       : null;
     return {columnCount, rows, initialScroll};
   });

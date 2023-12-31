@@ -1,8 +1,8 @@
 :host {
   display: block;
+  height: 100%;
 }
 
-.list {
-  width: 100vw;
-  height: calc(100dvh - 80px);
+app-list-view {
+  height: 100%;
 }
