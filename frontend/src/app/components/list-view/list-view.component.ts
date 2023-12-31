@@ -21,7 +21,6 @@ import {
 import {observeElementSize} from '../../util';
 import {distinctUntilChanged, filter, map, Subscription} from 'rxjs';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
-import PointerTracker from 'pointer-tracker';
 
 export type ListItem = {
   component: Type<unknown>,
@@ -74,17 +73,16 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   // the index of the first visible item
   public firstVisible: number = 0;
 
-  protected offsetY: number = 0;
-
   protected lastRootHeight = 0;
   protected children: Child[] = [];
 
-  private fling = new FlingVelocity(0);
   private schedule = new AnimationSchedule();
 
   private readonly observer = new ResizeObserver(entries => this.resizeObserverCallback(entries));
-
   private readonly cache = new Map<Type<unknown>, Child[]>();
+
+  private minTop: number = 0;
+  private maxTop: number = 0;
 
   @Input({required: true})
   public items!: ListItem[]
@@ -107,7 +105,17 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input({transform: numberAttribute})
   public perComponentCacheSize: number = 10;
 
+  protected get offsetY(): number {
+    return this.root.nativeElement.scrollTop;
+  }
+
+  protected set offsetY(value: number) {
+    this.root.nativeElement.scrollTop = value;
+  }
+
   constructor() {
+    this.offsetY = 0;
+
     observeElementSize(this.root.nativeElement)
       .pipe(
         map(sizes => sizes.height),
@@ -123,49 +131,10 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       this.firstVisible = this.initialScroll[0];
     }
 
+    this.offsetY = 0;
+
     this.ngZone.runOutsideAngular(() => {
-      const velocityTracker = new VelocityTracker();
-
-      const tracker: PointerTracker = new PointerTracker(this.root.nativeElement, {
-        start: () => {
-          // accept as a new pointer only if this is the first one.
-          if (tracker.currentPointers.length > 0) {
-            return false;
-          }
-
-          // stop any active fling now
-          this.fling.velocity = 0;
-
-          return true;
-        },
-
-        move: previousPointers => {
-          const prevY = previousPointers[0].pageY;
-          const currY = tracker.currentPointers[0].pageY;
-
-          const dy = prevY - currY;
-          this.offsetY += dy;
-          this.updateContent();
-
-          velocityTracker.track(currY);
-        },
-
-        end: () => {
-          const velocity = velocityTracker.get();
-          if (velocity && Math.abs(velocity) >= 1) {
-            debug('Starting fling with velocity of', velocity);
-            this.fling.velocity = velocity;
-            this.schedule.schedule('fling', dt => this.animate(dt));
-          }
-
-          velocityTracker.clear();
-        }
-      })
-
-      this.root.nativeElement.addEventListener('wheel', event => {
-        this.offsetY += event.deltaY;
-        this.updateContent();
-      })
+      this.root.nativeElement.addEventListener('scroll', () => this.updateContent());
     });
   }
 
@@ -208,22 +177,16 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
   }
 
-  private animate(dt: number) {
-    this.fling.update(dt);
-    this.offsetY -= this.fling.velocity * dt;
-    this.updateContent();
-
-    if (!this.fling.stopped) {
-      this.schedule.schedule('fling', dt => this.animate(dt));
-    }
-  }
-
   protected updateContent(height: number = this.lastRootHeight) {
+    debug('updateContent()')
     this.lastRootHeight = height;
 
     // ensure layout is fine first. We need to do this to
     // be able to use top + height in the code below
     this.layout();
+
+    // we might need to reset scrolling if we have no anchor to work with
+    this.resetScrolling();
 
     // find all visible children
     const visibleChildren = this.children.filter(child => {
@@ -246,16 +209,18 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     const heightOfVisibleChildren = visibleChildren.reduce((acc, ch) => acc + (ch.height ?? 0), 0);
 
     if (heightOfVisibleChildren < height && this.items.length) {
-      debug('Visible children count:', visibleChildren.length)
-      debug('Height of visible children is not enough, need to add more children');
+      if (!visibleChildren.length || visibleChildren[visibleChildren.length - 1].index === this.items.length) {
+        debug('Visible children count:', visibleChildren.length)
+        debug('Height of visible children is not enough, need to add more children');
 
-      // schedule another layout pass in the next frame to add more items
-      this.schedule.schedule('updateContent', () => this.updateContent());
+        // schedule another layout pass in the next frame to add more items
+        this.schedule.schedule('updateContent', () => this.updateContent());
+      }
     }
 
     // calculate the indices we want to show
     const minIndexToShow = this.firstVisible - this.bufferSize;
-    const maxIndexToShow = this.firstVisible + visibleChildren.length + this.bufferSize - 1;
+    const maxIndexToShow = this.firstVisible + Math.max(this.minWindowSize, visibleChildren.length) + this.bufferSize - 1;
 
     // only keep a few elements above the window
     this.cleanupChildrenOutsideOf(minIndexToShow, maxIndexToShow);
@@ -286,11 +251,19 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     // so we might need to re-layout again
     this.layout();
 
-    // with the most recent positional data we can limit scrolling now
-    this.limitScrolling();
+    const minTop = this.children[0]?.top != null && this.children[0].top;
+    if (minTop !== false && minTop < 0) {
+      // check if we layout some content outside of the canvas (negative y position)
+      // amount of space we need to add to the top
+      const newSpace = -minTop;
 
-    // apply transform
-    this.canvas.nativeElement.style.setProperty('--offset-y', (-this.offsetY) + 'px');
+      debug('Layouted children outside of container, adjust offset+scrolling by', newSpace);
+
+      this.offsetChildrenBy(newSpace);
+      this.offsetY += newSpace;
+    }
+
+    this.updateCanvasSize();
   }
 
   private cleanupChildrenOutsideOf(minIndexToShow: number, maxIndexToShow: number) {
@@ -304,7 +277,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
   }
 
-  private limitScrolling() {
+  private resetScrolling() {
     if (!this.children.length) {
       this.offsetY = 0;
     }
@@ -319,27 +292,6 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     if (!hasVisibleChildren) {
       this.offsetY = this.children[0]?.top ?? 0;
-      this.fling.velocity = 0;
-    }
-
-    const last = this.children[this.children.length - 1];
-    if (last?.top != null && last.height != null && last.index === this.items.length - 1) {
-      if (this.offsetY + this.lastRootHeight > last.top + last.height) {
-        if (last.top + last.height < this.lastRootHeight) {
-          // we do not have enough nodes to span the full scrolling area,
-          // we anchor the top.
-          this.offsetY = 0;
-
-        } else {
-          // all good, stop scrolling at the bottom of the screen.
-          this.offsetY = last.top + last.height - this.lastRootHeight
-        }
-      }
-    }
-
-    const first = this.children[0];
-    if (first.top != null && this.offsetY < first.top && first.index === 0) {
-      this.offsetY = first.top;
     }
   }
 
@@ -409,6 +361,46 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         child.top = top;
         child.node.style.top = top + 'px';
         child.dirty = false;
+      }
+    }
+  }
+
+  private updateCanvasSize() {
+    if (this.children.length === 0) {
+      this.canvas.nativeElement.style.height = '200%';
+      return;
+    }
+
+    const firstChild = this.children[0];
+    const lastChild = this.children[this.children.length - 1];
+
+    if (firstChild != null && firstChild.top != null && firstChild.height != null) {
+      if (firstChild.index === 0) {
+        this.minTop = firstChild.top;
+      } else {
+        this.minTop = Math.min(this.minTop, firstChild.top);
+      }
+    }
+
+    if (lastChild != null && lastChild.top != null && lastChild.height != null) {
+      if (lastChild.index === this.items.length - 1) {
+        // actually the last one
+        this.maxTop = lastChild.top + lastChild.height;
+      } else {
+        // estimate on how many more rows we might need to add
+        const extraSpace = 100 * (this.items.length - lastChild.index + 1);
+        this.maxTop = Math.max(this.maxTop, lastChild.top + lastChild.height + extraSpace);
+      }
+    }
+
+    this.canvas.nativeElement.style.height = (this.maxTop - this.minTop) + 'px';
+  }
+
+  private offsetChildrenBy(y: number) {
+    for (const child of this.children) {
+      if (child.top != null) {
+        child.top += y;
+        child.node.style.top = child.top + 'px';
       }
     }
   }
@@ -549,29 +541,6 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 }
 
-class FlingVelocity {
-  constructor(public velocity: number, private readonly friction: number = -1.8) {
-  }
-
-  get stopped(): boolean {
-    return this.isAtEquilibrium();
-  }
-
-  public update(dt: number) {
-    // more friction when already slow down
-    const friction = this.friction - 4 * (1 - Math.min(1, Math.abs(this.velocity) / 100));
-    this.velocity = this.velocity * Math.exp(dt * friction);
-
-    if (this.isAtEquilibrium()) {
-      this.velocity = 0;
-    }
-  }
-
-  private isAtEquilibrium(): boolean {
-    return Math.abs(this.velocity) < 0.5;
-  }
-}
-
 type AnimationHandler = (dt: number) => void;
 
 class AnimationSchedule {
@@ -611,47 +580,5 @@ class AnimationSchedule {
     for (const handler of handlers) {
       handler(dt);
     }
-  }
-}
-
-type VelocityItem = {
-  time: number,
-  position: number,
-}
-
-class VelocityTracker {
-  private readonly items: VelocityItem[] = [];
-
-  public track(position: number) {
-    this.items.push({time: performance.now(), position})
-
-    if (this.items.length > 2) {
-      this.items.shift();
-    }
-  }
-
-  public get(): number | null {
-    if (this.items.length < 2) {
-      return null;
-    }
-
-    const prev = this.items[this.items.length - 2];
-    const recent = this.items[this.items.length - 1];
-
-    // no movement since the last measurement
-    if (performance.now() - recent.time > 100) {
-      return null;
-    }
-
-    // almost no movement between the last two measurements
-    if (prev && Math.abs(recent.position - prev.position) < 2) {
-      return null;
-    }
-
-    return 1000 * (recent.position - prev.position) / (recent.time - prev.time)
-  }
-
-  public clear() {
-    this.items.splice(0);
   }
 }

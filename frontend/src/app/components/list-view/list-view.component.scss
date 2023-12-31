@@ -1,13 +1,16 @@
 :host {
   display: block;
-  overflow: hidden;
-  touch-action: none;
+  overflow-x: hidden;
+  overflow-y: scroll;
 }
 
 :host > .canvas {
   position: relative;
-  will-change: transform;
-  transform: translateY(var(--offset-y, 0px));
+  will-change: height;
+
+  // initial size to allow for some initial scrolling
+  // before anything was actually laid out
+  height: 200%;
 }
 
 :host > .canvas ::ng-deep {
