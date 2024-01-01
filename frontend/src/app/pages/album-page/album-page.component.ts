@@ -13,6 +13,7 @@ function convertToSections(album: Album): Section[] {
     name: album.name,
     timestamp: album.timestamp,
     items: album.items,
+    location: album.location,
   }]
 }
 

@@ -6,7 +6,6 @@ use tower_http::compression::CompressionLayer;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
-
 use crate::pica::accessor::MediaAccessor;
 use crate::pica::store::MediaStore;
 
@@ -28,6 +27,7 @@ pub async fn serve(store: MediaStore, accessor: MediaAccessor, addr: impl ToSock
         .route("/api/stream", get(handlers::api::handle_stream_get))
         .route("/api/albums", get(handlers::api::handle_albums_get))
         .route("/api/albums/:id", get(handlers::api::handle_album_get))
+        .route("/api/media/:id/exif", get(handlers::api::handle_exif_get))
         .layer(CompressionLayer::new().gzip(true))
         .route("/media/thumb/:id/*path", get(handlers::media::handle_thumbnail))
         .route("/media/preview/sdr/:id/*path", get(handlers::media::handle_preview_sdr))

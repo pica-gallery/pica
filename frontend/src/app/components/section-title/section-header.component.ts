@@ -6,6 +6,7 @@ export type SectionHeader = {
   name: string,
   timestamp: Date,
   mediaCount: number,
+  location: string | null,
 }
 
 @Component({

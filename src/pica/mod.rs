@@ -4,10 +4,11 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use anyhow::ensure;
+use anyhow::{anyhow, bail, ensure};
 use chrono::{DateTime, Utc};
-
 use serde_with::{DeserializeFromStr, SerializeDisplay};
+
+pub use album::by_directory;
 
 mod album;
 pub mod index;
@@ -18,9 +19,8 @@ pub mod accessor;
 pub mod store;
 pub mod db;
 pub mod queue;
-mod exif;
-
- pub use album::by_directory;
+pub mod exif;
+mod geo;
 
 #[derive(SerializeDisplay, DeserializeFromStr)]
 pub struct Id<T> {
@@ -111,6 +111,8 @@ pub struct MediaInfo {
     pub timestamp: DateTime<Utc>,
     pub width: u32,
     pub height: u32,
+    pub latitude: Option<f32>,
+    pub longitude: Option<f32>,
 }
 
 /// A [MediaItem] references a media file on the filesystem.
@@ -118,14 +120,82 @@ pub struct MediaInfo {
 pub struct MediaItem {
     pub id: MediaId,
     pub relpath: PathBuf,
-    pub name: String,
     pub filesize: u64,
+    pub name: String,
     pub typ: MediaType,
     pub info: MediaInfo,
-    pub hdr: bool,
+    pub location: Option<Location>,
 }
 
-pub type AlbumId = Id<Album<'static>>;
+impl MediaItem {
+    pub fn from_media_info(id: MediaId, relpath: PathBuf, filesize: u64, info: MediaInfo) -> anyhow::Result<Self> {
+        // take the file name and clear any invalid characters from it
+        let name = relpath
+            .file_name()
+            .ok_or_else(|| anyhow!("no file name in {:?}", relpath))?
+            .to_string_lossy()
+            .replace(core::char::REPLACEMENT_CHARACTER, "_");
+
+        let extension = relpath
+            .extension()
+            .ok_or_else(|| anyhow!("no file extension in {:?}", relpath))?
+            .to_string_lossy()
+            .to_lowercase();
+
+        let typ = match extension.as_str() {
+            "jpg" | "jpeg" | "png" => MediaType::Image,
+            "mp4" | "mkv" | "avi" | "mov" => MediaType::Video,
+            other => bail!("unknown extension: {:?}", other),
+        };
+
+        let location = match (info.latitude, info.longitude) {
+            (Some(latitude), Some(longitude)) => {
+                let city = geo::nearest_city(latitude, longitude)?.map(City::from);
+                Some(Location { latitude, longitude, city })
+            }
+
+            _ => None
+        };
+
+        Ok(Self {
+            id,
+            relpath,
+            filesize,
+            info,
+            name,
+            typ,
+            location,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Location {
+    pub latitude: f32,
+    pub longitude: f32,
+    pub city: Option<City>,
+}
+
+#[derive(Clone, Debug)]
+pub struct City {
+    pub latitude: f32,
+    pub longitude: f32,
+    pub name: String,
+    pub country: String,
+}
+
+impl From<&geo::City> for City {
+    fn from(value: &geo::City) -> Self {
+        Self {
+            name: value.name.to_owned(),
+            country: value.country.to_owned(),
+            latitude: value.latitude,
+            longitude: value.longitude,
+        }
+    }
+}
+
+pub type AlbumId = Id<Album>;
 
 #[derive(Clone, Debug)]
 pub struct AlbumInfo {
@@ -135,7 +205,7 @@ pub struct AlbumInfo {
 }
 
 #[derive(Clone, Debug)]
-pub struct Album<'a> {
+pub struct Album {
     pub id: AlbumId,
     pub name: String,
     pub timestamp: DateTime<Utc>,
@@ -144,8 +214,8 @@ pub struct Album<'a> {
     pub relpath: Option<PathBuf>,
 
     // a copy of the media items in this album
-    pub items: Vec<&'a MediaItem>,
-    
+    pub items: Vec<MediaItem>,
+
     // the albums preview image
-    pub cover: &'a MediaItem,
+    pub cover: MediaItem,
 }

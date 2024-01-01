@@ -3,6 +3,7 @@ import {
   type AlbumId,
   type AlbumTo,
   ApiService,
+  type ExifInfoTo,
   type MediaItemTo,
   type MediaUrls,
   mediaUrlsOf,
@@ -22,6 +23,7 @@ export type Stream = {
 export type Section = {
   name: string,
   timestamp: Date,
+  location: string | null,
   items: MediaItem[],
 }
 
@@ -32,11 +34,23 @@ export type Album = {
   relpath: string | null,
   items: MediaItem[],
   cover: MediaItem,
+  location: string | null,
+}
+
+export type ExifField = {
+  tag: string,
+  value: string,
+}
+
+export type ExifInfo = {
+  item: MediaItem,
+  exif: ExifField[] | null,
 }
 
 @Injectable({providedIn: 'root'})
 export class Gallery {
-  private readonly cache = new Map<string, Observable<Album>>();
+  private readonly albumCache = new Map<string, Observable<Album>>();
+  private readonly exifCache = new Map<string, Observable<ExifInfo>>();
 
   private readonly stream$ = this.apiService.stream().pipe(
     map(stream => convertStream(stream, Daily)),
@@ -60,19 +74,37 @@ export class Gallery {
   }
 
   public album(albumId: string): Observable<Album> {
-    const cached$ = this.cache.get(albumId);
+    return this.withCache(this.albumCache, albumId, () => {
+      return this.apiService.album(albumId).pipe(map(convertAlbum));
+    });
+  }
+
+  public exifInfo(mediaId: string): Observable<ExifInfo> {
+    return this.withCache(this.exifCache, mediaId, () => {
+      return this.apiService.exif(mediaId).pipe(map(convertExifInfo));
+    });
+  }
+
+  private withCache<Id, T>(cache: Map<Id, Observable<T>>, id: Id, fetch: () => Observable<T>): Observable<T> {
+    const cached$ = cache.get(id);
     if (cached$ != null) {
       return cached$
     }
 
-    const album$ = this.apiService.album(albumId).pipe(
-      map(stream => convertAlbum(stream)),
-      shareReplay(1),
-    )
+    const fetched$ = fetch().pipe(shareReplay(1));
+    cache.set(id, fetched$);
+    return fetched$;
+  }
+}
 
-    this.cache.set(albumId, album$);
-
-    return album$;
+function convertExifInfo(info: ExifInfoTo): ExifInfo {
+  return {
+    item: convertItem(info.item),
+    exif: info.exif ?
+      Object.entries(info.exif)
+        .map(([tag, value]) => ({tag, value}))
+        .sort((lhs, rhs) => lhs.tag.localeCompare(rhs.tag))
+      : null,
   }
 }
 
@@ -80,14 +112,57 @@ function convertAlbums(albums: AlbumTo[]): Album[] {
   return albums.map(al => convertAlbum(al));
 }
 
+function mainLocationOf(items: MediaItem[]): string | null {
+
+  let totalCount = 0;
+
+  const cityCounts = new Map<string, number>();
+  const countryCounts = new Map<string, number>();
+
+  for (const item of items) {
+    if (item.location == null) {
+      continue
+    }
+
+    // count city and country
+    const loc = item.location.city + ', ' + item.location.country;
+    cityCounts.set(loc, (cityCounts.get(loc) ?? 0) + 1);
+
+    // count only country too
+    countryCounts.set(loc, (countryCounts.get(item.location.country) ?? 0) + 1);
+
+    totalCount++;
+  }
+
+
+  // check that >= 95 percent of the items come from one city
+  for (const [loc, count] of [...cityCounts.entries()]) {
+    if (count >= totalCount * 0.95) {
+      return loc;
+    }
+  }
+
+  // check that >= 95 percent of the items come from one country
+  for (const [loc, count] of [...cityCounts.entries()]) {
+    if (count >= totalCount * 0.95) {
+      return loc;
+    }
+  }
+
+  return null;
+}
+
 function convertAlbum(album: AlbumTo): Album {
+  const items = album.items.map(item => convertItem(item));
+
   return {
     id: album.id,
     name: album.name,
     relpath: album.relpath,
     timestamp: album.timestamp,
-    items: album.items.map(item => convertItem(item)),
+    items: items,
     cover: convertItem(album.cover),
+    location: mainLocationOf(items),
   }
 }
 
@@ -103,9 +178,15 @@ function convertStream(stream: StreamTo, grouping: GroupingStrategy): Stream {
   let section: Section | null = null;
   for (const item of items) {
     if (section == null || !(grouping.partOf(section, item))) {
+      if (section != null) {
+        // finalize the previous section
+        section.location = mainLocationOf(section.items);
+      }
+
       section = {
         name: grouping.nameOf(item.timestamp),
         timestamp: item.timestamp,
+        location: null,
         items: []
       }
 

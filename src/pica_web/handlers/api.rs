@@ -1,63 +1,98 @@
 use std::cmp::Reverse;
+use std::path::PathBuf;
 
 use anyhow::anyhow;
 use axum::extract::{Path, State};
+use axum::http::StatusCode;
 use axum::Json;
 use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use serde::Serialize;
 
-use crate::pica::{Album, AlbumId, by_directory, MediaId, MediaItem};
+use crate::pica::{Album, AlbumId, by_directory, Location, MediaId, MediaItem};
+use crate::pica::exif::{GenericExif, parse_exif_generic};
 use crate::pica_web::AppState;
 use crate::pica_web::handlers::WebError;
 
 #[derive(Serialize)]
-struct MediaItemView<'a> {
+struct MediaItemView {
     id: MediaId,
-    name: &'a str,
+    name: String,
     timestamp: DateTime<Utc>,
     width: u32,
     height: u32,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    location: Option<LocationView>,
 }
 
-impl<'a> From<&'a MediaItem> for MediaItemView<'a> {
-    fn from(image: &'a MediaItem) -> Self {
+#[derive(Serialize)]
+struct LocationView {
+    latitude: f32,
+    longitude: f32,
+    city: Option<String>,
+    country: Option<String>,
+}
+
+impl From<Location> for LocationView {
+    fn from(value: Location) -> Self {
+        let mut city = value.city;
+
         Self {
-            id: image.id,
-            name: &image.name,
-            timestamp: image.info.timestamp,
-            width: image.info.width,
-            height: image.info.height,
+            latitude: value.latitude,
+            longitude: value.longitude,
+            city: city.as_mut().map(|city| std::mem::take(&mut city.name)),
+            country: city.as_mut().map(|city| std::mem::take(&mut city.country)),
+        }
+    }
+}
+
+impl From<MediaItem> for MediaItemView {
+    fn from(media: MediaItem) -> Self {
+        Self {
+            id: media.id,
+            name: media.name,
+            timestamp: media.info.timestamp,
+            width: media.info.width,
+            height: media.info.height,
+            location: media.location.map(LocationView::from),
         }
     }
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct AlbumView<'a> {
-    id: AlbumId,
-    name: &'a str,
-    items: Vec<MediaItemView<'a>>,
-    timestamp: DateTime<Utc>,
-    relpath: Option<&'a std::path::Path>,
-    cover: MediaItemView<'a>,
+struct ExifView {
+    item: MediaItemView,
+    exif: Option<GenericExif>,
 }
 
-impl<'a, 'b: 'a> From<&'b Album<'a>> for AlbumView<'a> {
-    fn from(value: &'b Album<'a>) -> Self {
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AlbumView {
+    id: AlbumId,
+    name: String,
+    items: Vec<MediaItemView>,
+    timestamp: DateTime<Utc>,
+    relpath: Option<PathBuf>,
+    cover: MediaItemView,
+}
+
+impl From<Album> for AlbumView {
+    fn from(value: Album) -> Self {
         Self::from_album(value, usize::MAX)
     }
 }
 
-impl<'a> AlbumView<'a> {
-    fn from_album<'b: 'a>(album: &'b Album<'a>, n: usize) -> AlbumView<'a> {
+impl AlbumView {
+    fn from_album(album: Album, n: usize) -> AlbumView {
         Self {
             id: album.id,
-            name: &album.name,
-            items: album.items.iter().take(n).copied().map(MediaItemView::from).collect(),
+            name: album.name,
+            items: album.items.into_iter().take(n).map(MediaItemView::from).collect(),
             timestamp: album.timestamp,
-            relpath: album.relpath.as_deref(),
+            relpath: album.relpath,
             cover: album.cover.into(),
         }
     }
@@ -65,14 +100,14 @@ impl<'a> AlbumView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct StreamView<'a> {
-    items: Vec<MediaItemView<'a>>,
+struct StreamView {
+    items: Vec<MediaItemView>,
 }
 
 pub async fn handle_stream_get(state: State<AppState>) -> Result<Response, WebError> {
     let items = state.store.items().await;
 
-    let items = items.iter()
+    let items = items.into_iter()
         .sorted_unstable_by_key(|img| Reverse(img.info.timestamp))
         .take(10000)
         .map(MediaItemView::from)
@@ -84,10 +119,10 @@ pub async fn handle_stream_get(state: State<AppState>) -> Result<Response, WebEr
 
 pub async fn handle_albums_get(state: State<AppState>) -> Result<Response, WebError> {
     let images = state.store.items().await;
-    let albums = by_directory(&images);
+    let albums = by_directory(images);
 
     let albums = albums
-        .iter()
+        .into_iter()
         .map(|al| AlbumView::from_album(al, 0))
         .collect_vec();
 
@@ -96,11 +131,23 @@ pub async fn handle_albums_get(state: State<AppState>) -> Result<Response, WebEr
 
 pub async fn handle_album_get(Path(id): Path<AlbumId>, state: State<AppState>) -> Result<Response, WebError> {
     let images = state.store.items().await;
-    let albums = by_directory(&images);
+    let albums = by_directory(images);
 
-    let album = albums.iter().find(|a| a.id == id)
+    let album = albums.into_iter()
+        .find(|a| a.id == id)
         .ok_or_else(|| anyhow!("no album found for id {:?}", id))?;
 
     let view = AlbumView::from(album);
     Ok(Json(view).into_response())
+}
+
+pub async fn handle_exif_get(Path(id): Path<MediaId>, state: State<AppState>) -> Result<Response, WebError> {
+    let Some(media) = state.store.get(id).await else {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    };
+
+    let exif = parse_exif_generic(state.accessor.full(&media))?;
+    let result = ExifView { item: media.into(), exif };
+
+    Ok(Json(result).into_response())
 }

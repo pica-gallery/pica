@@ -1,0 +1,25 @@
+:host {
+  display: block;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  border-radius: 32px;
+  background: #eee;
+  padding-left: 16px;
+  padding-right: 16px;
+  gap: 16px;
+}
+
+.input {
+  display: block;
+  background: transparent;
+  border: 0;
+  outline: 0;
+
+  padding: 16px 0;
+
+  color: black;
+  flex: 1;
+}

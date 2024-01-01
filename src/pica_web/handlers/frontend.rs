@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use axum::body::Body;
-use axum::handler::Handler;
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Router;

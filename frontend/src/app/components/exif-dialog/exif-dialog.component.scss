@@ -1,0 +1,17 @@
+:host {
+  display: block;
+  min-height: 100px;
+  max-height: 80dvh;
+  overflow-y: scroll;
+  overflow-x: hidden;
+}
+
+td.tag {
+  font-weight: bold;
+  padding-right: 8px;
+}
+
+td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}

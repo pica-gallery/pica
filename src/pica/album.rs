@@ -1,16 +1,17 @@
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::os::unix::ffi::OsStrExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use itertools::Itertools;
 
 use crate::pica::{Album, AlbumId, MediaItem};
 
-pub fn by_directory(items: &[MediaItem]) -> Vec<Album<'_>> {
+pub fn by_directory<'a>(items: impl IntoIterator<Item=MediaItem>) -> Vec<Album> {
     let re_album = regex::bytes::Regex::new(r#"Sony|staging|20\d\d-[01]\d-[0123]\d "#).unwrap();
+    let re_clean = regex::Regex::new(r#"^20\d\d-[01]\d-[0123]\d\s+"#).unwrap();
 
-    let mut albums = HashMap::<&Path, Album>::new();
+    let mut albums = HashMap::<PathBuf, Album>::new();
 
     for item in items {
         // let name = item.relpath.iter().rev().skip(1).find_map(|segment| {
@@ -33,16 +34,17 @@ pub fn by_directory(items: &[MediaItem]) -> Vec<Album<'_>> {
 
         let name = relpath.file_name()
             .and_then(|f| f.to_str())
-            .unwrap_or("Unknown");
+            .map(|name| re_clean.replace(name, ""))
+            .unwrap_or("Unknown".into());
 
-        let album = albums.entry(relpath).or_insert_with_key(|_relpath| {
+        let album = albums.entry(relpath.into()).or_insert_with_key(|_relpath| {
             Album {
                 id: album_id_for_relpath(relpath),
-                name: name.to_owned(),
+                name: name.into_owned(),
                 timestamp: item.info.timestamp,
                 relpath: Some(relpath.into()),
                 items: Vec::new(),
-                cover: item,
+                cover: item.clone(),
             }
         });
 
@@ -58,7 +60,7 @@ pub fn by_directory(items: &[MediaItem]) -> Vec<Album<'_>> {
     // sort items within all albums by time, descending
     for album in &mut albums {
         album.items.sort_by_key(|item| Reverse(item.info.timestamp));
-        album.cover = album.items[0];
+        album.cover = album.items[0].clone();
     }
 
     albums

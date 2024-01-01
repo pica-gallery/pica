@@ -1,26 +1,28 @@
 import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
 import {
-  mdiArrowLeft,
+  mdiArrowLeft, mdiClose,
   mdiDownload,
   mdiFolderImage,
   mdiFolderOutline,
   mdiImage,
   mdiImageOutline,
-  mdiImageSearch,
-  mdiImageSearchOutline,
-  mdiInformationOutline, mdiMagnify
+  mdiInformation,
+  mdiInformationOutline,
+  mdiMagnify
 } from '@mdi/js'
 
 export type IconName =
   | 'unknown'
+  | 'albums'
+  | 'albums-outline'
   | 'arrow-left'
   | 'download'
   | 'image'
   | 'image-outline'
-  | 'albums'
-  | 'albums-outline'
+  | 'info'
   | 'search'
   | 'search-outline'
+  | 'close'
 
 @Component({
   selector: 'app-icon',
@@ -59,6 +61,12 @@ export class IconComponent {
 
       case 'search-outline':
         return mdiMagnify;
+
+      case 'close':
+        return mdiClose;
+
+      case 'info':
+        return mdiInformation;
 
       case 'unknown':
         return mdiInformationOutline;

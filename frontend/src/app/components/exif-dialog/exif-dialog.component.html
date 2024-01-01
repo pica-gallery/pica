@@ -1,0 +1,12 @@
+@if (info$|async; as info) {
+  <table>
+    @for (field of info.exif; track field.tag) {
+      <tr>
+        <td class="tag">{{ field.tag }}</td>
+        <td>{{ field.value }}</td>
+      </tr>
+    }
+  </table>
+} @else {
+  <app-busy-full/>
+}

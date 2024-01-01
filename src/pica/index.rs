@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use anyhow::{anyhow, bail, Context, Result};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use itertools::Itertools;
 use regex::Regex;
 use tokio::sync::Mutex;
@@ -18,14 +18,15 @@ use tracing::{debug, debug_span, Instrument, warn};
 use walkdir::WalkDir;
 
 use crate::pica;
-use crate::pica::{db, MediaId, MediaInfo, MediaItem, MediaType};
+use crate::pica::{db, MediaId, MediaInfo, MediaItem};
 use crate::pica::accessor::MediaAccessor;
 use crate::pica::exif::ExifInfo;
 use crate::pica::queue::{QueueItem, ScanQueue};
 use crate::pica::store::MediaStore;
 
 thread_local! {
-    static RE_TIMESTAMP: Regex = Regex::new(r#"(20\d\d[01]\d[0123]\d)_?([012]\d[012345]\d[012345]\d)"#).unwrap();
+    static RE_TIMESTAMP: Regex = Regex::new(r#"((?:19|20)\d\d[01]\d[0123]\d)_?([012]\d[012345]\d[012345]\d)"#).unwrap();
+    static RE_TIMESTAMP_WA: Regex = Regex::new(r#"\b(20\d\d(?:01|02|03|04|05|06|07|08|09|10|11|12)[0123]\d)-WA\d\d\d\d"#).unwrap();
 }
 
 pub struct ScanItem {
@@ -206,7 +207,7 @@ impl Indexer {
     async fn index_one(&self, item: &ScanItem) -> Result<()> {
         let existing_error = {
             let mut tx = self.db.begin().await?;
-            db::media_get_error(&mut tx, item.id).await?
+            db::media::media_get_error(&mut tx, item.id).await?
         };
 
         if let Some(err) = existing_error {
@@ -225,7 +226,7 @@ impl Indexer {
 
             Err(err) => {
                 let mut tx = self.db.begin().await?;
-                db::media_mark_as_error(&mut tx, item.id, &err.to_string()).await?;
+                db::media::media_mark_as_error(&mut tx, item.id, &err.to_string()).await?;
                 tx.commit().await?;
                 Err(err)
             }
@@ -236,7 +237,7 @@ impl Indexer {
         // check cache for an indexed version first
         let cached = {
             let mut tx = self.db.begin().await?;
-            db::read_media_item(&mut tx, item.id).await?
+            db::media::read_media_item(&mut tx, item.id).await?
         };
 
         if let Some(media) = cached {
@@ -247,7 +248,7 @@ impl Indexer {
 
         // store the parsed item in the database
         let mut tx = self.db.begin().await?;
-        db::store_media_item(&mut tx, &item).await?;
+        db::media::store_media_item(&mut tx, &item).await?;
         tx.commit().await?;
 
         if let Some(accessor) = &self.accessor {
@@ -263,12 +264,6 @@ impl Indexer {
 /// Parses a [ScanItem] into a new [MediaItem]
 async fn parse(item: &ScanItem) -> Result<MediaItem> {
     let path = item.path.to_owned();
-
-    // take the file name and clear any invalid characters from it
-    let name = path.file_name()
-        .ok_or_else(|| anyhow!("no filename for {:?}", path))?
-        .to_string_lossy()
-        .replace(core::char::REPLACEMENT_CHARACTER, "_");
 
     let reader = image::io::Reader::open(&path)?;
     let (width, height) = reader
@@ -291,35 +286,18 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
     };
 
     let timestamp = timestamp_from_path(&item.relpath)
-        .or_else(|| exif?.timestamp)
+        .or_else(|| exif.as_ref()?.timestamp)
         .unwrap_or(item.timestamp);
 
     let info = MediaInfo {
         timestamp,
         width,
         height,
+        latitude: exif.as_ref().and_then(|exif| exif.latitude),
+        longitude: exif.as_ref().and_then(|exif| exif.longitude),
     };
 
-    let extension = path.extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or_default()
-        .to_lowercase();
-
-    let media_type = match extension.as_str() {
-        "jpg" | "jpeg" | "png" => MediaType::Image,
-        "mp4" | "mkv" | "avi" | "mov" => MediaType::Video,
-        other => bail!("unknown extension: {:?}", other),
-    };
-
-    Ok(MediaItem {
-        name,
-        info,
-        id: item.id,
-        relpath: item.relpath.clone(),
-        filesize: item.filesize,
-        typ: media_type,
-        hdr: false,
-    })
+    MediaItem::from_media_info(item.id, item.relpath.clone(), item.filesize, info)
 }
 
 fn timestamp_from_metadata(metadata: &Metadata) -> Result<DateTime<Utc>> {
@@ -336,16 +314,27 @@ fn timestamp_from_metadata(metadata: &Metadata) -> Result<DateTime<Utc>> {
 fn timestamp_from_path(path: &Path) -> Option<DateTime<Utc>> {
     let name = path.file_name()?.to_str()?;
 
-    RE_TIMESTAMP.with(|re| {
-        if let Some(m) = re.captures(name) {
-            let date = m.get(1)?.as_str();
-            let time = m.get(2)?.as_str();
+    let android = RE_TIMESTAMP.with(|re| {
+        let m = re.captures(name)?;
+        let date = m.get(1)?.as_str();
+        let time = m.get(2)?.as_str();
 
-            let datestr = String::from(date) + time;
-            let date = NaiveDateTime::parse_from_str(&datestr, "%Y%m%d%H%M%S").ok()?.and_utc();
-            return Some(date);
-        }
+        let datestr = String::from(date) + time;
+        let date = NaiveDateTime::parse_from_str(&datestr, "%Y%m%d%H%M%S").ok()?.and_utc();
+        Some(date)
+    });
 
-        None
-    })
+    // check for whatsapp file naming
+    let whatsapp = || RE_TIMESTAMP_WA.with(|re| {
+        let m = re.captures(name)?;
+        let date = m.get(1)?.as_str();
+
+        let date = NaiveDate::parse_from_str(date, "%Y%m%d").ok()?
+            .and_time(NaiveTime::from_hms_opt(12, 0, 0)?)
+            .and_utc();
+
+        Some(date)
+    });
+
+    android.or_else(whatsapp)
 }

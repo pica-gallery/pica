@@ -6,18 +6,22 @@ import {ImageSwiperComponent} from '../../components/image-swiper/image-swiper.c
 import type {AlbumId, MediaId} from '../../service/api';
 import {IconComponent} from '../../components/icon/icon.component';
 import {NavigationService} from '../../service/navigation';
-import {ActivatedRoute, ActivatedRouteSnapshot} from '@angular/router';
+import {ActivatedRoute} from '@angular/router';
+import {Dialog, DialogModule} from '@angular/cdk/dialog';
+import {ExifDialogComponent} from '../../components/exif-dialog/exif-dialog.component';
+import {BottomSheetComponent} from '../../components/bottom-sheet/bottom-sheet.component';
 
 @Component({
   selector: 'app-media-page',
   standalone: true,
-  imports: [AsyncPipe, ImageSwiperComponent, IconComponent],
+  imports: [AsyncPipe, ImageSwiperComponent, IconComponent, DialogModule, BottomSheetComponent, ExifDialogComponent],
   templateUrl: './media-page.component.html',
   styleUrl: './media-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MediaPageComponent {
   protected readonly currentItem = signal<MediaItem | null>(null);
+  protected readonly exifViewerMediaId = signal<MediaId | null>(null);
 
   @Input()
   public mediaId!: MediaId;
@@ -26,6 +30,7 @@ export class MediaPageComponent {
 
   constructor(
     private readonly navigationService: NavigationService,
+    private readonly dialog: Dialog,
     routeSnapshot: ActivatedRoute,
   ) {
     let albumId: AlbumId | null = null;
@@ -55,5 +60,21 @@ export class MediaPageComponent {
 
     // replace url, but let back still go to the previous page
     void this.navigationService.mediaViewer(item.id, true);
+  }
+
+  protected showExifViewer() {
+    if (this.exifViewerMediaId() != null) {
+      this.exifViewerMediaId.set(null);
+      return;
+    }
+
+    const mediaId = this.currentItem()?.id;
+    if (mediaId != null) {
+      this.exifViewerMediaId.set(mediaId);
+    }
+  }
+
+  protected closeExifViewer() {
+    this.exifViewerMediaId.set(null);
   }
 }

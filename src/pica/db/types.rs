@@ -1,32 +1,10 @@
-use sqlx::Sqlite;
 use sqlx::database::{HasArguments, HasValueRef};
 use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
+use sqlx::Sqlite;
 
-use crate::pica::{Id, MediaType};
+use crate::pica::{Id};
 use crate::pica::scale::ImageType;
-
-impl sqlx::Type<Sqlite> for MediaType {
-    fn type_info() -> <Sqlite as sqlx::Database>::TypeInfo {
-        str::type_info()
-    }
-}
-
-impl<'q> sqlx::Encode<'q, Sqlite> for MediaType {
-    fn encode_by_ref(&self, buf: &mut <Sqlite as HasArguments<'q>>::ArgumentBuffer) -> IsNull {
-        self.as_str().encode_by_ref(buf)
-    }
-}
-
-impl<'r> sqlx::Decode<'r, Sqlite> for MediaType {
-    fn decode(value: <Sqlite as HasValueRef<'r>>::ValueRef) -> Result<Self, BoxDynError> {
-        match String::decode(value)?.as_str() {
-            "image" => Ok(MediaType::Image),
-            "video" => Ok(MediaType::Video),
-            value => Err(format!("not valid: {:?}", value).into())
-        }
-    }
-}
 
 impl<T> sqlx::Type<Sqlite> for Id<T> {
     fn type_info() -> <Sqlite as sqlx::Database>::TypeInfo {
@@ -51,6 +29,7 @@ impl<'r, T> sqlx::Decode<'r, Sqlite> for Id<T> {
         Ok(Id::from(value.to_be_bytes()))
     }
 }
+
 
 impl sqlx::Type<Sqlite> for ImageType {
     fn type_info() -> <Sqlite as sqlx::Database>::TypeInfo {

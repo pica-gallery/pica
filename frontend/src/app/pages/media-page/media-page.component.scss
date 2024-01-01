@@ -6,16 +6,19 @@
   z-index: 2;
 }
 
-.button-back {
+.actions {
+  display: flex;
   position: absolute;
   top: 0;
-  left: 0;
+  width: 100%;
+  align-items: center;
+  color: white;
 }
 
-.button-fullsize {
-  position: absolute;
-  top: 0;
-  right: 0;
+.name {
+  flex: 1;
+  font-weight: bold;
+  line-height: 24px;
 }
 
 .button {

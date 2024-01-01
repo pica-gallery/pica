@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use itertools::Itertools;
 use sqlx::SqlitePool;
 
 use tracing::{debug_span, Instrument};
@@ -59,9 +58,9 @@ impl MediaAccessor {
         Ok(image)
     }
 
-    async fn get_hdr(&self, _image: &MediaItem, _size: u32) -> Result<PathBuf> {
-        anyhow::bail!("not implemented")
-    }
+    // async fn get_hdr(&self, _image: &MediaItem, _size: u32) -> Result<PathBuf> {
+    //     anyhow::bail!("not implemented")
+    // }
 }
 
 

@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import {array, nullable, number, object, string, transform, type TypeOf} from 'fud-ts';
+import {array, nullable, number, object, optional, record, string, transform, type TypeOf} from 'fud-ts';
 import {map, Observable} from 'rxjs';
 import {HttpClient} from '@angular/common/http';
 
@@ -11,6 +11,15 @@ const fAlbumId = string()
 
 const fTimestamp = string().pipe(transform(d => new Date(d)));
 
+
+export type LocationTo = TypeOf<typeof fLocation>;
+const fLocation = object({
+  latitude: number(),
+  longitude: number(),
+  city: string(),
+  country: string(),
+})
+
 export type MediaItemTo = TypeOf<typeof fMediaItem>;
 const fMediaItem = object({
   id: fMediaId,
@@ -18,6 +27,7 @@ const fMediaItem = object({
   timestamp: fTimestamp,
   width: number(),
   height: number(),
+  location: optional(fLocation),
 })
 
 export type AlbumTo = TypeOf<typeof fAlbum>;
@@ -33,6 +43,12 @@ const fAlbum = object({
 export type StreamTo = TypeOf<typeof fStream>;
 const fStream = object({
   items: array(fMediaItem),
+})
+
+export type ExifInfoTo = TypeOf<typeof fExifInfo>;
+const fExifInfo = object({
+  item: fMediaItem,
+  exif: nullable(record(string(), string())),
 })
 
 @Injectable({providedIn: 'root'})
@@ -57,6 +73,14 @@ export class ApiService {
 
     return this.httpClient.get<unknown>(url).pipe(
       map(resp => fAlbum.parse(resp)),
+    )
+  }
+
+  public exif(mediaId: MediaId): Observable<ExifInfoTo> {
+    const url = '/api/media/' + encodeURIComponent(mediaId) + '/exif';
+
+    return this.httpClient.get<unknown>(url).pipe(
+      map(resp => fExifInfo.parse(resp)),
     )
   }
 }

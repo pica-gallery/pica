@@ -6,12 +6,28 @@
   ></app-image-swiper>
 }
 
-<button class="button button-back" (click)="close()">
-  <app-icon name="arrow-left"/>
-</button>
+<div class="actions">
+  <button class="button button-back" (click)="close()">
+    <app-icon name="arrow-left"/>
+  </button>
 
-@if (currentItem(); as item) {
-  <a class="button button-fullsize" [download]="item.name" [href]="item.urls.fullsize">
-    <app-icon name="download"/>
-  </a>
+  @if (currentItem(); as item) {
+    <div class="name">
+      {{ item.name }}
+    </div>
+
+    <a class="button" [download]="item.name" [href]="item.urls.fullsize">
+      <app-icon name="download"/>
+    </a>
+
+    <button class="button" (click)="showExifViewer()">
+      <app-icon name="info"/>
+    </button>
+  }
+</div>
+
+@if (exifViewerMediaId(); as mediaId) {
+  <app-bottom-sheet (close)="closeExifViewer()">
+    <app-exif-dialog [mediaId]="mediaId"/>
+  </app-bottom-sheet>
 }

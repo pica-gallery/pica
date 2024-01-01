@@ -50,6 +50,11 @@ function matcherOf(term: string): Predicate {
       return album => album.timestamp.toDateString().includes(dateTerm)
     }
 
+    if (term.startsWith('loc:')) {
+      const dateTerm = term.slice(5);
+      return album => album.timestamp.toDateString().includes(dateTerm)
+    }
+
     return album => album.name.toLowerCase().includes(term);
   })
 

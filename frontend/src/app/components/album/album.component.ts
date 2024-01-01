@@ -95,6 +95,7 @@ export class AlbumComponent {
             name: section.name,
             timestamp: section.timestamp,
             mediaCount: section.items.length,
+            location: section.location,
           }
         }
       });
