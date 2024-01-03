@@ -4,7 +4,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   ComponentRef,
-  createComponent,
   ElementRef,
   EnvironmentInjector,
   EventEmitter,
@@ -21,6 +20,7 @@ import {
 import {observeElementSize} from '../../util';
 import {distinctUntilChanged, filter, map, Subscription} from 'rxjs';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+import {type DetachedChild, ViewRecycler} from './view-recycler';
 
 export type ListItem = {
   component: Type<unknown>,
@@ -32,7 +32,7 @@ type Child = {
   node: HTMLElement,
   ref: ComponentRef<unknown>,
   index: number,
-  height: number | null,
+  height: number,
   top: number | null,
   dirty: boolean,
   subscription: Subscription | null,
@@ -58,7 +58,6 @@ function removeInplace(children: Child[], child: Child) {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
-  private readonly injector = inject(EnvironmentInjector);
   private readonly applicationRef = inject(ApplicationRef);
   private readonly ngZone = inject(NgZone);
 
@@ -66,9 +65,6 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   @ViewChild('Canvas')
   protected canvas!: ElementRef<HTMLElement>;
-
-  @Input()
-  public initialIndex: number | null = null;
 
   // the index of the first visible item
   public firstVisible: number = 0;
@@ -79,12 +75,15 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   private readonly schedule = new AnimationSchedule();
 
   private readonly observer = new ResizeObserver(entries => this.resizeObserverCallback(entries));
-  private readonly cache = new Map<Type<unknown>, Child[]>();
+  private readonly recycler = new ViewRecycler(inject(EnvironmentInjector));
 
   private maxTop: number = 0;
 
   @Input({required: true})
   public items!: ListItem[]
+
+  @Input({transform: numberAttribute})
+  public initialIndex: number | null = null;
 
   /**
    * Number of items to prepare above and below the scroll window
@@ -140,6 +139,9 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   ngOnChanges(changes: SimpleChanges) {
     debug('Changes', changes);
 
+    // forward config to the recycler
+    this.recycler.perComponentCacheSize = this.perComponentCacheSize;
+
     const change = changes['items'];
     if (!change || change.firstChange) {
       return;
@@ -153,8 +155,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       // child is not compatible or not needed anymore, remove it now
       if (item == null || item.component !== child.ref.componentType) {
         debug('Need to get rid of child at', child.index);
-        this.detachChild(child);
-        this.cacheChild(child);
+        this.recycleChild(child);
         continue;
       }
 
@@ -174,18 +175,27 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.schedule.destroy();
     this.observer.disconnect();
 
-    debug('Destroy cached nodes')
-    for (const child of [...this.cache.values()].flat()) {
-      this.destroyChild(child);
-    }
+    // destroy the cached nodes. We do not need to destroy
+    // the attached nodes, as they are getting cleaned up by angular.
+    this.recycler.destroyAll();
   }
 
   protected updateContent(height: number = this.lastRootHeight) {
+    const now = performance.now();
+    this._updateContent(height);
+
+    const duration = performance.now() - now;
+    if (duration >= 2) {
+      debug('[slow] updateContent() took %sms', duration.toFixed(2));
+    }
+  }
+
+  private _updateContent(height: number = this.lastRootHeight) {
     debug('updateContent()')
     this.lastRootHeight = height;
 
-    // ensure layout is fine first. We need to do this to
-    // be able to use top + height in the code below
+    // ensure layout is fine first.
+    // We need to do this to be able to use top in the code below.
     this.layout();
 
     // we might need to reset scrolling if we have no anchor to work with
@@ -193,7 +203,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     // find all visible children
     const visibleChildren = this.children.filter(child => {
-      return child.top != null && child.height != null
+      return child.top != null
         && child.top + child.height > this.offsetY
         && child.top < this.offsetY + height
     });
@@ -242,12 +252,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         continue;
       }
 
-      this.ngZone.runTask(() => {
-        // create the child and insert it into the view at the right place
-        const child = this.cachedChild(item, index) ?? this.createChild(item, index);
-        this.bindInputsOutputs(child, item);
-        this.attachChild(child);
-      });
+      this.getChild(item, index);
     }
 
     // we might have placed new children into the dom,
@@ -260,10 +265,9 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   private cleanupChildrenOutsideOf(minIndexToShow: number, maxIndexToShow: number) {
     for (const child of [...this.children]) {
-      if (child.top != null && child.height != null) {
+      if (child.top != null) {
         if (child.index < minIndexToShow || child.index > maxIndexToShow) {
-          this.detachChild(child);
-          this.cacheChild(child);
+          this.recycleChild(child);
         }
       }
     }
@@ -277,7 +281,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     // it looks like someone scrolled so fast that no child is visible
     // anymore. In this case we just reset scrolling.
     const hasVisibleChildren = this.children.some(child => {
-      return child.top != null && child.height != null
+      return child.top != null
         && child.top + child.height > this.offsetY
         && child.top < this.offsetY + this.lastRootHeight
     });
@@ -307,7 +311,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       return;
     }
 
-    if (!this.children.some(child => child.dirty && child.height != null)) {
+    if (!this.children.some(child => child.dirty)) {
       // layout is clean, no need to do anything
       return;
     }
@@ -373,7 +377,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         debug('Anchor not at zero, fixing this now.');
 
         const removedSpace = firstChild.top;
-        this.offsetChildrenBy(-removedSpace);
+        this.moveChildrenY(-removedSpace);
         this.offsetY -= removedSpace;
 
       } else if (firstChild.top < 0) {
@@ -384,7 +388,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
         debug('Put children outside of container, adjust offset+scroll by', newSpace);
 
-        this.offsetChildrenBy(newSpace);
+        this.moveChildrenY(newSpace);
         this.offsetY += newSpace;
       }
     }
@@ -398,7 +402,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     const lastChild = this.children[this.children.length - 1];
 
-    if (lastChild != null && lastChild.top != null && lastChild.height != null) {
+    if (lastChild != null && lastChild.top != null) {
       if (lastChild.index === this.items.length - 1) {
         // actually the last one
         this.maxTop = lastChild.top + lastChild.height;
@@ -412,7 +416,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.canvas.nativeElement.style.height = this.maxTop + 'px';
   }
 
-  private offsetChildrenBy(y: number) {
+  private moveChildrenY(y: number) {
     for (const child of this.children) {
       if (child.top != null) {
         child.top += y;
@@ -421,27 +425,17 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
   }
 
-  private createChild(item: ListItem, idx: number): Child {
-    debug('Create child', idx);
-
-    const node = document.createElement('div');
-
-    const ref = createComponent(item.component, {
-      environmentInjector: this.injector,
-    })
-
-    return {
-      node,
-      ref,
+  private attachChild(detachedChild: DetachedChild, idx: number, item: ListItem): Child {
+    const child: Child = {
+      node: detachedChild.node,
+      ref: detachedChild.ref,
+      dirty: true,
       top: null,
-      height: null,
-      dirty: false,
+      height: 0,
       index: idx,
       subscription: null,
     }
-  }
 
-  private attachChild(child: Child): void {
     child.node.append(child.ref.location.nativeElement);
     child.node.dataset['index'] = child.index.toString();
 
@@ -452,58 +446,39 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.applicationRef.attachView(child.ref.hostView);
     this.observer.observe(child.node, {box: 'border-box'});
     this.children.push(child);
+
+    // bind inputs and run change detection to be able to correctly measure the
+    // view in the next step.
+    this.bindInputsOutputs(child, item);
+    child.ref.changeDetectorRef.detectChanges()
+
+    // measure child
+    child.height = child.node.offsetHeight;
+
+    return child;
   }
 
-  private detachChild(child: Child) {
+  private recycleChild(child: Child) {
+    this.recycler.cacheChild(this.detachChild(child))
+  }
+
+  private detachChild(child: Child): DetachedChild {
     debug('Detaching child', child.index);
     removeInplace(this.children, child);
 
     child.subscription?.unsubscribe()
 
-    child.top = null;
-    child.height = null;
-    child.dirty = false;
-    child.subscription = null;
-
     this.observer.unobserve(child.node);
     this.applicationRef.detachView(child.ref.hostView);
     this.canvas.nativeElement.removeChild(child.node);
 
-    child.node.classList.remove('layouted')
-  }
+    // measure child now
+    child.height = child.node.offsetHeight;
 
-  private destroyChild(child: Child) {
-    debug('Destroying child', child.index);
-    child.ref.destroy();
-    child.node.innerHTML = '';
-  }
-
-  private cacheChild(child: Child) {
-    let cache = this.cache.get(child.ref.componentType);
-    if (cache == null) {
-      this.cache.set(child.ref.componentType, cache = []);
+    return {
+      node: child.node,
+      ref: child.ref,
     }
-
-    if (cache.length >= this.perComponentCacheSize) {
-      // we have enough items in the cache, remove this one.
-      this.destroyChild(child);
-      return;
-    }
-
-    debug('Put child into cache', child.index)
-    cache.push(child);
-  }
-
-  private cachedChild(item: ListItem, idx: number): Child | null {
-    const child = this.cache.get(item.component)?.pop();
-    if (child == null) {
-      return null;
-    }
-
-    child.index = idx;
-
-    debug('Returning child from cache:', child.index);
-    return child;
   }
 
   private resizeObserverCallback(entries: ResizeObserverEntry[]) {
@@ -522,6 +497,8 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         if (height === 0) {
           console.warn('Got zero size for child', child);
         }
+
+        debug('Child size changed from %d to %d', child.height, height)
 
         child.height = height;
         child.dirty = true;
@@ -554,6 +531,18 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         }
       }
     }
+  }
+
+  /**
+   * Returns a Child instance bound with the given item data
+   * attached to the list view container
+   */
+  private getChild(item: ListItem, index: number): Child {
+    return this.ngZone.runTask(() => {
+      // create the child and insert it into the view at the right place
+      const child = this.recycler.get(item.component);
+      return this.attachChild(child, index, item);
+    });
   }
 }
 
