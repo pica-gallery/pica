@@ -26,6 +26,7 @@ pub async fn serve(store: MediaStore, accessor: MediaAccessor, addr: impl ToSock
     let app = Router::new()
         .route("/api/stream", get(handlers::api::handle_stream_get))
         .route("/api/albums", get(handlers::api::handle_albums_get))
+        .route("/api/albums/full", get(handlers::api::handle_albums_get_full))
         .route("/api/albums/:id", get(handlers::api::handle_album_get))
         .route("/api/media/:id/exif", get(handlers::api::handle_exif_get))
         .layer(CompressionLayer::new().gzip(true))

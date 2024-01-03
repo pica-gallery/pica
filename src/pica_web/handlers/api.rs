@@ -117,13 +117,22 @@ pub async fn handle_stream_get(state: State<AppState>) -> Result<Response, WebEr
     Ok(Json(stream).into_response())
 }
 
+
 pub async fn handle_albums_get(state: State<AppState>) -> Result<Response, WebError> {
+    albums_get(state, 0).await
+}
+
+pub async fn handle_albums_get_full(state: State<AppState>) -> Result<Response, WebError> {
+    albums_get(state, usize::MAX).await
+}
+
+async fn albums_get(state: State<AppState>, n: usize) -> Result<Response, WebError> {
     let images = state.store.items().await;
     let albums = by_directory(images);
 
     let albums = albums
         .into_iter()
-        .map(|al| AlbumView::from_album(al, 0))
+        .map(|al| AlbumView::from_album(al, n))
         .collect_vec();
 
     Ok(Json(albums).into_response())

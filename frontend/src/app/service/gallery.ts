@@ -62,6 +62,11 @@ export class Gallery {
     shareReplay({bufferSize: 1, refCount: false}),
   )
 
+  private readonly albumsWithContent$ = this.apiService.albumsWithContent().pipe(
+    map(albums => convertAlbums(albums)),
+    shareReplay({bufferSize: 1, refCount: false}),
+  )
+
   constructor(private readonly apiService: ApiService) {
   }
 
@@ -71,6 +76,10 @@ export class Gallery {
 
   public albums(): Observable<Album[]> {
     return this.albums$;
+  }
+
+  public albumsWithContent(): Observable<Album[]> {
+    return this.albumsWithContent$;
   }
 
   public album(albumId: string): Observable<Album> {
@@ -91,7 +100,7 @@ export class Gallery {
       return cached$
     }
 
-    const fetched$ = fetch().pipe(shareReplay(1));
+    const fetched$ = fetch().pipe(shareReplay({bufferSize: 1, refCount: false}));
     cache.set(id, fetched$);
     return fetched$;
   }

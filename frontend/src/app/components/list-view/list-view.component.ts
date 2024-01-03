@@ -163,6 +163,10 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       this.bindInputsOutputs(child, item);
     }
 
+    if (this.firstVisible >= this.items.length) {
+      this.firstVisible = Math.max(0, this.items.length - 1);
+    }
+
     this.updateContent();
   }
 

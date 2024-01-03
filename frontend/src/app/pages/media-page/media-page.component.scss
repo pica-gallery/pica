@@ -19,6 +19,10 @@
   flex: 1;
   font-weight: bold;
   line-height: 24px;
+
+  text-overflow: ellipsis;
+  max-width: calc(100vw - 48px * 3);
+  overflow: hidden;
 }
 
 .button {

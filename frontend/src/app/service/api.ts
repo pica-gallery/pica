@@ -68,6 +68,12 @@ export class ApiService {
     )
   }
 
+  public albumsWithContent(): Observable<AlbumTo[]> {
+    return this.httpClient.get<unknown>('/api/albums/full').pipe(
+      map(resp => array(fAlbum).parse(resp)),
+    )
+  }
+
   public album(albumId: AlbumId): Observable<AlbumTo> {
     const url = '/api/albums/' + encodeURIComponent(albumId);
 
