@@ -1,7 +1,6 @@
 @if (state(); as state) {
   <app-list-view
     [items]="state.rows"
-    [bufferSize]="4"
-    [initialIndex]="state.initialScroll"
+    bufferSize="512"
     [ngStyle]="{'--column-count': state.columnCount}"/>
 }
