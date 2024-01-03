@@ -1,3 +1,6 @@
 @if (items(); as items) {
-  <app-list-view [items]="items" bufferSize="256" />
+  <app-list-view
+    [items]="items"
+    [initialScroll]="null"
+    bufferSize="384"/>
 }

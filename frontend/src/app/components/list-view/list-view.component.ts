@@ -13,6 +13,7 @@ import {
   numberAttribute,
   type OnChanges,
   type OnDestroy,
+  Output,
   type SimpleChanges,
   type Type,
   ViewChild
@@ -48,6 +49,11 @@ function removeInplace(children: Child[], child: Child) {
   }
 }
 
+export type SavedScroll = {
+  index: number,
+  offsetY: number,
+}
+
 @Component({
   selector: 'app-list-view',
   standalone: true,
@@ -63,21 +69,21 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   private readonly root: ElementRef<HTMLElement> = inject(ElementRef);
 
   @ViewChild('Canvas')
-  protected canvas!: ElementRef<HTMLElement>;
+  private canvas!: ElementRef<HTMLElement>;
 
-  protected lastRootHeight = 0;
-  protected readonly children: Child[] = [];
+  private canvasHeight: number = 0;
+  private lastRootHeight = 0;
+  private readonly children: Child[] = [];
 
   private readonly observer = new ResizeObserver(entries => this.resizeObserverCallback(entries));
   private readonly recycler = new ViewRecycler(inject(EnvironmentInjector));
 
-  private canvasHeight: number = 0;
 
-  @Input({required: true})
-  public items!: ListItem[]
+  @Input()
+  public items: ListItem[] = [];
 
-  @Input({transform: numberAttribute})
-  public initialIndex: number | null = null;
+  @Input()
+  public initialScroll: SavedScroll | null = null;
 
   /**
    * Number of pixels to fill above and below the visible area.
@@ -95,7 +101,10 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
    * Number of detached views to store per component.
    */
   @Input({transform: numberAttribute})
-  public perComponentCacheSize: number = 10;
+  public perComponentCacheSize: number = 4;
+
+  @Output()
+  scrollChanged = new EventEmitter<SavedScroll>();
 
   constructor() {
     this.offsetY = 0;
@@ -125,6 +134,8 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.ngZone.runOutsideAngular(() => {
       this.root.nativeElement.addEventListener('scroll', () => this.updateContent());
     });
+
+    this.scrollChanged.subscribe(ev => console.info(ev));
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -186,7 +197,9 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
 
     // run the actual layout
-    this.layout(layoutChild, height);
+    if (this.items.length > 0) {
+      this.layout(layoutChild, height);
+    }
 
     // remove all the children that we did not layout this time
     for (const child of [...this.children]) {
@@ -201,23 +214,45 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     // calculate new height for the canvas based on the now layouted children
     this.updateCanvasSize();
 
+    // build the new scroll and emit it
+    const anchorChild = this.anchorChild()
+    if (anchorChild != null) {
+      const offsetY = anchorChild.top - this.offsetY;
+      this.scrollChanged.emit({index: anchorChild.index, offsetY})
+    }
+
+
     const duration = performance.now() - now;
     if (duration >= 16) {
       debug('[slow] updateContent() took %sms', duration.toFixed(2));
     }
   }
 
-  private layout(layoutChild: (child: Child, top: number) => boolean, height: number) {
+  private anchorScroll(): SavedScroll {
     // find the child we want to anchor all the views to
     const anchorChild = this.anchorChild();
+    if (anchorChild != null) {
+      return {
+        index: anchorChild.index,
+        offsetY: anchorChild.top,
+      }
+    }
 
-    // start layout at the anchor
-    let nextTop = anchorChild?.top ?? 0;
+    // use initial scroll if it has valid values
+    if (this.initialScroll) {
+      if (this.initialScroll.index >= 0 && this.initialScroll.index < this.items.length) {
+        return this.initialScroll
+      }
+    }
 
-    // and layout the anchor first
-    const indexStart = anchorChild?.index ?? this.initialIndex ?? 0;
+    return {index: 0, offsetY: 0}
+  }
+
+  private layout(layoutChild: (child: Child, top: number) => boolean, height: number) {
+    const {index: indexStart, offsetY: anchorTop} = this.anchorScroll();
 
     // fill elements starting at the first one to show
+    let nextTop = anchorTop;
     for (let index = indexStart; index < this.items.length; index++) {
       const child = this.getChild(index);
 
@@ -232,9 +267,8 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       }
     }
 
-    let previousTop = anchorChild?.top ?? 0;
-
     // go backwards starting at the child before the anchor
+    let previousTop = anchorTop;
     for (let index = indexStart - 1; index >= 0; index--) {
       const child = this.getChild(index);
 
@@ -306,23 +340,22 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   private fixOverflow() {
     // fix scroll offset if we've layouted children to the outside of the scroll container.
     const minChild = this.minChild();
+    if (minChild == null) {
+      return
+    }
 
-    if (minChild != null) {
-      if (minChild.index === 0 && minChild.top > 0) {
-        debug('Anchor not at zero, fixing this now.');
+    if (minChild.index === 0 && minChild.top > 0) {
+      const removedSpace = -minChild.top;
+      debug('First child not at zero, moving views up by %d', removedSpace);
+      this.offsetChildrenKeepScroll(removedSpace);
 
-        const removedSpace = minChild.top;
-        this.offsetChildrenKeepScroll(removedSpace);
-
-      } else if (minChild.top < 0) {
-        // if we have layouted some content "before" the container, we need to correct all children
-        // again to move them out of the container area. We also need to offset the current scroll
-        // by the same amount.
-        const newSpace = -minChild.top;
-
-        debug('Put children outside of container, adjust offset+scroll by', newSpace);
-        this.offsetChildrenKeepScroll(newSpace)
-      }
+    } else if (minChild.top < 0) {
+      // if we have layouted some content "before" the container, we need to correct all children
+      // again to move them out of the container area. We also need to offset the current scroll
+      // by the same amount.
+      const newSpace = -minChild.top;
+      debug('Children are overflowing on top, moving everything down by %d', newSpace);
+      this.offsetChildrenKeepScroll(newSpace)
     }
   }
 
@@ -501,4 +534,8 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     this.offsetY += space;
   }
+}
+
+function negate(val: number | null | undefined): number | null | undefined {
+  return val != null ? -val : val;
 }
