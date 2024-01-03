@@ -168,7 +168,38 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   protected updateContent(height: number = this.lastRootHeight) {
     const now = performance.now();
-    this._updateContent(height);
+
+    this.lastRootHeight = height;
+
+    // we might need to reset scrolling if we have no anchor to work with
+    this.resetScrolling();
+
+    // keep a list of children that we actually layout, so we can
+    // later remove all children from the canvas, that were not layout.
+    const childrenToKeep = new Set();
+
+    // function to track children that were layout
+    const layoutChild = (child: Child, top: number): boolean => {
+      childrenToKeep.add(child);
+      this.layoutChild(child, top);
+      return childrenToKeep.size < this.maxChildrenToLayout
+    }
+
+    // run the actual layout
+    this.layout(layoutChild, height);
+
+    // remove all the children that we did not layout this time
+    for (const child of [...this.children]) {
+      if (!childrenToKeep.has(child)) {
+        this.recycleChild(child);
+      }
+    }
+
+    // fix any children that were layout outside of the container
+    this.fixOverflow();
+
+    // calculate new height for the canvas based on the now layouted children
+    this.updateCanvasSize();
 
     const duration = performance.now() - now;
     if (duration >= 16) {
@@ -176,13 +207,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
   }
 
-  private _updateContent(height: number = this.lastRootHeight) {
-    // debug('updateContent()')
-    this.lastRootHeight = height;
-
-    // we might need to reset scrolling if we have no anchor to work with
-    this.resetScrolling();
-
+  private layout(layoutChild: (child: Child, top: number) => boolean, height: number) {
     // find the child we want to anchor all the views to
     const anchorChild = this.anchorChild();
 
@@ -192,19 +217,17 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     // and layout the anchor first
     const indexStart = anchorChild?.index ?? this.initialIndex ?? 0;
 
-    const childrenToKeep = new Set();
-
     // fill elements starting at the first one to show
     for (let index = indexStart; index < this.items.length; index++) {
       const child = this.getChild(index);
 
-      // keep this child
-      childrenToKeep.add(child);
+      if (!layoutChild(child, nextTop)) {
+        break;
+      }
 
-      this.layoutChild(child, nextTop)
       nextTop += child.height;
 
-      if (nextTop > this.offsetY + height + this.bufferSize || childrenToKeep.size >= this.maxChildrenToLayout) {
+      if (nextTop > this.offsetY + height + this.bufferSize) {
         break;
       }
     }
@@ -215,30 +238,16 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     for (let index = indexStart - 1; index >= 0; index--) {
       const child = this.getChild(index);
 
-      // keep this child
-      childrenToKeep.add(child);
+      if (!layoutChild(child, previousTop - child.height)) {
+        break;
+      }
 
-      this.layoutChild(child, previousTop - child.height)
       previousTop -= child.height;
 
-      if (previousTop < this.offsetY - this.bufferSize || childrenToKeep.size >= this.maxChildrenToLayout) {
+      if (previousTop < this.offsetY - this.bufferSize) {
         break;
       }
     }
-
-    for (const child of [...this.children]) {
-      if (!childrenToKeep.has(child)) {
-        this.recycleChild(child);
-      }
-    }
-
-    // ensure children are sorted by their y position
-    this.children.sort((lhs, rhs) => lhs.top - rhs.top);
-
-    this.fixScrollOverflow();
-
-    // calculate new height for the canvas based on the now layouted children
-    this.updateCanvasSize();
   }
 
   private layoutChild(child: Child, top: number) {
@@ -253,45 +262,63 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private resetScrolling() {
-    if (!this.children.length) {
-      this.offsetY = 0;
+    for (const child of this.children) {
+      const visible = child.top + child.height > this.offsetY && child.top < this.offsetY + this.lastRootHeight;
+      if (visible) {
+        return;
+      }
     }
 
     // it looks like someone scrolled so fast that no child is visible
-    // anymore. In this case we just reset scrolling.
-    const hasVisibleChildren = this.children.some(child => {
-      return this.childIntersectsViewport(child)
-    });
-
-    if (!hasVisibleChildren) {
-      this.offsetY = this.children[0]?.top ?? 0;
-    }
-  }
-
-  private childIntersectsViewport(child: Child): boolean {
-    return child.top + child.height > this.offsetY
-      && child.top < this.offsetY + this.lastRootHeight
+    // anymore. In this case we just reset scrolling to the position
+    // of the first child that we have
+    this.offsetY = this.children[0]?.top ?? 0;
   }
 
   private anchorChild(): Child | null {
     return this.children.find(child => child.top >= this.offsetY) ?? null;
   }
 
-  private fixScrollOverflow() {
+  private minChild(): Child | null {
+    let minChild = this.children[0] ?? null;
+
+    for (let i = 1; i < this.children.length; i++) {
+      if (this.children[i].top < minChild.top) {
+        minChild = this.children[i];
+      }
+    }
+
+    return minChild;
+  }
+
+  private maxChild(): Child | null {
+    let maxChild = this.children[0] ?? null;
+
+    for (let i = 1; i < this.children.length; i++) {
+      if (this.children[i].top + this.children[i].height > maxChild.top + maxChild.height) {
+        maxChild = this.children[i];
+      }
+    }
+
+    return maxChild;
+  }
+
+  private fixOverflow() {
     // fix scroll offset if we've layouted children to the outside of the scroll container.
-    const firstChild = this.children.find(child => child.top);
-    if (firstChild != null) {
-      if (firstChild.index === 0 && firstChild.top > 0) {
+    const minChild = this.minChild();
+
+    if (minChild != null) {
+      if (minChild.index === 0 && minChild.top > 0) {
         debug('Anchor not at zero, fixing this now.');
 
-        const removedSpace = firstChild.top;
+        const removedSpace = minChild.top;
         this.offsetChildrenKeepScroll(removedSpace);
 
-      } else if (firstChild.top < 0) {
+      } else if (minChild.top < 0) {
         // if we have layouted some content "before" the container, we need to correct all children
         // again to move them out of the container area. We also need to offset the current scroll
         // by the same amount.
-        const newSpace = -firstChild.top;
+        const newSpace = -minChild.top;
 
         debug('Put children outside of container, adjust offset+scroll by', newSpace);
         this.offsetChildrenKeepScroll(newSpace)
@@ -305,17 +332,15 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       return;
     }
 
-    const lastChild = this.children[this.children.length - 1];
+    const maxChild = this.maxChild()!;
 
-    if (lastChild != null) {
-      if (lastChild.index === this.items.length - 1) {
-        // actually the last one
-        this.canvasHeight = lastChild.top + lastChild.height;
-      } else {
-        // estimate on how many more rows we might need to add
-        const extraSpace = 100 * (this.items.length - lastChild.index + 1);
-        this.canvasHeight = Math.max(this.canvasHeight, lastChild.top + lastChild.height + extraSpace);
-      }
+    if (maxChild.index === this.items.length - 1) {
+      // actually the last one
+      this.canvasHeight = maxChild.top + maxChild.height;
+    } else {
+      // estimate on how many more rows we might need to add
+      const extraSpace = 100 * (this.items.length - maxChild.index + 1);
+      this.canvasHeight = Math.max(this.canvasHeight, maxChild.top + maxChild.height + extraSpace);
     }
 
     this.canvas.nativeElement.style.height = this.canvasHeight + 'px';
@@ -325,10 +350,14 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     const child: Child = {
       node: detachedChild.node,
       ref: detachedChild.ref,
-      top: Number.NaN,
-      height: 0,
       index: idx,
       subscription: null,
+
+      // not yet layouted
+      top: Number.NaN,
+
+      // not yet measured
+      height: Number.NaN,
     }
 
     child.node.append(child.ref.location.nativeElement);
@@ -340,7 +369,9 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     this.applicationRef.attachView(child.ref.hostView);
     this.observer.observe(child.node, {box: 'border-box'});
-    this.children.push(child);
+
+    const idxToInsert = this.children.findIndex(ch => ch.index > child.index)
+    this.children.splice(idxToInsert === -1 ? this.children.length : idxToInsert, 0, child);
 
     // bind inputs and run change detection to be able to correctly measure the
     // view in the next step.
