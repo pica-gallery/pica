@@ -8,6 +8,11 @@
   padding: 16px;
 }
 
+app-search-results {
+  flex: 1;
+  height: 20vh;
+}
+
 app-album-list {
   height: calc(100dvh - 80px - 86px);
 }

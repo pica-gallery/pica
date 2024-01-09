@@ -29,11 +29,13 @@ export type ListItem = {
   outputs?: Record<string, (value: any) => void>,
 }
 
-type Child = {
+export type Child = {
   node: HTMLElement,
   ref: ComponentRef<unknown>,
   index: number,
   top: number,
+  left: number,
+  width: number,
   height: number,
   subscription: Subscription | null,
 }
@@ -103,6 +105,9 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input({transform: numberAttribute})
   public perComponentCacheSize: number = 4;
 
+  @Input()
+  public layout: ((layouter: LayoutHelper) => void) | null = null;
+
   @Output()
   scrollChanged = new EventEmitter<SavedScroll>();
 
@@ -134,8 +139,6 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.ngZone.runOutsideAngular(() => {
       this.root.nativeElement.addEventListener('scroll', () => this.updateContent());
     });
-
-    this.scrollChanged.subscribe(ev => console.info(ev));
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -190,15 +193,26 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     const childrenToKeep = new Set();
 
     // function to track children that were layout
-    const layoutChild = (child: Child, top: number): boolean => {
+    const layoutChild = (child: Child, left: number, top: number): boolean => {
       childrenToKeep.add(child);
-      this.layoutChild(child, top);
+      this.layoutChild(child, left, top);
       return childrenToKeep.size < this.maxChildrenToLayout
+    }
+
+    const helper: LayoutHelper = {
+      height,
+      layoutChild,
+      getChild: this.getChild.bind(this),
+      offsetY: this.offsetY,
+      bufferSize: this.bufferSize,
+      maxChildrenToLayout: this.maxChildrenToLayout,
+      itemCount: this.items.length,
+      anchorScroll: this.anchorScroll(),
     }
 
     // run the actual layout
     if (this.items.length > 0) {
-      this.layout(layoutChild, height);
+      (this.layout ?? layout)(helper);
     }
 
     // remove all the children that we did not layout this time
@@ -248,45 +262,11 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     return {index: 0, offsetY: 0}
   }
 
-  private layout(layoutChild: (child: Child, top: number) => boolean, height: number) {
-    const {index: indexStart, offsetY: anchorTop} = this.anchorScroll();
-
-    // fill elements starting at the first one to show
-    let nextTop = anchorTop;
-    for (let index = indexStart; index < this.items.length; index++) {
-      const child = this.getChild(index);
-
-      if (!layoutChild(child, nextTop)) {
-        break;
-      }
-
-      nextTop += child.height;
-
-      if (nextTop > this.offsetY + height + this.bufferSize) {
-        break;
-      }
-    }
-
-    // go backwards starting at the child before the anchor
-    let previousTop = anchorTop;
-    for (let index = indexStart - 1; index >= 0; index--) {
-      const child = this.getChild(index);
-
-      if (!layoutChild(child, previousTop - child.height)) {
-        break;
-      }
-
-      previousTop -= child.height;
-
-      if (previousTop < this.offsetY - this.bufferSize) {
-        break;
-      }
-    }
-  }
-
-  private layoutChild(child: Child, top: number) {
-    if (child.top != top) {
+  private layoutChild(child: Child, left: number, top: number) {
+    if (child.left != left || child.top != top) {
       child.top = top;
+      child.left = left;
+      child.node.style.left = left + 'px';
       child.node.style.top = top + 'px';
     }
   }
@@ -329,7 +309,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     let maxChild = this.children[0] ?? null;
 
     for (let i = 1; i < this.children.length; i++) {
-      if (this.children[i].top + this.children[i].height > maxChild.top + maxChild.height) {
+      if (this.children[i].top + this.children[i].height >= maxChild.top + maxChild.height) {
         maxChild = this.children[i];
       }
     }
@@ -387,9 +367,11 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       subscription: null,
 
       // not yet layouted
+      left: Number.NaN,
       top: Number.NaN,
 
       // not yet measured
+      width: Number.NaN,
       height: Number.NaN,
     }
 
@@ -412,6 +394,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     child.ref.changeDetectorRef.detectChanges()
 
     // measure child
+    child.width = child.node.offsetWidth;
     child.height = child.node.offsetHeight;
 
     return child;
@@ -451,17 +434,20 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       }
 
       // get the new height of the child
+      const width = entry.borderBoxSize[0].inlineSize;
       const height = entry.borderBoxSize[0].blockSize;
 
       // only mark the child dirty if it has changed to our previous value.
-      if (child.height != height) {
-        if (height === 0) {
+      if (child.width != width || child.height != height) {
+        if (width === 0 || height === 0) {
           console.warn('Got zero size for child', child);
         }
 
-        debug('Child size changed from %d to %d', child.height, height)
+        debug('Child size changed from %dx%d to %dx%d', child.width, child.height, width, height)
 
+        child.width = width;
         child.height = height;
+
         hasChanges = true;
       }
     }
@@ -536,6 +522,49 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 }
 
-function negate(val: number | null | undefined): number | null | undefined {
-  return val != null ? -val : val;
+export type LayoutHelper = {
+  height: number,
+  offsetY: number,
+  bufferSize: number,
+  maxChildrenToLayout: number,
+  itemCount: number,
+  getChild: (idx: number) => Child,
+  layoutChild: (child: Child, left: number, top: number, width?: string, height?: string) => boolean,
+  anchorScroll: SavedScroll,
+}
+
+function layout(helper: LayoutHelper) {
+  const {index: indexStart, offsetY: anchorTop} = helper.anchorScroll
+
+  // fill elements starting at the first one to show
+  let nextTop = anchorTop;
+  for (let index = indexStart; index < helper.itemCount; index++) {
+    const child = helper.getChild(index);
+
+    if (!helper.layoutChild(child, 0, nextTop)) {
+      break;
+    }
+
+    nextTop += child.height;
+
+    if (nextTop > helper.offsetY + helper.height + helper.bufferSize) {
+      break;
+    }
+  }
+
+  // go backwards starting at the child before the anchor
+  let previousTop = anchorTop;
+  for (let index = indexStart - 1; index >= 0; index--) {
+    const child = helper.getChild(index);
+
+    if (!helper.layoutChild(child, 0, previousTop - child.height)) {
+      break;
+    }
+
+    previousTop -= child.height;
+
+    if (previousTop < helper.offsetY - helper.bufferSize) {
+      break;
+    }
+  }
 }

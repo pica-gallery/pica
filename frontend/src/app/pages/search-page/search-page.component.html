@@ -2,8 +2,8 @@
   <app-search-input (searchTermChanged)="searchTermChanged($event)"/>
 </div>
 
-@if (results(); as results) {
-  <app-album-list showHeader="false" [albums]="results"/>
+@if (items(); as items) {
+  <app-search-results [items]="items"/>
 } @else {
   <app-busy-full/>
 }

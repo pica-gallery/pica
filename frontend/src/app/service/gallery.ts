@@ -268,6 +268,6 @@ const MONTHS = [
   'August',
   'September',
   'Oktober',
-  'Novemeber',
+  'November',
   'Dezember',
 ]
