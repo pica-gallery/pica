@@ -2,12 +2,14 @@ import {ChangeDetectionStrategy, Component, HostListener, inject, Input} from '@
 import type {Album} from '../../service/gallery';
 import {DatePipe} from '@angular/common';
 import {NavigationService} from '../../service/navigation';
+import {ThumbnailComponent} from '../thumbnail/thumbnail.component';
 
 @Component({
   selector: 'app-album-list-item',
   standalone: true,
   imports: [
-    DatePipe
+    DatePipe,
+    ThumbnailComponent
   ],
   templateUrl: './album-list-item.component.html',
   styleUrl: './album-list-item.component.scss',

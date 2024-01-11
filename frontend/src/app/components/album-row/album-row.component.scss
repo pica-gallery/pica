@@ -13,4 +13,5 @@
 
 app-thumbnail {
   width: calc((100% - ((var(--row-columns) - 1) * 4px)) / var(--row-columns));
+  --thumbnail-border-radius: 2px;
 }

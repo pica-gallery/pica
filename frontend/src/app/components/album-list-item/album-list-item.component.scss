@@ -5,13 +5,7 @@
 
 .thumb {
   display: block;
-  aspect-ratio: 1;
-  width: 100%;
-
-  object-fit: cover;
-  background: #eeeeee;
-
-  border-radius: 8px;
+  --thumbnail-border-radius: 8px;
 }
 
 .info {

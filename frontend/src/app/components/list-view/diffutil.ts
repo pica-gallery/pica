@@ -229,7 +229,7 @@ interface Diff {
   convertOldPositionToNew(oldListPosition: int): int | null;
 }
 
-export function diffOf(cb: Callback, detectMoves: boolean = true): Diff {
+export async function diffOf(cb: Callback, detectMoves: boolean = true): Promise<Diff> {
   const oldSize = cb.oldListSize
   const newSize = cb.newListSize
 
@@ -251,7 +251,7 @@ export function diffOf(cb: Callback, detectMoves: boolean = true): Diff {
 
   while (stack.length) {
     const range = stack.pop()!;
-    const snake = midpoint(range, cb, forward, backward);
+    const snake = await midpoint(range, cb, forward, backward);
     if (snake != null) {
       // if it has a diagonal, save it
       if (snake.diagonalSize > 0) {
@@ -626,7 +626,7 @@ function getPostponedUpdate(
   return postponedUpdate;
 }
 
-function midpoint(range: IndexRange, cb: Callback, forward: CenteredArray, backward: CenteredArray): Snake | null {
+async function midpoint(range: IndexRange, cb: Callback, forward: CenteredArray, backward: CenteredArray): Promise<Snake | null> {
   if (range.oldSize < 1 || range.newSize < 1) {
     return null
   }
@@ -635,7 +635,14 @@ function midpoint(range: IndexRange, cb: Callback, forward: CenteredArray, backw
   forward.set(1, range.oldListStart);
   backward.set(1, range.oldListEnd);
 
+  let yieldAt = Date.now() + 8;
+
   for (let d: int = 0; d < max; d++) {
+    if (d % 100 === 0 && Date.now() >= yieldAt) {
+      await yieldToIdle();
+      yieldAt = Date.now() + 8;
+    }
+
     let snake = forwards(range, cb, forward, backward, d);
     if (snake != null) {
       return snake;
@@ -648,6 +655,10 @@ function midpoint(range: IndexRange, cb: Callback, forward: CenteredArray, backw
   }
 
   return null;
+}
+
+async function yieldToIdle(): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve));
 }
 
 function forwards(range: IndexRange, cb: Callback, forward: CenteredArray, backward: CenteredArray, d: int): Snake | null {

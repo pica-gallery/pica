@@ -45,6 +45,7 @@ export class SearchPageComponent {
         results.push({
           component: AlbumListItemComponent,
           inputs: {album: item.album},
+          id: item.album,
         })
       }
 
@@ -52,11 +53,10 @@ export class SearchPageComponent {
         results.push({
           component: ThumbnailComponent,
           inputs: {src: item.media.urls.thumb},
+          id: item.media,
         })
       }
     }
-
-    console.info(results);
 
     return results;
   })

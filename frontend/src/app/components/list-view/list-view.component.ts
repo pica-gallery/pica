@@ -22,6 +22,7 @@ import {observeElementSize} from '../../util';
 import {distinctUntilChanged, filter, map, Subscription} from 'rxjs';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {type DetachedChild, ViewRecycler} from './view-recycler';
+import {diffOf, ItemCallback} from './diffutil';
 
 export type ListItem = {
   component: Type<unknown>,
@@ -80,6 +81,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   private readonly observer = new ResizeObserver(entries => this.resizeObserverCallback(entries));
   private readonly recycler = new ViewRecycler(inject(EnvironmentInjector));
 
+  private itemsVersion: number = 0;
 
   @Input()
   public items: ListItem[] = [];
@@ -152,21 +154,9 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       return;
     }
 
-    const items = change.currentValue as ListItem[];
-
-    for (const child of [...this.children]) {
-      const item = items[child.index];
-
-      // child is not compatible or not needed anymore, remove it now
-      if (item == null || item.component !== child.ref.componentType) {
-        debug('Need to get rid of child at', child.index);
-        this.recycleChild(child);
-        continue;
-      }
-
-      // child is compatible, update input and outputs now
-      debug('Can rebind child at ', child.index);
-      this.bindInputsOutputs(child, item);
+    // recycle all
+    for (const child of this.children.splice(0)) {
+      this.recycleChild(child);
     }
 
     this.updateContent();
@@ -178,6 +168,98 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     // destroy the cached nodes. We do not need to destroy
     // the attached nodes, as they are getting cleaned up by angular.
     this.recycler.destroyAll();
+  }
+
+  async postUpdate(newItems: ListItem[]) {
+    const prev = this.items;
+    const next = newItems;
+
+    const itemVersion = ++this.itemsVersion;
+
+    if (!next.length || !prev.length || !this.children.length) {
+      // recycle all children
+      for (const child of this.children.splice(0)) {
+        this.recycleChild(child);
+      }
+
+      // update items
+      this.items = newItems;
+
+      // and trigger a layout pass
+      this.updateContent();
+      return;
+    }
+
+    const diff = await diffOf(new ItemCallback(prev, next, {
+      sameItem: (oItem, nItem) => (oItem as any).id === (nItem as any).id,
+      sameContents: (oItem, nItem) => true,
+    }))
+
+    // FIXME we need to handle concurrency and
+    //  with some kind of optimistic locking
+    if (this.itemsVersion !== itemVersion) {
+      // we are too late, skip update
+      return
+    }
+
+    this.items = newItems;
+
+    const minChildIndex = this.children[0].index
+    const maxChildIndex = this.children[this.children.length - 1].index;
+
+    diff.dispatchUpdatesTo({
+      onInserted: (position: number, count: number): void => {
+        debug('onInsert', position, count)
+
+        if (position <= maxChildIndex) {
+          for (const child of this.children) {
+            if (child.index >= position) {
+              child.index += count;
+              child.node.dataset['index'] = child.index.toString();
+            }
+          }
+        }
+      },
+
+      onRemoved: (position: number, count: number): void => {
+        debug('onRemoved', position, count)
+
+        if (position <= maxChildIndex) {
+          for (const child of [...this.children]) {
+            if (child.index >= position) {
+              if (child.index < position + count) {
+                this.recycleChild(child);
+                continue
+              }
+
+              child.index -= count;
+              child.node.dataset['index'] = child.index.toString();
+            }
+          }
+        }
+      },
+
+      onChanged: (position: number, count: number, payload: unknown): void => {
+        debug('onChanged', position, count)
+        if (minChildIndex <= position && position <= maxChildIndex) {
+          for (const child of this.children) {
+            if (child.index >= position && child.index < position + count) {
+              this.bindInputsOutputs(child, newItems[child.index])
+            }
+          }
+        }
+      },
+
+      onMoved: (fromPosition: number, toPosition: number): void => {
+        // TODO correctly move the existing children
+        for (const child of [...this.children]) {
+          this.recycleChild(child);
+        }
+      }
+    })
+
+    // now do the layout
+    this.updateContent();
   }
 
   protected updateContent(height: number = this.lastRootHeight) {

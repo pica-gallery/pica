@@ -118,7 +118,9 @@ function convertExifInfo(info: ExifInfoTo): ExifInfo {
 }
 
 function convertAlbums(albums: AlbumTo[]): Album[] {
-  return albums.map(al => convertAlbum(al));
+  return albums
+    .map(al => convertAlbum(al))
+    .sort((lhs, rhs) => rhs.timestamp.getTime() - lhs.timestamp.getTime());
 }
 
 function mainLocationOf(items: MediaItem[]): string | null {
@@ -162,7 +164,9 @@ function mainLocationOf(items: MediaItem[]): string | null {
 }
 
 function convertAlbum(album: AlbumTo): Album {
-  const items = album.items.map(item => convertItem(item));
+  const items = album.items
+    .map(item => convertItem(item))
+    .sort((lhs, rhs) => rhs.timestamp.getTime() - lhs.timestamp.getTime())
 
   return {
     id: album.id,

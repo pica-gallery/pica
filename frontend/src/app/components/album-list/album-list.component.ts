@@ -48,11 +48,6 @@ export class AlbumListComponent {
       return null;
     }
 
-    // sort albums by time desc
-    albums = [...albums].sort((lhs, rhs) => {
-      return rhs.timestamp.getTime() - lhs.timestamp.getTime();
-    })
-
     const rows: ListItem[] = [];
 
     if (this.showHeaderSignal()) {

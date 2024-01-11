@@ -1,14 +1,12 @@
 :host {
   display: block;
   aspect-ratio: 1;
-  overflow: hidden;
-  border-radius: 2px;
-
   background: rgba(0, 0, 0, 0.15) 50% 50%;
-
   transition: opacity ease-out 150ms, box-shadow ease-out 150ms;
-
   cursor: pointer;
+
+  overflow: hidden;
+  border-radius: var(--thumbnail-border-radius, 0px);
 }
 
 img {
