@@ -7,7 +7,6 @@ import {BusyFullComponent} from '../../components/busy-full/busy-full.component'
 import {iterSearch, predicateOf} from '../../service/search';
 import {type ResultListItem, SearchResultsComponent} from '../../components/search-results/search-results.component';
 import {AlbumListItemComponent} from '../../components/album-list-item/album-list-item.component';
-import {ThumbnailComponent} from '../../components/thumbnail/thumbnail.component';
 
 
 @Component({
@@ -43,16 +42,20 @@ export class SearchPageComponent {
     for (const item of iterSearch(albums, predicateOf(term))) {
       if (item.type === 'album') {
         results.push({
-          component: AlbumListItemComponent,
-          inputs: {album: item.album},
+          viewType: 'Album',
+          context: {album: item.album},
           id: item.album,
         })
       }
 
       if (item.type === 'media') {
         results.push({
-          component: ThumbnailComponent,
-          inputs: {src: item.media.urls.thumb},
+          viewType: 'Media',
+          context: {
+            src: item.media.urls.thumb,
+            album: item.album,
+            media: item.media,
+          },
           id: item.media,
         })
       }

@@ -52,14 +52,14 @@ export class AlbumListComponent {
 
     if (this.showHeaderSignal()) {
       rows.push({
-        component: AlbumListHeaderComponent,
+        viewType: AlbumListHeaderComponent,
       })
     }
 
     rows.push(
       ...chunksOf(albums, columnCount).map((albums: Album[]): ListItem => {
         return {
-          component: AlbumListRowComponent,
+          viewType: AlbumListRowComponent,
           inputs: {items: albums},
         };
       }),

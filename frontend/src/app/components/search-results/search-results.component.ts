@@ -1,22 +1,29 @@
-import {ChangeDetectionStrategy, Component, Input, type Type, ViewChild} from '@angular/core';
-import {type LayoutHelper, type ListItem, ListViewComponent} from '../list-view/list-view.component';
-import type {ThumbnailComponent} from '../thumbnail/thumbnail.component';
-import type {AlbumListItemComponent} from '../album-list-item/album-list-item.component';
-import type {Album} from '../../service/gallery';
+import {ChangeDetectionStrategy, Component, Input, ViewChild} from '@angular/core';
+import {
+  type LayoutHelper,
+  type ListItem,
+  ListViewComponent,
+  ListViewItemDirective
+} from '../list-view/list-view.component';
+import {ThumbnailComponent} from '../thumbnail/thumbnail.component';
+import {AlbumListItemComponent} from '../album-list-item/album-list-item.component';
+import type {Album, MediaItem} from '../../service/gallery';
 import {ArrayDataSource} from '../list-view/datasource';
 
 export type MediaListItem = ListItem & {
-  component: Type<ThumbnailComponent>,
   id: unknown,
-  inputs: {
+  viewType: 'Media',
+  context: {
     src: string,
+    album: Album,
+    media: MediaItem,
   },
 }
 
 export type AlbumListItem = ListItem & {
-  component: Type<AlbumListItemComponent>,
   id: unknown,
-  inputs: {
+  viewType: 'Album',
+  context: {
     album: Album,
   },
 }
@@ -31,7 +38,10 @@ export type ResultListItem =
   selector: 'app-search-results',
   standalone: true,
   imports: [
-    ListViewComponent
+    ListViewComponent,
+    ListViewItemDirective,
+    ThumbnailComponent,
+    AlbumListItemComponent,
   ],
   templateUrl: './search-results.component.html',
   styleUrl: './search-results.component.scss',
@@ -113,6 +123,14 @@ export class SearchResultsComponent {
 
       prevTop -= rowHeight + padding;
     }
+  }
+
+  albumClicked(album: Album) {
+    console.info(album)
+  }
+
+  mediaClicked(album: Album, media: MediaItem) {
+    console.info(album, media)
   }
 }
 

@@ -28,14 +28,12 @@ import {type ListItem, ListViewComponent} from '../list-view/list-view.component
 import {type SectionHeader, SectionHeaderComponent} from '../section-title/section-header.component';
 
 type SectionHeaderListItem = ListItem & {
-  type: 'header',
-  component: Type<SectionHeaderComponent>,
+  viewType: Type<SectionHeaderComponent>,
   inputs: { header: SectionHeader },
 }
 
 type ThumbnailsListItem = ListItem & {
-  type: 'thumbs',
-  component: Type<AlbumRowComponent>,
+  viewType: Type<AlbumRowComponent>,
   inputs: { items: MediaItem[], columns: number },
   outputs: { mediaClicked: (item: MediaItem) => void },
 }
@@ -88,8 +86,7 @@ export class AlbumComponent {
       const rows: RowListItem[] = [];
 
       rows.push({
-        type: 'header',
-        component: SectionHeaderComponent,
+        viewType: SectionHeaderComponent,
         inputs: {
           header: {
             name: section.name,
@@ -102,8 +99,7 @@ export class AlbumComponent {
 
       rows.push(...chunksOf(section.items, columnCount).map((chunk): ThumbnailsListItem => {
         return {
-          type: 'thumbs',
-          component: AlbumRowComponent,
+          viewType: AlbumRowComponent,
           inputs: {
             items: chunk,
             columns: columnCount,

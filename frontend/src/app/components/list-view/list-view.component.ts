@@ -1,9 +1,11 @@
 import {
+  type AfterContentInit,
   type AfterViewInit,
   ApplicationRef,
   ChangeDetectionStrategy,
   Component,
-  ComponentRef,
+  ContentChildren,
+  Directive,
   ElementRef,
   EnvironmentInjector,
   EventEmitter,
@@ -14,25 +16,32 @@ import {
   type OnChanges,
   type OnDestroy,
   Output,
+  QueryList,
   type SimpleChanges,
+  TemplateRef,
   type Type,
   ViewChild
 } from '@angular/core';
 import {observeElementSize} from '../../util';
 import {distinctUntilChanged, filter, map, Subscription} from 'rxjs';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
-import {type DetachedChild, ViewRecycler} from './view-recycler';
+import {type DetachedChild, type View, ViewRecycler, type ViewType} from './view-recycler';
 import {ArrayDataSource, type DataSource, type Edit} from './datasource';
 
-export type ListItem = {
-  component: Type<unknown>,
+export type ListItem =
+  | {
+  viewType: Type<unknown>,
   inputs?: Record<string, unknown>,
   outputs?: Record<string, (value: any) => void>,
+}
+  | {
+  viewType: TemplateRef<unknown> | string,
+  context: unknown,
 }
 
 export type Child = {
   node: HTMLElement,
-  ref: ComponentRef<unknown>,
+  view: View,
   index: number,
   top: number,
   left: number,
@@ -57,6 +66,38 @@ export type SavedScroll = {
   offsetY: number,
 }
 
+@Directive({
+  standalone: true,
+  selector: '[listViewItem]',
+})
+export class ListViewItemDirective {
+  @Input({required: true, alias: 'listViewItem'})
+  name!: string
+
+  constructor(
+    readonly templateRef: TemplateRef<unknown>,
+  ) {
+  }
+}
+
+class TemplateLookup {
+  private lookup = new Map<string, TemplateRef<unknown>>();
+
+  constructor(private readonly templates: QueryList<ListViewItemDirective>) {
+    this.update();
+    templates.changes.subscribe(() => this.update())
+  }
+
+  public get(name: string): TemplateRef<unknown> | null {
+    return this.lookup.get(name) ?? null;
+  }
+
+  private update() {
+    const pairs = this.templates.map(item => [item.name, item.templateRef] as const);
+    this.lookup = new Map(pairs);
+  }
+}
+
 @Component({
   selector: 'app-list-view',
   standalone: true,
@@ -65,7 +106,7 @@ export type SavedScroll = {
   styleUrl: './list-view.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
+export class ListViewComponent implements AfterViewInit, AfterContentInit, OnChanges, OnDestroy {
   private readonly applicationRef = inject(ApplicationRef);
   private readonly ngZone = inject(NgZone);
 
@@ -73,6 +114,10 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   @ViewChild('Canvas')
   private canvas!: ElementRef<HTMLElement>;
+
+  @ContentChildren(ListViewItemDirective, {descendants: false})
+  private templates!: QueryList<ListViewItemDirective>
+  private lookupTemplates!: TemplateLookup
 
   private canvasHeight: number = 0;
   private lastRootHeight = 0;
@@ -143,6 +188,10 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.root.nativeElement.scrollTop = value;
   }
 
+  ngAfterContentInit() {
+    this.lookupTemplates = new TemplateLookup(this.templates);
+  }
+
   ngAfterViewInit() {
     // ensure we're scrolled to the top
     this.offsetY = 0;
@@ -210,12 +259,25 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     this.dataSourceSubscription = dataSource.observe().subscribe(update => {
       if (update.type === 'full' || !update.items.length || !update.previous.length || !this.children.length) {
-        // recycle all children
-        for (const child of this.children.splice(0)) {
-          this.recycleChild(child);
+
+        if (update.type === 'full') {
+          for (const child of [...this.children]) {
+            const item = update.items[child.index];
+            if (item != null && child.view.viewType === this.viewTypeOf(item)) {
+              // same view type, just require a rebind
+              child.view.bindValues(item)
+            } else {
+              this.recycleChild(child);
+            }
+          }
+        } else {
+          // need to recycle all children
+          for (const child of this.children.splice(0)) {
+            this.recycleChild(child);
+          }
         }
 
-        // update items
+        // store items
         this.items = update.items;
 
         // and trigger a layout pass
@@ -254,7 +316,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
           if (minChildIndex <= edit.position && edit.position <= maxChildIndex) {
             for (const child of this.children) {
               if (child.index >= edit.position && child.index < edit.position + edit.count) {
-                this.bindInputsOutputs(child, this.items[child.index])
+                child.view.bindValues(this.items[child.index])
               }
             }
           }
@@ -472,7 +534,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   private attachChild(detachedChild: DetachedChild, idx: number, item: ListItem): Child {
     const child: Child = {
       node: detachedChild.node,
-      ref: detachedChild.ref,
+      view: detachedChild.view,
       index: idx,
       subscription: null,
 
@@ -485,14 +547,13 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       height: Number.NaN,
     }
 
-    child.node.append(child.ref.location.nativeElement);
+    child.view.appendTo(child.node);
     child.node.dataset['index'] = child.index.toString();
 
     // check for the next child so we can insert this one before
     const next = this.findChild(child.index + 1);
     this.canvas.nativeElement.insertBefore(child.node, next?.node ?? null);
-
-    this.applicationRef.attachView(child.ref.hostView);
+    child.view.attach(this.applicationRef);
     this.observer.observe(child.node, {box: 'border-box'});
 
     const idxToInsert = this.children.findIndex(ch => ch.index > child.index)
@@ -500,8 +561,8 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     // bind inputs and run change detection to be able to correctly measure the
     // view in the next step.
-    this.bindInputsOutputs(child, item);
-    child.ref.changeDetectorRef.detectChanges()
+    child.view.bindValues(item)
+    child.view.detectChanges();
 
     // measure child
     child.width = child.node.offsetWidth;
@@ -511,13 +572,12 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private detachChild(child: Child): DetachedChild {
-    // debug('Detaching child', child.index);
     removeInplace(this.children, child);
 
     child.subscription?.unsubscribe()
 
     this.observer.unobserve(child.node);
-    this.applicationRef.detachView(child.ref.hostView);
+    child.view.detach(this.applicationRef);
     this.canvas.nativeElement.removeChild(child.node);
 
     // measure child now
@@ -525,7 +585,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     return {
       node: child.node,
-      ref: child.ref,
+      view: child.view,
     }
   }
 
@@ -568,6 +628,19 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
   }
 
+  private viewTypeOf(item: ListItem): ViewType {
+    if (typeof item.viewType === 'string') {
+      const templateType = this.lookupTemplates.get(item.viewType);
+      if (templateType == null) {
+        throw new Error(`template '${item.viewType}' not found`)
+      }
+
+      return templateType;
+    }
+
+    return item.viewType
+  }
+
   /**
    * Returns a Child instance bound with the given item data
    * attached to the list view container.
@@ -583,7 +656,7 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     return this.ngZone.runTask(() => {
       // create the child and insert it into the view at the right place
-      const child = this.recycler.get(item.component);
+      const child = this.recycler.get(this.viewTypeOf(item));
       return this.attachChild(child, index, item);
     });
   }
@@ -593,33 +666,6 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
    */
   private recycleChild(child: Child) {
     this.recycler.cacheChild(this.detachChild(child))
-  }
-
-  /**
-   * Binds the item to the given child.
-   */
-  private bindInputsOutputs(child: Child, item: ListItem) {
-    if (item.inputs) {
-      for (const [key, value] of Object.entries(item.inputs)) {
-        child.ref.setInput(key, value)
-      }
-    }
-
-    child.subscription?.unsubscribe();
-
-    if (item.outputs) {
-      child.subscription = new Subscription();
-
-      for (const [key, value] of Object.entries(item.outputs)) {
-        const output = (child.ref.instance as any)[key];
-
-        if (output instanceof EventEmitter) {
-          child.subscription.add(
-            output.subscribe(event => value(event))
-          );
-        }
-      }
-    }
   }
 
   private offsetChildrenKeepScroll(space: number) {
