@@ -3,6 +3,7 @@ import {type LayoutHelper, type ListItem, ListViewComponent} from '../list-view/
 import type {ThumbnailComponent} from '../thumbnail/thumbnail.component';
 import type {AlbumListItemComponent} from '../album-list-item/album-list-item.component';
 import type {Album} from '../../service/gallery';
+import {ArrayDataSource} from '../list-view/datasource';
 
 export type MediaListItem = ListItem & {
   component: Type<ThumbnailComponent>,
@@ -37,22 +38,19 @@ export type ResultListItem =
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SearchResultsComponent {
+  protected readonly dataSource = new ArrayDataSource<ResultListItem>();
+
   @Input()
   public set items(newItems: ResultListItem[]) {
-    this.updateView(newItems);
+    this.dataSource.items = newItems
   }
 
   @ViewChild(ListViewComponent)
   protected listView!: ListViewComponent;
 
-  private async updateView(newItems: ResultListItem[]) {
-    void this.listView?.postUpdate(newItems);
-  }
-
   protected readonly layout = (helper: LayoutHelper): void => {
     const padding = 16;
     const columnCount = 2;
-
 
     const itemWidth = (window.innerWidth - padding * (columnCount + 1)) / columnCount;
 

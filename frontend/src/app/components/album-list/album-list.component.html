@@ -1,6 +1,6 @@
 @if (state(); as state) {
   <app-list-view
-    [items]="state.rows"
+    [dataSource]="state.rows"
     bufferSize="512"
     [ngStyle]="{'--column-count': state.columnCount}"/>
 }

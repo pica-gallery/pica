@@ -22,7 +22,7 @@ import {observeElementSize} from '../../util';
 import {distinctUntilChanged, filter, map, Subscription} from 'rxjs';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {type DetachedChild, ViewRecycler} from './view-recycler';
-import {diffOf, ItemCallback} from './diffutil';
+import {ArrayDataSource, type DataSource, type Edit} from './datasource';
 
 export type ListItem = {
   component: Type<unknown>,
@@ -81,10 +81,19 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   private readonly observer = new ResizeObserver(entries => this.resizeObserverCallback(entries));
   private readonly recycler = new ViewRecycler(inject(EnvironmentInjector));
 
-  private itemsVersion: number = 0;
+  private items: ListItem[] = [];
+  private _dataSource: DataSource = new ArrayDataSource();
+  private dataSourceSubscription: Subscription | null = null;
+
 
   @Input()
-  public items: ListItem[] = [];
+  public set dataSource(newValue: DataSource | ListItem[]) {
+    this.updateDataSource(newValue);
+  }
+
+  public get dataSource(): DataSource {
+    return this._dataSource
+  }
 
   @Input()
   public initialScroll: SavedScroll | null = null;
@@ -138,6 +147,8 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     // ensure we're scrolled to the top
     this.offsetY = 0;
 
+    this.observe(this._dataSource);
+
     this.ngZone.runOutsideAngular(() => {
       this.root.nativeElement.addEventListener('scroll', () => this.updateContent());
     });
@@ -149,17 +160,14 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     // forward config to the recycler
     this.recycler.perComponentCacheSize = this.perComponentCacheSize;
 
-    const change = changes['items'];
-    if (!change || change.firstChange) {
-      return;
-    }
+    /*
+        // recycle all
+        for (const child of this.children.splice(0)) {
+          this.recycleChild(child);
+        }
 
-    // recycle all
-    for (const child of this.children.splice(0)) {
-      this.recycleChild(child);
-    }
-
-    this.updateContent();
+        this.updateContent();
+        */
   }
 
   ngOnDestroy(): void {
@@ -170,96 +178,116 @@ export class ListViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.recycler.destroyAll();
   }
 
-  async postUpdate(newItems: ListItem[]) {
-    const prev = this.items;
-    const next = newItems;
+  private updateDataSource(dataSourceOrItems: DataSource | ListItem[]) {
+    if (Array.isArray(dataSourceOrItems)) {
+      // ensure we have a simple data source configured
+      let dataSource: SimpleArrayDataSource;
 
-    const itemVersion = ++this.itemsVersion;
-
-    if (!next.length || !prev.length || !this.children.length) {
-      // recycle all children
-      for (const child of this.children.splice(0)) {
-        this.recycleChild(child);
+      if (this.dataSource instanceof SimpleArrayDataSource) {
+        dataSource = this.dataSource;
+      } else {
+        this.dataSource = dataSource = new SimpleArrayDataSource();
+        this.observe(dataSource);
       }
 
-      // update items
-      this.items = newItems;
-
-      // and trigger a layout pass
-      this.updateContent();
+      // and set the new values
+      dataSource.items = dataSourceOrItems;
       return;
     }
 
-    const diff = await diffOf(new ItemCallback(prev, next, {
-      sameItem: (oItem, nItem) => (oItem as any).id === (nItem as any).id,
-      sameContents: (oItem, nItem) => true,
-    }))
+    // we got a new real data source
+    this._dataSource = dataSourceOrItems;
+    this.observe(dataSourceOrItems);
+  }
 
-    // FIXME we need to handle concurrency and
-    //  with some kind of optimistic locking
-    if (this.itemsVersion !== itemVersion) {
-      // we are too late, skip update
-      return
+  private observe(dataSource: DataSource) {
+    this.dataSourceSubscription?.unsubscribe();
+    this.dataSourceSubscription = null;
+
+    if (this.canvas == null) {
+      return;
     }
 
-    this.items = newItems;
+    this.dataSourceSubscription = dataSource.observe().subscribe(update => {
+      if (update.type === 'full' || !update.items.length || !update.previous.length || !this.children.length) {
+        // recycle all children
+        for (const child of this.children.splice(0)) {
+          this.recycleChild(child);
+        }
 
+        // update items
+        this.items = update.items;
+
+        // and trigger a layout pass
+        this.updateContent();
+        return;
+      }
+
+      this.items = update.items;
+      this.applyEditsToChildren(update.edits);
+
+      // now trigger a layout pass
+      this.updateContent();
+    })
+  }
+
+  private applyEditsToChildren(edits: Edit[]) {
     const minChildIndex = this.children[0].index
     const maxChildIndex = this.children[this.children.length - 1].index;
 
-    diff.dispatchUpdatesTo({
-      onInserted: (position: number, count: number): void => {
-        debug('onInsert', position, count)
-
-        if (position <= maxChildIndex) {
-          for (const child of this.children) {
-            if (child.index >= position) {
-              child.index += count;
-              child.node.dataset['index'] = child.index.toString();
-            }
-          }
-        }
-      },
-
-      onRemoved: (position: number, count: number): void => {
-        debug('onRemoved', position, count)
-
-        if (position <= maxChildIndex) {
-          for (const child of [...this.children]) {
-            if (child.index >= position) {
-              if (child.index < position + count) {
-                this.recycleChild(child);
-                continue
+    // incremental update
+    for (const edit of edits) {
+      switch (edit.type) {
+        case 'insert':
+          if (edit.position <= maxChildIndex) {
+            for (const child of this.children) {
+              if (child.index >= edit.position) {
+                child.index += edit.count;
+                child.node.dataset['index'] = child.index.toString();
               }
-
-              child.index -= count;
-              child.node.dataset['index'] = child.index.toString();
             }
           }
-        }
-      },
 
-      onChanged: (position: number, count: number, payload: unknown): void => {
-        debug('onChanged', position, count)
-        if (minChildIndex <= position && position <= maxChildIndex) {
-          for (const child of this.children) {
-            if (child.index >= position && child.index < position + count) {
-              this.bindInputsOutputs(child, newItems[child.index])
+          break;
+
+        case 'change':
+          if (minChildIndex <= edit.position && edit.position <= maxChildIndex) {
+            for (const child of this.children) {
+              if (child.index >= edit.position && child.index < edit.position + edit.count) {
+                this.bindInputsOutputs(child, this.items[child.index])
+              }
             }
           }
-        }
-      },
 
-      onMoved: (fromPosition: number, toPosition: number): void => {
-        // TODO correctly move the existing children
-        for (const child of [...this.children]) {
-          this.recycleChild(child);
-        }
+          break;
+
+        case 'remove':
+          if (edit.position <= maxChildIndex) {
+            for (const child of [...this.children]) {
+              if (child.index >= edit.position) {
+                if (child.index < edit.position + edit.count) {
+                  this.recycleChild(child);
+                  continue
+                }
+
+                child.index -= edit.count;
+                child.node.dataset['index'] = child.index.toString();
+              }
+            }
+          }
+
+          break;
+
+        case 'move':
+          console.warn('move currently unsupported, recycle all children');
+
+          for (const child of [...this.children]) {
+            this.recycleChild(child);
+          }
+
+          break;
       }
-    })
-
-    // now do the layout
-    this.updateContent();
+    }
   }
 
   protected updateContent(height: number = this.lastRootHeight) {
@@ -648,5 +676,11 @@ function layout(helper: LayoutHelper) {
     if (previousTop < helper.offsetY - helper.bufferSize) {
       break;
     }
+  }
+}
+
+class SimpleArrayDataSource extends ArrayDataSource<ListItem> {
+  constructor() {
+    super();
   }
 }

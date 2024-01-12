@@ -1,4 +1,4 @@
-type int = number;
+export type int = number;
 
 export interface Callback {
   readonly oldListSize: int
