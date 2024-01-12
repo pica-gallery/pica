@@ -5,9 +5,3 @@
 app-list-view {
   height: 100%;
 }
-
-:host ::ng-deep {
-  app-album-list-item, app-thumbnail {
-    width: calc((100vw - 16px - 32px) / 2);
-  }
-}

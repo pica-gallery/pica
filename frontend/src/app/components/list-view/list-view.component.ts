@@ -120,7 +120,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
   private lookupTemplates!: TemplateLookup
 
   private canvasHeight: number = 0;
-  private lastRootHeight = 0;
+  private lastRootHeight: number = 0;
   private readonly children: Child[] = [];
 
   private readonly observer = new ResizeObserver(entries => this.resizeObserverCallback(entries));
@@ -415,6 +415,11 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
   }
 
   private anchorScroll(): SavedScroll {
+    if (this.offsetY === 0) {
+      // if we've scrolled to the top, we're anchored there
+      return {index: 0, offsetY: 0}
+    }
+
     // find the child we want to anchor all the views to
     const anchorChild = this.anchorChild();
     if (anchorChild != null) {
@@ -646,7 +651,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
    * attached to the list view container.
    * If the view is already attached, it is not rebound.
    */
-  private getChild(index: number): Child {
+  private getChild(index: number, style?: Record<string, StyleValue>): Child {
     const existingChild = this.findChild(index);
     if (existingChild != null) {
       return existingChild;
@@ -657,6 +662,14 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
     return this.ngZone.runTask(() => {
       // create the child and insert it into the view at the right place
       const child = this.recycler.get(this.viewTypeOf(item));
+      child.node.attributeStyleMap.clear();
+
+      if (style != null) {
+        for (const [key, value] of Object.entries(style)) {
+          child.node.attributeStyleMap.set(key, value);
+        }
+      }
+
       return this.attachChild(child, index, item);
     });
   }
@@ -678,13 +691,15 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
   }
 }
 
+export type StyleValue = CSSStyleValue | string | (CSSStyleValue | string)[];
+
 export type LayoutHelper = {
   height: number,
   offsetY: number,
   bufferSize: number,
   maxChildrenToLayout: number,
   itemCount: number,
-  getChild: (idx: number) => Child,
+  getChild: (idx: number, style?: Record<string, StyleValue>) => Child,
   layoutChild: (child: Child, left: number, top: number, width?: string, height?: string) => boolean,
   anchorScroll: SavedScroll,
 }

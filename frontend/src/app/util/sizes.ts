@@ -30,7 +30,7 @@ export function columnCount$(element: HTMLElement, ngZone: NgZone, maxColumnSize
   );
 }
 
-function columnCount(width: number, maxColumnSize: number): number {
+export function columnCount(width: number, maxColumnSize: number): number {
   return Math.max(1, Math.ceil(width / maxColumnSize))
 }
 

@@ -11,12 +11,17 @@ export class NavigationService {
     await this.router.navigate([
       {
         outlets: {
-          media: [id]
+          media: [id],
         }
       }
     ], {
       replaceUrl
     })
+  }
+
+  public async mediaViewerInAlbum(albumId: AlbumId, mediaId: MediaId) {
+    await this.openAlbum(albumId);
+    await this.mediaViewer(mediaId);
   }
 
   public async clearMediaViewer() {
