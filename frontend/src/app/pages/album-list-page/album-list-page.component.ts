@@ -4,6 +4,9 @@ import {toSignal} from '@angular/core/rxjs-interop';
 import {AlbumListComponent} from '../../components/album-list/album-list.component';
 import {ProgressBarComponent} from '../../components/progressbar/progress-bar.component';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
+import {fUrlScrollState, parseQuery, type UrlScrollState, UrlStateUpdater} from '../../service/persistent-state';
+import {Router} from '@angular/router';
+import type {SavedScroll} from '../../components/list-view/list-view.component';
 
 @Component({
   selector: 'app-album-list-page',
@@ -21,4 +24,22 @@ export class AlbumListPageComponent {
   private readonly gallery = inject(Gallery);
   protected readonly albums = toSignal(this.gallery.albums());
 
+  private readonly initialScrollState = parseQuery(fUrlScrollState, 'scroll.');
+
+  protected readonly updater = new UrlStateUpdater<UrlScrollState>(
+    fUrlScrollState,
+    'scroll.',
+    inject(Router),
+  )
+
+  constructor() {
+    console.info(this.initialScrollState);
+  }
+
+  scrollChanged(scroll: SavedScroll) {
+    this.updater.update({
+      id: scroll.index.toString(),
+      offset: scroll.offsetY,
+    })
+  }
 }

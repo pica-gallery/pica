@@ -1,5 +1,5 @@
 @if (albums(); as albums) {
-  <app-album-list [albums]="albums"/>
+  <app-album-list [albums]="albums" (scrollChanged)="scrollChanged($event)"/>
 } @else {
   <app-busy-full/>
 }

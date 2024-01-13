@@ -4,8 +4,10 @@ import {
   Component,
   computed,
   ElementRef,
+  EventEmitter,
   inject,
   Input,
+  Output,
   signal
 } from '@angular/core';
 import type {Album} from '../../service/gallery';
@@ -15,7 +17,7 @@ import {NgStyle} from '@angular/common';
 import {ScrollingModule} from '@angular/cdk-experimental/scrolling';
 import {AlbumListRowComponent} from '../album-list-row/album-list-row.component';
 import {MyAutoSizeVirtualScroll} from '../../directives/auto-size-scrolling.directive';
-import {type ListItem, ListViewComponent} from '../list-view/list-view.component';
+import {type ListItem, ListViewComponent, type SavedScroll} from '../list-view/list-view.component';
 import {AlbumListHeaderComponent} from '../album-list-header/album-list-header.component';
 
 @Component({
@@ -81,6 +83,9 @@ export class AlbumListComponent {
   set showHeader(show: boolean) {
     this.showHeaderSignal.set(show);
   }
+
+  @Output()
+  public readonly scrollChanged = new EventEmitter<SavedScroll>();
 }
 
 let firstVisible: number;

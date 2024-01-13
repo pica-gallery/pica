@@ -24,7 +24,7 @@ import {AlbumRowComponent} from '../album-row/album-row.component';
 import {ScrollingModule} from '@angular/cdk-experimental/scrolling';
 import {MyAutoSizeVirtualScroll} from '../../directives/auto-size-scrolling.directive';
 import {AlbumListComponent} from '../album-list/album-list.component';
-import {type ListItem, ListViewComponent} from '../list-view/list-view.component';
+import {type ListItem, ListViewComponent, type SavedScroll} from '../list-view/list-view.component';
 import {type SectionHeader, SectionHeaderComponent} from '../section-title/section-header.component';
 
 type SectionHeaderListItem = ListItem & {
@@ -72,6 +72,9 @@ export class AlbumComponent {
 
   @Output()
   readonly mediaClicked = new EventEmitter<MediaItem>();
+
+  @Output()
+  readonly scrollChanged = new EventEmitter<SavedScroll>();
 
   private readonly columnCount = columnCountSignal(inject(ElementRef).nativeElement, 120);
 

@@ -2,5 +2,6 @@
   <app-list-view
     [dataSource]="items"
     [initialScroll]="null"
+    (scrollChanged)="scrollChanged.emit($event)"
     bufferSize="384"/>
 }
