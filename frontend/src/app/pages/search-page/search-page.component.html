@@ -3,7 +3,11 @@
 </div>
 
 @if (items(); as items) {
+  @if(items.length) {
   <app-search-results [items]="items"/>
+  } @else {
+    <div class="no-results">No results</div>
+  }
 } @else {
   <app-busy-full/>
 }

@@ -2,7 +2,7 @@ import {
   type AfterContentInit,
   type AfterViewInit,
   ApplicationRef,
-  ChangeDetectionStrategy,
+  ChangeDetectionStrategy, ChangeDetectorRef,
   Component,
   ContentChildren,
   Directive,
@@ -47,7 +47,6 @@ export type Child = {
   left: number,
   width: number,
   height: number,
-  subscription: Subscription | null,
 }
 
 function debug(...args: any[]) {
@@ -109,6 +108,7 @@ class TemplateLookup {
 export class ListViewComponent implements AfterViewInit, AfterContentInit, OnChanges, OnDestroy {
   private readonly applicationRef = inject(ApplicationRef);
   private readonly ngZone = inject(NgZone);
+  private readonly changeDetectorRef = inject(ChangeDetectorRef);
 
   private readonly root: ElementRef<HTMLElement> = inject(ElementRef);
 
@@ -280,16 +280,17 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
         // store items
         this.items = update.items;
 
-        // and trigger a layout pass
-        this.updateContent();
-        return;
+      } else {
+        // partial update
+        this.items = update.items;
+        this.applyEditsToChildren(update.edits);
       }
-
-      this.items = update.items;
-      this.applyEditsToChildren(update.edits);
 
       // now trigger a layout pass
       this.updateContent();
+
+      // and run change detection
+      this.changeDetectorRef.detectChanges();
     })
   }
 
@@ -541,7 +542,6 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
       node: detachedChild.node,
       view: detachedChild.view,
       index: idx,
-      subscription: null,
 
       // not yet layouted
       left: Number.NaN,
@@ -579,10 +579,9 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
   private detachChild(child: Child): DetachedChild {
     removeInplace(this.children, child);
 
-    child.subscription?.unsubscribe()
-
     this.observer.unobserve(child.node);
     child.view.detach(this.applicationRef);
+
     this.canvas.nativeElement.removeChild(child.node);
 
     // measure child now
@@ -654,6 +653,13 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
   private getChild(index: number, style?: Record<string, StyleValue>): Child {
     const existingChild = this.findChild(index);
     if (existingChild != null) {
+      // TODO do we need to do this every time?
+      if (style != null) {
+        for (const [key, value] of Object.entries(style)) {
+          existingChild.node.attributeStyleMap.set(key, value);
+        }
+      }
+
       return existingChild;
     }
 
@@ -662,6 +668,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
     return this.ngZone.runTask(() => {
       // create the child and insert it into the view at the right place
       const child = this.recycler.get(this.viewTypeOf(item));
+
       child.node.attributeStyleMap.clear();
 
       if (style != null) {

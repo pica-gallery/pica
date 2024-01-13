@@ -16,3 +16,9 @@ app-search-results {
 app-album-list {
   height: calc(100dvh - 80px - 86px);
 }
+
+.no-results {
+  flex: 1;
+  display: grid;
+  place-items: center;
+}

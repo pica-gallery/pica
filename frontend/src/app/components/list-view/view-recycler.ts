@@ -153,6 +153,9 @@ class ComponentView implements View {
   }
 
   detach(app: ApplicationRef): void {
+    this.subscription?.unsubscribe();
+    this.subscription = null;
+    
     app.detachView(this.ref.hostView);
   }
 

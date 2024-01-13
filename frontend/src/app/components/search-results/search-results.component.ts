@@ -1,5 +1,6 @@
 import {ChangeDetectionStrategy, Component, inject, Input, ViewChild} from '@angular/core';
 import {
+  type Child,
   type LayoutHelper,
   type ListItem,
   ListViewComponent,
@@ -124,6 +125,7 @@ function columnsLayout(helper: LayoutHelper): void {
   outer: while (idx > 0) {
     let rowHeight = 0;
 
+    let pending: { child: Child, left: number }[] = [];
     for (let column = columns - 1; column >= 0; column--) {
       idx--;
 
@@ -136,13 +138,16 @@ function columnsLayout(helper: LayoutHelper): void {
       }
 
       const left = padding + column * (padding + itemWidth);
-
       const child = helper.getChild(idx, {width: itemWidth + 'px'});
-      helper.layoutChild(child, left, prevTop - child.height - padding);
+      pending.push({child, left})
 
       if (child.height > rowHeight) {
         rowHeight = child.height
       }
+    }
+
+    for (const p of pending) {
+      helper.layoutChild(p.child, p.left, prevTop - rowHeight - padding);
     }
 
     prevTop -= rowHeight + padding;
