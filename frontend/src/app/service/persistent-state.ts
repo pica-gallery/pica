@@ -1,7 +1,7 @@
 import {inject} from '@angular/core';
 import {ActivatedRoute, NavigationStart, type Router} from '@angular/router';
 import {defaultValue, InvalidValue, number, object, optional, string, type Type, type TypeOf} from 'fud-ts';
-import {auditTime, BehaviorSubject, debounceTime, filter} from 'rxjs';
+import {auditTime, BehaviorSubject, filter} from 'rxjs';
 
 type VersionedState<T> = {
   version: number,
@@ -60,7 +60,6 @@ export function parseQuery<T>(type: Type<T, any>, prefix: string): InvalidValue 
     }
   }
 
-  console.info("parse", queryValues);
   return type.parseSafe(queryValues);
 }
 

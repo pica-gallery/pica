@@ -1,7 +1,8 @@
 @if (state(); as state) {
   <app-list-view
     bufferSize="512"
+    [layout]="layout"
     [dataSource]="state.rows"
     (scrollChanged)="scrollChanged.emit($event)"
-    [ngStyle]="{'--column-count': state.columnCount}"/>
+  />
 }

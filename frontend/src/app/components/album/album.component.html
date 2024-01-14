@@ -1,7 +1,18 @@
 @if (items(); as items) {
   <app-list-view
+    [layout]="layout"
     [dataSource]="items"
-    [initialScroll]="null"
     (scrollChanged)="scrollChanged.emit($event)"
-    bufferSize="384"/>
+    bufferSize="384">
+
+    <ng-template listViewItem="SectionHeader" let-item>
+      <app-section-header [header]="item.header"/>
+    </ng-template>
+
+    <ng-template listViewItem="MediaItem" let-item>
+      <app-media-item
+        [media]="item.media" (click)="mediaClicked.emit(item.media)"
+        class="row-item"/>
+    </ng-template>
+  </app-list-view>
 }

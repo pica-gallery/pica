@@ -3,6 +3,9 @@ import {AppComponent} from './app/app.component';
 import {provideHttpClient} from '@angular/common/http';
 import {provideRouter, type Route, withComponentInputBinding} from '@angular/router';
 
+import './app/history'
+import {instrumentHistoryTracking} from './app/history';
+
 const routes: Route[] = [
   {
     path: '',
@@ -29,7 +32,6 @@ const routes: Route[] = [
     pathMatch: 'full',
     loadComponent: () => import('./app/pages/search-page/search-page.component').then(m => m.SearchPageComponent),
   },
-
   {
     outlet: 'media',
     path: ':mediaId',
@@ -38,12 +40,17 @@ const routes: Route[] = [
   }
 ];
 
+instrumentHistoryTracking();
+
 void bootstrapApplication(AppComponent, {
   providers: [
     provideHttpClient(),
     provideRouter(routes,
       withComponentInputBinding(),
+      // withDebugTracing(),
       // withInMemoryScrolling({scrollPositionRestoration: 'enabled'}),
     ),
   ]
 })
+
+

@@ -38,6 +38,6 @@ export class AlbumPageComponent implements OnInit {
   }
 
   mediaClicked(item: MediaItem) {
-    void this.navigationService.mediaViewer(item.id);
+    void this.navigationService.media(item.id);
   }
 }

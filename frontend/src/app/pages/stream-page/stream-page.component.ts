@@ -6,8 +6,6 @@ import {map} from 'rxjs';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {NavigationService} from '../../service/navigation';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
-import type {SavedScroll} from '../../components/list-view/list-view.component';
-import {updateQueryValues, type UrlScrollState} from '../../service/persistent-state';
 
 @Component({
   selector: 'app-stream-page',
@@ -25,12 +23,15 @@ export class StreamPageComponent {
   private readonly gallery = inject(Gallery);
   private readonly router = inject(NavigationService);
 
+  constructor() {
+  }
+
   protected sections = toSignal(
     this.gallery.stream().pipe(map(st => st.sections)),
   );
 
   protected async mediaClicked(item: MediaItem) {
-    await this.router.mediaViewer(item.id)
+    await this.router.media(item.id)
   }
 }
 

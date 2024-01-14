@@ -1,6 +1,7 @@
-import {ChangeDetectionStrategy, Component} from '@angular/core';
+import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {RouterOutlet} from '@angular/router';
 import {NavbarComponent} from './components/navbar/navbar.component';
+import {HistoryTrackingService} from './history';
 
 @Component({
   selector: 'app-root',
@@ -11,4 +12,7 @@ import {NavbarComponent} from './components/navbar/navbar.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent {
+  constructor() {
+    inject(HistoryTrackingService)
+  }
 }

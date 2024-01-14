@@ -2,7 +2,8 @@ import {
   type AfterContentInit,
   type AfterViewInit,
   ApplicationRef,
-  ChangeDetectionStrategy, ChangeDetectorRef,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   ContentChildren,
   Directive,
@@ -28,16 +29,27 @@ import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {type DetachedChild, type View, ViewRecycler, type ViewType} from './view-recycler';
 import {ArrayDataSource, type DataSource, type Edit} from './datasource';
 
-export type ListItem =
-  | {
+export type TemplateListItem = {
+  viewType: string,
+  context: unknown,
+}
+
+
+export type TemplateRefListItem = {
+  viewType: TemplateRef<unknown>,
+  context: unknown,
+}
+
+export type ComponentListItem = {
   viewType: Type<unknown>,
   inputs?: Record<string, unknown>,
   outputs?: Record<string, (value: any) => void>,
 }
-  | {
-  viewType: TemplateRef<unknown> | string,
-  context: unknown,
-}
+
+export type ListItem =
+  | TemplateListItem
+  | TemplateRefListItem
+  | ComponentListItem
 
 export type Child = {
   node: HTMLElement,
@@ -379,6 +391,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
       offsetY: this.offsetY,
       bufferSize: this.bufferSize,
       maxChildrenToLayout: this.maxChildrenToLayout,
+      item: idx => this.items[idx],
       itemCount: this.items.length,
       anchorScroll: this.anchorScroll(),
     }
@@ -612,12 +625,12 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
       const height = entry.borderBoxSize[0].blockSize;
 
       // only mark the child dirty if it has changed to our previous value.
-      if (child.width != width || child.height != height) {
+      if (Math.abs(child.width - width) >= 1 || Math.abs(child.height - height) >= 1) {
         if (width === 0 || height === 0) {
           console.warn('Got zero size for child', child);
         }
 
-        debug('Child size changed from %dx%d to %dx%d', child.width, child.height, width, height)
+        debug('Child size changed from %sx%s to %sx%s', child.width, child.height, width, height)
 
         child.width = width;
         child.height = height;
@@ -656,7 +669,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
       // TODO do we need to do this every time?
       if (style != null) {
         for (const [key, value] of Object.entries(style)) {
-          existingChild.node.attributeStyleMap.set(key, value);
+          existingChild.node.style.setProperty(key, value);
         }
       }
 
@@ -669,11 +682,11 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
       // create the child and insert it into the view at the right place
       const child = this.recycler.get(this.viewTypeOf(item));
 
-      child.node.attributeStyleMap.clear();
+      child.node.setAttribute('style', '');
 
       if (style != null) {
         for (const [key, value] of Object.entries(style)) {
-          child.node.attributeStyleMap.set(key, value);
+          child.node.style.setProperty(key, value);
         }
       }
 
@@ -698,7 +711,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
   }
 }
 
-export type StyleValue = CSSStyleValue | string | (CSSStyleValue | string)[];
+export type StyleValue = string | null;
 
 export type LayoutHelper = {
   height: number,
@@ -706,6 +719,7 @@ export type LayoutHelper = {
   bufferSize: number,
   maxChildrenToLayout: number,
   itemCount: number,
+  item: (idx: number) => ListItem,
   getChild: (idx: number, style?: Record<string, StyleValue>) => Child,
   layoutChild: (child: Child, left: number, top: number, width?: string, height?: string) => boolean,
   anchorScroll: SavedScroll,

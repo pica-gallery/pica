@@ -6,7 +6,6 @@ import {AlbumListComponent} from '../../components/album-list/album-list.compone
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
 import {iterSearch, predicateOf} from '../../service/search';
 import {type ResultListItem, SearchResultsComponent} from '../../components/search-results/search-results.component';
-import {AlbumListItemComponent} from '../../components/album-list-item/album-list-item.component';
 
 
 @Component({

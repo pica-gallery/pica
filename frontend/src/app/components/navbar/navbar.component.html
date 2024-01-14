@@ -1,18 +1,18 @@
 <app-navbar-item
-  routerLink="/stream"
-  routerLinkActive="active"
+  [appNavLink]="{action: 'top'}"
+  appNavLinkActive="active"
   icon="image-outline"
   label="Stream"/>
 
 <app-navbar-item
-  routerLink="/albums"
-  routerLinkActive="active"
+  [appNavLink]="{action: 'albums'}"
+  appNavLinkActive="active"
   icon="albums-outline"
   label="Albums"/>
 
 <app-navbar-item
-  routerLink="/search"
-  routerLinkActive="active"
+  [appNavLink]="{action: 'search'}"
+  appNavLinkActive="active"
   icon="search"
   label="Search"/>
 

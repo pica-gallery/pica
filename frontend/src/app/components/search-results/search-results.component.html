@@ -1,6 +1,6 @@
 <app-list-view [dataSource]="dataSource" [layout]="layout">
   <ng-template listViewItem="Media" let-item>
-    <app-thumbnail [src]="item.src" (click)="mediaClicked(item.album, item.media)"/>
+    <app-media-item [media]="item.media"/>
   </ng-template>
 
   <ng-template listViewItem="Album" let-item>

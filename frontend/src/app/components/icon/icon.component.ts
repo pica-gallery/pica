@@ -1,6 +1,7 @@
 import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
 import {
-  mdiArrowLeft, mdiClose,
+  mdiArrowLeft,
+  mdiClose,
   mdiDownload,
   mdiFolderImage,
   mdiFolderOutline,

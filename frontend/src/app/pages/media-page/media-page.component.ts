@@ -51,15 +51,17 @@ export class MediaPageComponent {
   }
 
   protected close() {
+    void this.navigationService.up();
+
     // drop the open media from url
-    void this.navigationService.clearMediaViewer();
+    // void this.navigationService.clearMediaViewer();
   }
 
   protected itemChanged(item: MediaItem) {
     this.currentItem.set(item);
 
     // replace url, but let back still go to the previous page
-    void this.navigationService.mediaViewer(item.id, true);
+    void this.navigationService.mediaUpdate(item.id);
   }
 
   protected showExifViewer() {

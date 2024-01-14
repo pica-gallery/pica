@@ -1,7 +1,9 @@
 :host {
   display: block;
+  --thumbnail-border-radius: 2px;
 }
 
 app-list-view {
   height: 100%;
 }
+

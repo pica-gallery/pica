@@ -18,11 +18,14 @@ import {ThumbnailComponent} from '../thumbnail/thumbnail.component';
 export class AlbumListItemComponent {
   private readonly navigationService = inject(NavigationService);
 
-  @Input() album!: Album;
-
+  @Input({required: true})
+  public album!: Album;
 
   @HostListener('click')
   protected onClick() {
-    void this.navigationService.openAlbum(this.album.id);
+    void this.navigationService.navigate({
+      action: 'album',
+      albumId: this.album.id,
+    });
   }
 }
