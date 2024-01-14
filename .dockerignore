@@ -1,0 +1,9 @@
+Dockerfile
+
+/.idea
+/target
+*.db
+
+frontend/node_modules
+frontend/dist/
+frontend/.angular/

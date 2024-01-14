@@ -241,6 +241,13 @@ impl Indexer {
         };
 
         if let Some(media) = cached {
+            // ensure that media exists
+            if let Some(accessor) = &self.accessor {
+                debug!("Create thumbnails");
+                accessor.thumb(&media).await?;
+                accessor.preview(&media).await?;
+            }
+
             return Ok(media);
         }
 

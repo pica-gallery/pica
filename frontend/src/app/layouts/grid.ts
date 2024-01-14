@@ -55,7 +55,6 @@ export function gridLayout(config: GridLayoutConfig) {
       for (let column = columns - 1; column >= 0 && idx > 0; column--) {
         idx--;
 
-
         const left = config.gapX + column * (config.gapX + itemWidth);
         const paddingTop = idx < columns ? config.paddingTop : null;
         const child = helper.getChild(idx, {width: `${itemWidth}px`, 'padding-top': paddingTop ?? null});
