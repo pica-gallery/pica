@@ -7,7 +7,7 @@ import type {AlbumId, MediaId} from '../../service/api';
 import {IconComponent} from '../../components/icon/icon.component';
 import {NavigationService} from '../../service/navigation';
 import {ActivatedRoute} from '@angular/router';
-import {Dialog, DialogModule} from '@angular/cdk/dialog';
+import {DialogModule} from '@angular/cdk/dialog';
 import {ExifDialogComponent} from '../../components/exif-dialog/exif-dialog.component';
 import {BottomSheetComponent} from '../../components/bottom-sheet/bottom-sheet.component';
 
@@ -30,7 +30,6 @@ export class MediaPageComponent {
 
   constructor(
     private readonly navigationService: NavigationService,
-    private readonly dialog: Dialog,
     routeSnapshot: ActivatedRoute,
   ) {
     let albumId: AlbumId | null = null;

@@ -11,7 +11,8 @@
 
     <ng-template listViewItem="MediaItem" let-item>
       <app-media-item
-        [media]="item.media" (click)="mediaClicked.emit(item.media)"
+        [media]="item.media"
+        (click)="mediaClicked.emit(item.media)"
         class="row-item"/>
     </ng-template>
   </app-list-view>

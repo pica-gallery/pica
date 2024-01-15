@@ -1,11 +1,11 @@
-import {ChangeDetectionStrategy, Component, Input, ViewChild} from '@angular/core';
+import {ChangeDetectionStrategy, Component, inject, Input, ViewChild} from '@angular/core';
 import {type ListItem, ListViewComponent, ListViewItemDirective} from '../list-view/list-view.component';
-import {ThumbnailComponent} from '../thumbnail/thumbnail.component';
 import {AlbumListItemComponent} from '../album-list-item/album-list-item.component';
 import type {Album, MediaItem} from '../../service/gallery';
 import {ArrayDataSource} from '../list-view/datasource';
 import {MediaItemComponent} from '../media-item/media-item.component';
 import {gridLayout} from '../../layouts';
+import {NavigationService} from '../../service/navigation';
 
 export type MediaListItem = ListItem & {
   id: unknown,
@@ -45,6 +45,8 @@ export type ResultListItem =
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SearchResultsComponent {
+  private readonly navigation = inject(NavigationService);
+
   protected readonly dataSource = new ArrayDataSource<ResultListItem>(null && {
     sameItem(lhs: ResultListItem, rhs: ResultListItem): boolean {
       return lhs.id === rhs.id;
@@ -68,4 +70,8 @@ export class SearchResultsComponent {
     gapX: 16,
     gapY: 16,
   });
+
+  protected async mediaClicked(album: Album, media: MediaItem) {
+    await this.navigation.mediaViewerInAlbum(album.id, media.id)
+  }
 }
