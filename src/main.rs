@@ -72,7 +72,7 @@ async fn main() -> Result<()> {
         tokio::task::spawn(indexer.run());
     }
 
-    info!("Starting webserver on {:?}", config.http_address);
+    info!("Starting webserver on http://{}/", config.http_address);
     pica_web::serve(store, media, config.http_address).await?;
 
     Ok(())

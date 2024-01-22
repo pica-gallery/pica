@@ -154,12 +154,21 @@ fn file_is_hidden(name: &OsStr) -> bool {
 }
 
 fn file_is_jpeg(name: &OsStr) -> bool {
-    name.to_str()
-        .map(|name| {
-            let lower = name.to_lowercase();
-            lower.ends_with(".jpg") || lower.ends_with(".jpeg")
-        })
-        .unwrap_or(false)
+    let name = name.to_str().unwrap_or_default();
+
+    let lower = name.to_lowercase();
+    lower.ends_with(".jpg") || lower.ends_with(".jpeg")
+}
+
+pub enum FileType {
+    // simple generic image format like jpg, png or avif
+    Generic,
+    
+    // sony arw file
+    ARW,
+
+    // canon raw file
+    CR3,
 }
 
 pub struct Indexer {

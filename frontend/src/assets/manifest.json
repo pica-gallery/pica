@@ -1,0 +1,22 @@
+{
+  "short_name": "Pica",
+  "name": "Pica: Free your photos!",
+  "icons": [
+    {
+      "src": "/assets/ic_launcher.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/ic_launcher_maskable.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/"
+}
