@@ -3,9 +3,8 @@ import {
   Component,
   computed,
   EventEmitter,
-  Input,
+  input,
   Output,
-  signal,
   type TemplateRef,
   ViewChild
 } from '@angular/core';
@@ -51,12 +50,7 @@ type RowListItem =
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AlbumComponent {
-  private readonly sectionsSignal = signal<Section[]>([]);
-
-  @Input()
-  public set sections(sections: Section[]) {
-    this.sectionsSignal.set(sections);
-  }
+  public readonly sections = input.required<Section[]>();
 
   @Output()
   readonly mediaClicked = new EventEmitter<MediaItem>();
@@ -70,8 +64,6 @@ export class AlbumComponent {
   protected readonly layout = columnsLayout;
 
   protected readonly items = computed(() => {
-    const sections = this.sectionsSignal();
-
     const convertSection = (section: Section): RowListItem[] => {
       const rows: RowListItem[] = [];
 
@@ -98,7 +90,7 @@ export class AlbumComponent {
       return rows;
     }
 
-    return sections.flatMap(section => convertSection(section));
+    return this.sections().flatMap(section => convertSection(section));
   });
 }
 

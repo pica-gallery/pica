@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, computed, EventEmitter, Input, Output, signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, EventEmitter, input, Input, Output, signal} from '@angular/core';
 import type {Album} from '../../service/gallery';
 import {type ListItem, ListViewComponent, type SavedScroll} from '../list-view/list-view.component';
 import {AlbumListItemComponent} from '../album-list-item/album-list-item.component';
@@ -22,12 +22,8 @@ export class AlbumListComponent {
     paddingTop: '16px',
   })
 
-  private readonly albumsSignal = signal<Album[]>([]);
-
   protected readonly state = computed(() => {
-    const albums = this.albumsSignal();
-
-    const rows: ListItem[] = albums.map(album => {
+    const rows: ListItem[] = this.albums().map(album => {
       return {
         viewType: AlbumListItemComponent,
         inputs: {album},
@@ -41,10 +37,7 @@ export class AlbumListComponent {
     return {rows, initialScroll};
   });
 
-  @Input()
-  set albums(albums: Album[]) {
-    this.albumsSignal.set(albums);
-  }
+  public readonly albums = input.required<Album[]>()
 
   @Output()
   public readonly scrollChanged = new EventEmitter<SavedScroll>();
