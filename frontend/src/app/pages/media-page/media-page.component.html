@@ -27,7 +27,9 @@
 </div>
 
 @if (exifViewerMediaId(); as mediaId) {
-  <app-bottom-sheet (close)="closeExifViewer()">
-    <app-exif-dialog [mediaId]="mediaId"/>
-  </app-bottom-sheet>
+  @defer (on immediate) {
+    <app-bottom-sheet (close)="closeExifViewer()">
+      <app-exif-dialog [mediaId]="mediaId"/>
+    </app-bottom-sheet>
+  }
 }

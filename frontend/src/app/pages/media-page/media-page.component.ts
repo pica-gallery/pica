@@ -7,14 +7,13 @@ import type {AlbumId, MediaId} from '../../service/api';
 import {IconComponent} from '../../components/icon/icon.component';
 import {NavigationService} from '../../service/navigation';
 import {ActivatedRoute} from '@angular/router';
-import {DialogModule} from '@angular/cdk/dialog';
 import {ExifDialogComponent} from '../../components/exif-dialog/exif-dialog.component';
 import {BottomSheetComponent} from '../../components/bottom-sheet/bottom-sheet.component';
 
 @Component({
   selector: 'app-media-page',
   standalone: true,
-  imports: [AsyncPipe, ImageSwiperComponent, IconComponent, DialogModule, BottomSheetComponent, ExifDialogComponent],
+  imports: [AsyncPipe, ImageSwiperComponent, IconComponent, BottomSheetComponent, ExifDialogComponent],
   templateUrl: './media-page.component.html',
   styleUrl: './media-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
