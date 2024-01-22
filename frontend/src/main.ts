@@ -5,6 +5,7 @@ import {provideRouter, type Route, withComponentInputBinding} from '@angular/rou
 
 import './app/history'
 import {instrumentHistoryTracking} from './app/history';
+import {ɵprovideZonelessChangeDetection} from '@angular/core';
 
 const routes: Route[] = [
   {
@@ -44,6 +45,7 @@ instrumentHistoryTracking();
 
 void bootstrapApplication(AppComponent, {
   providers: [
+    ɵprovideZonelessChangeDetection(),
     provideHttpClient(),
     provideRouter(routes,
       withComponentInputBinding(),
