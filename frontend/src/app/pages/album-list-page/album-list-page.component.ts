@@ -22,9 +22,9 @@ import type {SavedScroll} from '../../components/list-view/list-view.component';
 })
 export class AlbumListPageComponent {
   private readonly gallery = inject(Gallery);
-  protected readonly albums = toSignal(this.gallery.albums());
 
-  private readonly initialScrollState = parseQuery(fUrlScrollState, 'scroll.');
+  protected readonly albums = toSignal(this.gallery.albums());
+  protected readonly initialScrollState: SavedScroll | null = null;
 
   protected readonly updater = new UrlStateUpdater<UrlScrollState>(
     fUrlScrollState,
@@ -33,7 +33,14 @@ export class AlbumListPageComponent {
   )
 
   constructor() {
-    console.info(this.initialScrollState);
+    const scrollState = parseQuery(fUrlScrollState, 'scroll.');
+
+    this.initialScrollState = scrollState && {
+      index: parseInt(scrollState.id, 10),
+      offsetY: scrollState.offset,
+    }
+
+    console.info('Need to restore scroll to', this.initialScrollState);
   }
 
   scrollChanged(scroll: SavedScroll) {

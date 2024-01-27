@@ -1,6 +1,6 @@
 import {inject} from '@angular/core';
 import {ActivatedRoute, NavigationStart, type Router} from '@angular/router';
-import {defaultValue, InvalidValue, number, object, optional, string, type Type, type TypeOf} from 'fud-ts';
+import {object, string, transform, type Type, type TypeOf} from 'fud-ts';
 import {auditTime, BehaviorSubject, filter} from 'rxjs';
 
 type VersionedState<T> = {
@@ -33,6 +33,10 @@ export class UrlStateUpdater<T extends Record<string, string | number>> {
     })
   }
 
+  public get currentState(): T | null {
+    return this.stateSubject.value?.value ?? null
+  }
+
   private persistCurrent() {
     this.persist(this.stateSubject.value)
   }
@@ -50,7 +54,7 @@ export class UrlStateUpdater<T extends Record<string, string | number>> {
   }
 }
 
-export function parseQuery<T>(type: Type<T, any>, prefix: string): InvalidValue | T {
+export function parseQuery<T>(type: Type<T, any>, prefix: string): T | null {
   const route = inject(ActivatedRoute);
 
   const queryValues: Record<string, string> = {};
@@ -60,7 +64,7 @@ export function parseQuery<T>(type: Type<T, any>, prefix: string): InvalidValue 
     }
   }
 
-  return type.parseSafe(queryValues);
+  return type.parseOrNull(queryValues);
 }
 
 export function updateQueryValues(state: Record<string, string | number>, prefix: string) {
@@ -76,7 +80,7 @@ export function updateQueryValues(state: Record<string, string | number>, prefix
 
 export const fUrlScrollState = object({
   id: string(),
-  offset: optional(number()).pipe(defaultValue(0)),
+  offset: string().pipe(transform(value => parseInt(value, 10))),
 });
 
 export type UrlScrollState = TypeOf<typeof fUrlScrollState>;

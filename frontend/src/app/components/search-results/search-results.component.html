@@ -1,4 +1,9 @@
-<app-list-view [dataSource]="dataSource" [layout]="layout">
+<app-list-view
+  [dataSource]="dataSource"
+  [layout]="layout"
+  [initialScroll]="initialScrollState"
+  (scrollChanged)="scrollChanged.emit($event)">
+
   <ng-template listViewItem="Media" let-item>
     <app-media-item [media]="item.media" (click)="mediaClicked(item.album, item.media)"/>
   </ng-template>
@@ -6,4 +11,5 @@
   <ng-template listViewItem="Album" let-item>
     <app-album-list-item [album]="item.album"/>
   </ng-template>
+
 </app-list-view>

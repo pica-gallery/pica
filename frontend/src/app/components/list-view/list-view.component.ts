@@ -138,6 +138,8 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
   private readonly observer = new ResizeObserver(entries => this.resizeObserverCallback(entries));
   private readonly recycler = new ViewRecycler(inject(EnvironmentInjector));
 
+  private firstLayout: boolean = true;
+
   private items: ListItem[] = [];
   private _dataSource: DataSource = new ArrayDataSource();
   private dataSourceSubscription: Subscription | null = null;
@@ -366,6 +368,11 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
   }
 
   protected updateContent(height: number = this.lastRootHeight) {
+    if (height === 0) {
+      console.warn('Skip layout for zero height');
+      return;
+    }
+
     const now = performance.now();
 
     this.lastRootHeight = height;
@@ -384,6 +391,9 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
       return childrenToKeep.size < this.maxChildrenToLayout
     }
 
+    const firstLayout = this.firstLayout;
+    this.firstLayout = false;
+
     const helper: LayoutHelper = {
       height,
       layoutChild,
@@ -393,7 +403,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
       maxChildrenToLayout: this.maxChildrenToLayout,
       item: idx => this.items[idx],
       itemCount: this.items.length,
-      anchorScroll: this.anchorScroll(),
+      anchorScroll: this.anchorScroll(firstLayout),
     }
 
     // run the actual layout
@@ -428,25 +438,28 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
     }
   }
 
-  private anchorScroll(): SavedScroll {
-    if (this.offsetY === 0) {
-      // if we've scrolled to the top, we're anchored there
-      return {index: 0, offsetY: 0}
-    }
-
-    // find the child we want to anchor all the views to
-    const anchorChild = this.anchorChild();
-    if (anchorChild != null) {
-      return {
-        index: anchorChild.index,
-        offsetY: anchorChild.top,
+  private anchorScroll(firstLayout: boolean): SavedScroll {
+    if (firstLayout) {
+      // use initial scroll if it has valid values
+      if (this.initialScroll) {
+        if (this.initialScroll.index >= 0 && this.initialScroll.index < this.items.length) {
+          return this.initialScroll
+        }
       }
-    }
 
-    // use initial scroll if it has valid values
-    if (this.initialScroll) {
-      if (this.initialScroll.index >= 0 && this.initialScroll.index < this.items.length) {
-        return this.initialScroll
+    } else {
+      if (this.offsetY === 0) {
+        // if we've scrolled to the top, we're anchored there
+        return {index: 0, offsetY: 0}
+      }
+
+      // find the child we want to anchor all the views to
+      const anchorChild = this.anchorChild();
+      if (anchorChild != null) {
+        return {
+          index: anchorChild.index,
+          offsetY: anchorChild.top,
+        }
       }
     }
 

@@ -64,7 +64,7 @@
               "buildTarget": "pica:build:production"
             },
             "development": {
-              "proxyConfig": "src/proxy.conf.json",
+              "proxyConfig": "src/proxy-prod.conf.json",
               "buildTarget": "pica:build:development"
             }
           },

@@ -39,6 +39,9 @@ export class AlbumListComponent {
 
   public readonly albums = input.required<Album[]>()
 
+  @Input()
+  public initialScrollState : SavedScroll | null = null;
+
   @Output()
   public readonly scrollChanged = new EventEmitter<SavedScroll>();
 }

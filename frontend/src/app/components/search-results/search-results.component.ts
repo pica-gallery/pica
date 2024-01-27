@@ -1,5 +1,10 @@
-import {ChangeDetectionStrategy, Component, inject, Input, ViewChild} from '@angular/core';
-import {type ListItem, ListViewComponent, ListViewItemDirective} from '../list-view/list-view.component';
+import {ChangeDetectionStrategy, Component, EventEmitter, inject, Input, Output, ViewChild} from '@angular/core';
+import {
+  type ListItem,
+  ListViewComponent,
+  ListViewItemDirective,
+  type SavedScroll
+} from '../list-view/list-view.component';
 import {AlbumListItemComponent} from '../album-list-item/album-list-item.component';
 import type {Album, MediaItem} from '../../service/gallery';
 import {ArrayDataSource} from '../list-view/datasource';
@@ -61,6 +66,12 @@ export class SearchResultsComponent {
   public set items(newItems: ResultListItem[]) {
     this.dataSource.items = newItems
   }
+
+  @Input()
+  public initialScrollState: SavedScroll | null = null;
+
+  @Output()
+  public readonly scrollChanged = new EventEmitter<SavedScroll>();
 
   @ViewChild(ListViewComponent)
   protected listView!: ListViewComponent;

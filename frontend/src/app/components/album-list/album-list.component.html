@@ -3,6 +3,7 @@
     bufferSize="512"
     [layout]="layout"
     [dataSource]="state.rows"
+    [initialScroll]="initialScrollState"
     (scrollChanged)="scrollChanged.emit($event)"
   />
 }

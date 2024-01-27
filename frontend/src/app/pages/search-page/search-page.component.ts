@@ -6,6 +6,10 @@ import {AlbumListComponent} from '../../components/album-list/album-list.compone
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
 import {iterSearch, predicateOf} from '../../service/search';
 import {type ResultListItem, SearchResultsComponent} from '../../components/search-results/search-results.component';
+import {parseQuery, UrlStateUpdater} from '../../service/persistent-state';
+import {Router} from '@angular/router';
+import type {SavedScroll} from '../../components/list-view/list-view.component';
+import {object, string, transform, type TypeOf} from 'fud-ts';
 
 
 @Component({
@@ -22,8 +26,22 @@ import {type ResultListItem, SearchResultsComponent} from '../../components/sear
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SearchPageComponent {
+  private initialState: UrlState | null = parseQuery(fUrlScrollState, 'st.');
+
   private readonly albums = toSignal(inject(Gallery).albumsWithContent());
-  private readonly searchTerm = signal('');
+  protected readonly searchTerm = signal(this.initialState?.searchQuery ?? '');
+
+  protected readonly updater = new UrlStateUpdater<UrlState>(
+    fUrlScrollState,
+    'st.',
+    inject(Router),
+  )
+
+  constructor() {
+    if (this.initialState) {
+      this.updater.update(this.initialState);
+    }
+  }
 
   protected readonly items = computed(() => {
     const albums = this.albums();
@@ -64,6 +82,45 @@ export class SearchPageComponent {
   })
 
   protected searchTermChanged(term: string) {
-    this.searchTerm.set(term);
+    if(this.searchTerm() !== term) {
+      this.searchTerm.set(term);
+
+      console.info("Reset scroll due to search term changed.");
+
+      this.updater.update({
+        id: 0,
+        offset: 0,
+        searchQuery: this.searchTerm(),
+      })
+
+      this.initialState = null;
+    }
+  }
+
+  protected scrollChanged(scrollState: SavedScroll) {
+    this.updater.update({
+      id: scrollState.index,
+      offset: scrollState.offsetY,
+      searchQuery: this.searchTerm(),
+    })
+  }
+
+  protected toScrollState(): SavedScroll | null {
+    if (this.initialState == null) {
+      return null
+    }
+
+    return {
+      index: this.initialState?.id,
+      offsetY: this.initialState?.offset,
+    };
   }
 }
+
+const fUrlScrollState = object({
+  id: string().pipe(transform(value => parseInt(value, 10))),
+  offset: string().pipe(transform(value => parseInt(value, 10))),
+  searchQuery: string(),
+});
+
+type UrlState = TypeOf<typeof fUrlScrollState>;

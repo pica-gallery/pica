@@ -1,10 +1,16 @@
 <div class="search">
-  <app-search-input (searchTermChanged)="searchTermChanged($event)"/>
+  <app-search-input
+    [initialValue]="searchTerm()"
+    (searchTermChanged)="searchTermChanged($event)"/>
 </div>
 
 @if (items(); as items) {
-  @if(items.length) {
-  <app-search-results [items]="items"/>
+  @if (items.length) {
+    <app-search-results
+      [items]="items"
+      (scrollChanged)="scrollChanged($event)"
+      [initialScrollState]="toScrollState()"
+    />
   } @else {
     <div class="no-results">No results</div>
   }
