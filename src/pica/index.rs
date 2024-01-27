@@ -14,13 +14,14 @@ use regex::Regex;
 use tokio::sync::Mutex;
 use tokio::task::block_in_place;
 use tokio::time::sleep;
-use tracing::{debug, debug_span, Instrument, warn};
+use tracing::{debug, info, Instrument, instrument, warn};
 use walkdir::WalkDir;
 
 use crate::pica;
 use crate::pica::{db, MediaId, MediaInfo, MediaItem};
 use crate::pica::accessor::MediaAccessor;
 use crate::pica::exif::ExifInfo;
+use crate::pica::image::MediaType;
 use crate::pica::queue::{QueueItem, ScanQueue};
 use crate::pica::store::MediaStore;
 
@@ -39,6 +40,9 @@ pub struct ScanItem {
 
     // modified timestamp from metadata
     pub timestamp: DateTime<Utc>,
+
+    // the media type, derived from the file name
+    pub typ: MediaType,
 }
 
 pub struct Scanner {
@@ -53,22 +57,25 @@ impl Scanner {
     }
 
     /// Runs scanning once and writes the files found to the scan queue
+    #[instrument(skip_all)]
     pub async fn scan(&mut self) {
         let start_time = Instant::now();
+
         debug!("Starting scan in {:?}",  self.root);
 
         let mut seen = HashSet::new();
 
-        let mut iter = scan_iter(&self.root);
-        while let Some(item) = block_in_place(|| iter.next()) {
-            let item = match item {
-                Ok(item) => item,
-                Err(err) => {
-                    warn!("Failed to scan file: {:?}", err);
-                    continue;
-                }
-            };
+        let items = block_in_place(|| scan_path_for_items(&self.root));
 
+        info!("Scan of {:?} finished in {:?}, found {} media files",
+            self.root,
+            Instant::now().duration_since(start_time),
+            items.len(),
+        );
+
+        let items = collapse_raw_with_jpeg(items);
+
+        for item in items {
             seen.insert(item.id);
 
             if !self.known.contains(&item.id) {
@@ -82,20 +89,41 @@ impl Scanner {
         deleted.for_each(|id| queue.remove(*id));
 
         self.known = seen;
-
-        debug!("Scan finished in {:?}", Instant::now().duration_since(start_time));
     }
 }
 
+#[instrument(skip_all)]
+fn collapse_raw_with_jpeg(items: Vec<ScanItem>) -> impl Iterator<Item=ScanItem> {
+    // set of all names
+    let names: HashSet<_> = items.iter()
+        .filter(|item| !item.typ.is_raw())
+        .map(|item| item.relpath.with_extension(""))
+        .collect();
+
+    items.into_iter().filter(move |item| {
+        if item.typ.is_raw() {
+            // skip this if we have a non-raw version of this image
+            let base = item.relpath.with_extension("");
+            if names.contains(&base) {
+                return false;
+            }
+        }
+
+        return true;
+    })
+}
+
+
 /// Returns an iterator over files we might want to index
-fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
+#[instrument]
+fn scan_path_for_items(root: &Path) -> Vec<ScanItem> {
     let files_iter = WalkDir::new(root)
         .same_file_system(true)
         .follow_links(false)
         .follow_root_links(false)
         .into_iter();
 
-    files_iter
+    let items_iter = files_iter
         // filter out hidden files
         .filter_entry(|entry| !file_is_hidden(entry.file_name()))
 
@@ -103,7 +131,7 @@ fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
         .map(|res| res.map_err(anyhow::Error::from))
 
         // keep only jpeg files
-        .filter_ok(|entry| entry.file_type().is_file() && file_is_jpeg(entry.file_name()))
+        .filter_ok(|entry| entry.file_type().is_file() && file_is_indexable(entry.path()))
 
         // extract metadata and convert into scan items
         .map_ok(move |entry| -> Result<ScanItem> {
@@ -125,6 +153,8 @@ fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
                 hasher.digest().bytes()
             };
 
+            let typ = MediaType::from_path(&relpath).ok_or_else(|| anyhow!("no media type in {:?}", relpath))?;
+
             // build id from hash
             let mut bytes = [0_u8; 8];
             bytes.copy_from_slice(&hash[..8]);
@@ -135,6 +165,7 @@ fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
                     id,
                     timestamp,
                     relpath,
+                    typ,
                     filesize: meta.size(),
                     path: entry.into_path(),
                 }
@@ -144,7 +175,18 @@ fn scan_iter(root: &Path) -> impl Iterator<Item=Result<ScanItem>> + '_ {
         .flatten_ok()
 
         // filter out what looks like crap
-        .filter_ok(|item| item.filesize > 256)
+        .filter_ok(|item| item.filesize > 8192);
+
+    let mut items = Vec::new();
+
+    for item in items_iter {
+        match item {
+            Err(err) => warn!("Failed to scan file: {:?}", err),
+            Ok(item) => items.push(item),
+        }
+    }
+
+    items
 }
 
 fn file_is_hidden(name: &OsStr) -> bool {
@@ -153,22 +195,12 @@ fn file_is_hidden(name: &OsStr) -> bool {
         .unwrap_or(false)
 }
 
-fn file_is_jpeg(name: &OsStr) -> bool {
-    let name = name.to_str().unwrap_or_default();
-
-    let lower = name.to_lowercase();
-    lower.ends_with(".jpg") || lower.ends_with(".jpeg")
-}
-
-pub enum FileType {
-    // simple generic image format like jpg, png or avif
-    Generic,
-    
-    // sony arw file
-    ARW,
-
-    // canon raw file
-    CR3,
+fn file_is_indexable(name: &Path) -> bool {
+    match MediaType::from_path(name) {
+        Some(MediaType::GenericVideo) => false,
+        Some(_) => true,
+        None => false,
+    }
 }
 
 pub struct Indexer {
@@ -191,9 +223,7 @@ impl Indexer {
 
             match queued {
                 Some(QueueItem::Add(item)) => {
-                    let task = self
-                        .index_one(&item)
-                        .instrument(debug_span!("Indexing", relpath=?item.relpath));
+                    let task = self.index_one(&item);
 
                     if let Err(err) = task.await {
                         warn!("Indexing failed for {:?}: {:?}", item.relpath, err);
@@ -213,6 +243,7 @@ impl Indexer {
         }
     }
 
+    #[instrument(skip_all, fields(? item.relpath))]
     async fn index_one(&self, item: &ScanItem) -> Result<()> {
         let existing_error = {
             let mut tx = self.db.begin().await?;
@@ -242,6 +273,7 @@ impl Indexer {
         }
     }
 
+    #[instrument(skip_all, fields(? item.relpath))]
     async fn parse_item(&self, item: &ScanItem) -> Result<MediaItem> {
         // check cache for an indexed version first
         let cached = {
@@ -260,7 +292,9 @@ impl Indexer {
             return Ok(media);
         }
 
-        let item = parse(item).await?;
+        let item = parse(item)
+            .await
+            .with_context(|| "parse to MediaItem")?;
 
         // store the parsed item in the database
         let mut tx = self.db.begin().await?;
@@ -278,10 +312,12 @@ impl Indexer {
 }
 
 /// Parses a [ScanItem] into a new [MediaItem]
+#[instrument(skip_all, fields(? item.relpath))]
 async fn parse(item: &ScanItem) -> Result<MediaItem> {
-    let path = item.path.to_owned();
+    let path = pica::image::get(&item.path).await?;
 
-    let reader = image::io::Reader::open(&path)?;
+    let reader = image::io::Reader::open(path.as_ref())?;
+
     let (width, height) = reader
         .with_guessed_format()?
         .into_dimensions()?;
@@ -316,6 +352,7 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
     MediaItem::from_media_info(item.id, item.relpath.clone(), item.filesize, info)
 }
 
+#[instrument(skip_all)]
 fn timestamp_from_metadata(metadata: &Metadata) -> Result<DateTime<Utc>> {
     let modified = metadata.modified().or_else(|_| metadata.created())?;
     let epoch_seconds = modified.duration_since(SystemTime::UNIX_EPOCH)?.as_secs();

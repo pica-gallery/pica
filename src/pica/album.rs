@@ -7,7 +7,7 @@ use itertools::Itertools;
 
 use crate::pica::{Album, AlbumId, MediaItem};
 
-pub fn by_directory<'a>(items: impl IntoIterator<Item=MediaItem>) -> Vec<Album> {
+pub fn by_directory(items: impl IntoIterator<Item=MediaItem>) -> Vec<Album> {
     let re_album = regex::bytes::Regex::new(r#"Sony|staging|20\d\d-[01]\d-[0123]\d "#).unwrap();
     let re_clean = regex::Regex::new(r#"^20\d\d-[01]\d-[0123]\d\s+"#).unwrap();
 

@@ -4,11 +4,13 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use anyhow::{anyhow, bail, ensure};
+use anyhow::{anyhow, ensure};
 use chrono::{DateTime, Utc};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 
 pub use album::by_directory;
+
+use crate::pica::image::MediaType;
 
 mod album;
 pub mod index;
@@ -21,6 +23,7 @@ pub mod db;
 pub mod queue;
 pub mod exif;
 mod geo;
+mod image;
 
 #[derive(SerializeDisplay, DeserializeFromStr)]
 pub struct Id<T> {
@@ -91,20 +94,6 @@ impl<T> Display for Id<T> {
 
 pub type MediaId = Id<MediaItem>;
 
-#[derive(Clone, Debug)]
-pub enum MediaType {
-    Image,
-    Video,
-}
-
-impl MediaType {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            MediaType::Image => "image",
-            MediaType::Video => "video",
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct MediaInfo {
@@ -136,17 +125,8 @@ impl MediaItem {
             .to_string_lossy()
             .replace(core::char::REPLACEMENT_CHARACTER, "_");
 
-        let extension = relpath
-            .extension()
-            .ok_or_else(|| anyhow!("no file extension in {:?}", relpath))?
-            .to_string_lossy()
-            .to_lowercase();
-
-        let typ = match extension.as_str() {
-            "jpg" | "jpeg" | "png" => MediaType::Image,
-            "mp4" | "mkv" | "avi" | "mov" => MediaType::Video,
-            other => bail!("unknown extension: {:?}", other),
-        };
+        let typ = MediaType::from_path(&relpath)
+            .ok_or_else(|| anyhow!("unknown media type for file {:?}", relpath))?;
 
         let location = match (info.latitude, info.longitude) {
             (Some(latitude), Some(longitude)) => {

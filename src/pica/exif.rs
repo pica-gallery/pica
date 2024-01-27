@@ -21,14 +21,13 @@ pub enum Orientation {
 
 impl Orientation {
     pub fn transposed(&self) -> bool {
-        match self {
-            Orientation::Rotate180 => true,
-            Orientation::FlipHRotate270 => true,
-            Orientation::Rotate90 => true,
-            Orientation::FlipHRotate90 => true,
-            Orientation::Rotate270 => true,
-            _ => false,
-        }
+        matches!(self,
+            | Orientation::Rotate180
+            | Orientation::FlipHRotate270
+            | Orientation::Rotate90
+            | Orientation::FlipHRotate90
+            | Orientation::Rotate270
+        )
     }
 }
 

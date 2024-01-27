@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use sqlx::SqlitePool;
-
 use tracing::{debug_span, Instrument};
 
+use crate::pica;
 use crate::pica::{db, MediaId, MediaItem};
 use crate::pica::scale::{Image, MediaScaler};
 
@@ -50,6 +50,10 @@ impl MediaAccessor {
         }
 
         let path = self.root.join(&media.relpath);
+
+        // extract an image we can process from the media file.
+        let path = pica::image::get(path).await?;
+
         let image = self.scaler.image(path, size).await?;
 
         // save it for next time
@@ -57,10 +61,6 @@ impl MediaAccessor {
 
         Ok(image)
     }
-
-    // async fn get_hdr(&self, _image: &MediaItem, _size: u32) -> Result<PathBuf> {
-    //     anyhow::bail!("not implemented")
-    // }
 }
 
 

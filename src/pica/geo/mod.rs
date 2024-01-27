@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use ordered_float::OrderedFloat;
 use serde::Deserialize;
 
-static DATA: &'static [u8] = include_bytes!("./worldcities.csv.gz");
+static DATA: &[u8] = include_bytes!("./worldcities.csv.gz");
 
 #[derive(Deserialize)]
 pub struct City {
@@ -28,12 +28,12 @@ pub fn nearest_city(latitude: f32, longitude: f32) -> Result<Option<&'static Cit
 fn distance_sqr(city: &City, latitude: f32, longitude: f32) -> f32 {
     let d_lat = city.latitude - latitude;
     let d_long = city.longitude - longitude;
-    return d_lat * d_lat + d_long * d_long;
+    d_lat * d_lat + d_long * d_long
 }
 
 fn cities() -> Result<&'static [City]> {
     static CITIES: OnceLock<Result<Vec<City>>> = OnceLock::new();
-    CITIES.get_or_init(|| parse()).as_deref().map_err(|err| anyhow!("{:?}", err))
+    CITIES.get_or_init(parse).as_deref().map_err(|err| anyhow!("{:?}", err))
 }
 
 fn parse() -> Result<Vec<City>> {
