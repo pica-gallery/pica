@@ -63,7 +63,9 @@ pub async fn read_media_item(tx: &mut Transaction<'_, Sqlite>, id: MediaId) -> R
         .await?;
 
     // get the single row if any
-    let Some(row) = row else { return Ok(None); };
+    let Some(row) = row else {
+        return Ok(None);
+    };
 
     Ok(Some(MediaItem::try_from(row)?))
 }

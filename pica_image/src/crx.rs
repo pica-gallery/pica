@@ -21,7 +21,8 @@ impl<'a, R> Atom<'a, R> {
 }
 
 impl<'a, R> Atom<'a, R>
-    where R: Read + Seek,
+where
+    R: Read + Seek,
 {
     pub fn into_iter(self, offset: u64) -> AtomIter<'a, R> {
         AtomIter {
@@ -40,12 +41,17 @@ struct AtomIter<'a, R> {
 
 impl<'a, R> AtomIter<'a, R> {
     pub fn new(stream: &'a mut R) -> Self {
-        Self { stream, next: 0, end: None }
+        Self {
+            stream,
+            next: 0,
+            end: None,
+        }
     }
 }
 
 impl<'a, R> AtomIter<'a, R>
-    where R: Read + Seek,
+where
+    R: Read + Seek,
 {
     pub fn next(&mut self) -> Result<Option<Atom<R>>> {
         // seek to start of the next box
@@ -97,7 +103,13 @@ impl<'a, R> AtomIter<'a, R>
         }
 
         // and return the box
-        Ok(Some(Atom { payload_start, payload_end, name, uuid, payload: self.stream }))
+        Ok(Some(Atom {
+            payload_start,
+            payload_end,
+            name,
+            uuid,
+            payload: self.stream,
+        }))
     }
 }
 
@@ -122,7 +134,7 @@ pub fn read_preview(mut fp: impl Read + Seek) -> Result<Option<impl Read>> {
 
             // length of the jpeg data
             let jpeg_size = prvw_box.payload.read_u32::<BigEndian>()? as u64;
-            debug!("jpeg size is {}",  jpeg_size);
+            debug!("jpeg size is {}", jpeg_size);
 
             return Ok(Some(fp.take(jpeg_size)));
         }
@@ -139,7 +151,7 @@ mod test {
     use anyhow::Result;
     use hex_literal::hex;
 
-    use crate::crx::{Atom, AtomIter, read_preview};
+    use crate::crx::{read_preview, Atom, AtomIter};
 
     fn has_children<R>(b: &Atom<R>) -> Option<u64> {
         match b.name.as_slice() {
@@ -150,7 +162,7 @@ mod test {
         }
     }
 
-    fn print_tree<>(mut iter: AtomIter<impl Read + Seek>, depth: usize) -> Result<()> {
+    fn print_tree(mut iter: AtomIter<impl Read + Seek>, depth: usize) -> Result<()> {
         let indent = "                                                               ";
         let mut idx = 0;
         while let Some(atom) = iter.next()? {

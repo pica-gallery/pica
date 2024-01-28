@@ -3,8 +3,8 @@ use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
 use sqlx::Sqlite;
 
-use crate::pica::{Id};
 use crate::pica::scale::ImageType;
+use crate::pica::Id;
 
 impl<T> sqlx::Type<Sqlite> for Id<T> {
     fn type_info() -> <Sqlite as sqlx::Database>::TypeInfo {
@@ -30,7 +30,6 @@ impl<'r, T> sqlx::Decode<'r, Sqlite> for Id<T> {
     }
 }
 
-
 impl sqlx::Type<Sqlite> for ImageType {
     fn type_info() -> <Sqlite as sqlx::Database>::TypeInfo {
         str::type_info()
@@ -48,7 +47,7 @@ impl<'r> sqlx::Decode<'r, Sqlite> for ImageType {
         match String::decode(value)?.as_str() {
             "image/avif" => Ok(Self::Avif),
             "image/jpeg" => Ok(Self::Jpeg),
-            value => Err(format!("not valid: {:?}", value).into())
+            value => Err(format!("not valid: {:?}", value).into()),
         }
     }
 }

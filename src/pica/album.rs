@@ -1,8 +1,8 @@
+use arcstr::ArcStr;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
-use arcstr::ArcStr;
 
 use itertools::Itertools;
 use tracing::instrument;
@@ -10,12 +10,12 @@ use tracing::instrument;
 use crate::pica::{Album, AlbumId, AlbumInfo, MediaItem};
 
 #[instrument(skip_all)]
-pub fn by_directory(items: impl IntoIterator<Item=MediaItem>) -> Vec<Album> {
+pub fn by_directory(items: impl IntoIterator<Item = MediaItem>) -> Vec<Album> {
     let re_album = regex::bytes::Regex::new(r#"Sony|staging|20\d\d-[01]\d-[0123]\d "#).unwrap();
     let re_clean = regex::Regex::new(r#"^20\d\d-[01]\d-[0123]\d\s+"#).unwrap();
 
     let mut albums = HashMap::<PathBuf, Album>::new();
-    
+
     for item in items {
         let Some(parent) = item.relpath.parent() else {
             continue;
@@ -28,7 +28,8 @@ pub fn by_directory(items: impl IntoIterator<Item=MediaItem>) -> Vec<Album> {
             continue;
         };
 
-        let name = relpath.file_name()
+        let name = relpath
+            .file_name()
             .and_then(|f| f.to_str())
             .map(|name| re_clean.replace(name, ""))
             .unwrap_or("Unknown".into());
@@ -53,7 +54,8 @@ pub fn by_directory(items: impl IntoIterator<Item=MediaItem>) -> Vec<Album> {
     }
 
     // get a sorted list of all albums
-    let mut albums = albums.into_values()
+    let mut albums = albums
+        .into_values()
         .sorted_unstable_by_key(|a| a.info.timestamp)
         .collect_vec();
 

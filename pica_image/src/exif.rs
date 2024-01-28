@@ -22,7 +22,8 @@ pub fn parse_exif_generic(path: impl AsRef<Path> + Debug) -> Result<Option<ExifR
         Err(err) => return Err(err.into()),
     };
 
-    let fields = parsed.fields()
+    let fields = parsed
+        .fields()
         .filter(|field| field.ifd_num == In::PRIMARY)
         .map(|field| (field.tag.to_string(), field.display_value().to_string()))
         .collect();
@@ -43,7 +44,10 @@ pub fn parse_exif(path: impl AsRef<Path> + Debug) -> anyhow::Result<Option<ExifS
     };
 
     let timestamp = match parsed.get_field(Tag::DateTimeOriginal, In::PRIMARY) {
-        Some(Field { value: Value::Ascii(ascii_values), .. }) if !ascii_values.is_empty() => {
+        Some(Field {
+            value: Value::Ascii(ascii_values),
+            ..
+        }) if !ascii_values.is_empty() => {
             let datestr = std::str::from_utf8(&ascii_values[0])?;
             Some(NaiveDateTime::parse_from_str(datestr, "%Y:%m:%d %H:%M:%S")?.and_utc())
         }
@@ -60,11 +64,17 @@ pub fn parse_exif(path: impl AsRef<Path> + Debug) -> anyhow::Result<Option<ExifS
     let latitude = latitude.and_then(|value| Some(value * latitude_ref?));
     let longitude = longitude.and_then(|value| Some(value * longitude_ref?));
 
-    let orientation = parsed.get_field(Tag::Orientation, In::PRIMARY)
+    let orientation = parsed
+        .get_field(Tag::Orientation, In::PRIMARY)
         .map(|f| parse_orientation(f.value.get_uint(0)))
         .unwrap_or(Orientation::Original);
 
-    Ok(Some(ExifSummary { timestamp, orientation, latitude, longitude }))
+    Ok(Some(ExifSummary {
+        timestamp,
+        orientation,
+        latitude,
+        longitude,
+    }))
 }
 
 fn parse_gps_coordinate_value(field: Option<&Field>) -> Option<f32> {
@@ -115,13 +125,10 @@ pub enum Orientation {
 
 impl Orientation {
     pub fn transposed(&self) -> bool {
-        matches!(self,
-            | Orientation::Rotate180
-            | Orientation::FlipHRotate270
+        matches!(self, |Orientation::Rotate180| Orientation::FlipHRotate270
             | Orientation::Rotate90
             | Orientation::FlipHRotate90
-            | Orientation::Rotate270
-        )
+            | Orientation::Rotate270)
     }
 }
 

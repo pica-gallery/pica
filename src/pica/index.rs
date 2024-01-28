@@ -10,19 +10,19 @@ use std::time::{Duration, Instant, SystemTime};
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use itertools::Itertools;
+use pica_image::exif::ExifSummary;
 use regex::Regex;
 use tokio::sync::Mutex;
-use tokio::task::{block_in_place};
+use tokio::task::block_in_place;
 use tokio::time::sleep;
 use tracing::{debug, info, instrument, warn};
 use walkdir::WalkDir;
-use pica_image::exif::ExifSummary;
 
-use crate::pica::{db, MediaId, MediaInfo, MediaItem};
 use crate::pica::accessor::MediaAccessor;
-use pica_image::MediaType;
 use crate::pica::queue::{QueueItem, ScanQueue};
 use crate::pica::store::MediaStore;
+use crate::pica::{db, MediaId, MediaInfo, MediaItem};
+use pica_image::MediaType;
 
 thread_local! {
     static RE_TIMESTAMP: Regex = Regex::new(r#"((?:19|20)\d\d[01]\d[0123]\d)_?([012]\d[012345]\d[012345]\d)"#).unwrap();
@@ -52,7 +52,11 @@ pub struct Scanner {
 
 impl Scanner {
     pub fn new(root: impl Into<PathBuf>, queue: Arc<Mutex<ScanQueue>>) -> Self {
-        Self { root: root.into(), queue, known: HashSet::new() }
+        Self {
+            root: root.into(),
+            queue,
+            known: HashSet::new(),
+        }
     }
 
     /// Runs scanning once and writes the files found to the scan queue
@@ -60,13 +64,14 @@ impl Scanner {
     pub async fn scan(&mut self) {
         let start_time = Instant::now();
 
-        debug!("Starting scan in {:?}",  self.root);
+        debug!("Starting scan in {:?}", self.root);
 
         let mut seen = HashSet::new();
 
         let items = block_in_place(|| scan_path_for_items(&self.root));
 
-        info!("Scan of {:?} finished in {:?}, found {} media files",
+        info!(
+            "Scan of {:?} finished in {:?}, found {} media files",
             self.root,
             Instant::now().duration_since(start_time),
             items.len(),
@@ -92,9 +97,10 @@ impl Scanner {
 }
 
 #[instrument(skip_all)]
-fn collapse_raw_with_jpeg(items: Vec<ScanItem>) -> impl Iterator<Item=ScanItem> {
+fn collapse_raw_with_jpeg(items: Vec<ScanItem>) -> impl Iterator<Item = ScanItem> {
     // set of all names
-    let names: HashSet<_> = items.iter()
+    let names: HashSet<_> = items
+        .iter()
         .filter(|item| !item.typ.is_raw())
         .map(|item| item.relpath.with_extension(""))
         .collect();
@@ -112,7 +118,6 @@ fn collapse_raw_with_jpeg(items: Vec<ScanItem>) -> impl Iterator<Item=ScanItem> 
     })
 }
 
-
 /// Returns an iterator over files we might want to index
 #[instrument]
 fn scan_path_for_items(root: &Path) -> Vec<ScanItem> {
@@ -125,21 +130,15 @@ fn scan_path_for_items(root: &Path) -> Vec<ScanItem> {
     let items_iter = files_iter
         // filter out hidden files
         .filter_entry(|entry| !file_is_hidden(entry.file_name()))
-
         // convert any error to anyhow errors.
         .map(|res| res.map_err(anyhow::Error::from))
-
         // keep only jpeg files
         .filter_ok(|entry| entry.file_type().is_file() && file_is_indexable(entry.path()))
-
         // extract metadata and convert into scan items
         .map_ok(move |entry| -> Result<ScanItem> {
             let ctx = || entry.path().display().to_string();
 
-            let relpath = entry.path()
-                .strip_prefix(root)
-                .with_context(ctx)?
-                .to_owned();
+            let relpath = entry.path().strip_prefix(root).with_context(ctx)?.to_owned();
 
             let meta = entry.metadata().with_context(ctx)?;
             let timestamp = timestamp_from_metadata(&meta).with_context(ctx)?;
@@ -159,20 +158,16 @@ fn scan_path_for_items(root: &Path) -> Vec<ScanItem> {
             bytes.copy_from_slice(&hash[..8]);
             let id = MediaId::from(bytes);
 
-            Ok(
-                ScanItem {
-                    id,
-                    timestamp,
-                    relpath,
-                    typ,
-                    filesize: meta.size(),
-                    path: entry.into_path(),
-                }
-            )
+            Ok(ScanItem {
+                id,
+                timestamp,
+                relpath,
+                typ,
+                filesize: meta.size(),
+                path: entry.into_path(),
+            })
         })
-
         .flatten_ok()
-
         // filter out what looks like crap
         .filter_ok(|item| item.filesize > 8192);
 
@@ -189,9 +184,7 @@ fn scan_path_for_items(root: &Path) -> Vec<ScanItem> {
 }
 
 fn file_is_hidden(name: &OsStr) -> bool {
-    name.to_str()
-        .map(|name| name.starts_with('.'))
-        .unwrap_or(false)
+    name.to_str().map(|name| name.starts_with('.')).unwrap_or(false)
 }
 
 fn file_is_indexable(name: &Path) -> bool {
@@ -210,8 +203,18 @@ pub struct Indexer {
 }
 
 impl Indexer {
-    pub fn new(db: sqlx::sqlite::SqlitePool, queue: Arc<Mutex<ScanQueue>>, store: MediaStore, accessor: Option<MediaAccessor>) -> Self {
-        Self { db, queue, accessor, store }
+    pub fn new(
+        db: sqlx::sqlite::SqlitePool,
+        queue: Arc<Mutex<ScanQueue>>,
+        store: MediaStore,
+        accessor: Option<MediaAccessor>,
+    ) -> Self {
+        Self {
+            db,
+            queue,
+            accessor,
+            store,
+        }
     }
 
     pub async fn run(self) {
@@ -291,9 +294,7 @@ impl Indexer {
             return Ok(media);
         }
 
-        let item = parse(item)
-            .await
-            .with_context(|| "parse to MediaItem")?;
+        let item = parse(item).await.with_context(|| "parse to MediaItem")?;
 
         // store the parsed item in the database
         let mut tx = self.db.begin().await?;
@@ -317,9 +318,7 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
 
     let reader = image::io::Reader::open(path.as_ref())?;
 
-    let (width, height) = reader
-        .with_guessed_format()?
-        .into_dimensions()?;
+    let (width, height) = reader.with_guessed_format()?.into_dimensions()?;
 
     let exif = match block_in_place(|| pica_image::exif::parse_exif(&path)) {
         Ok(Some(exif)) => Some(exif),
@@ -333,7 +332,7 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
     // if we have information about the orientation, rotate width + height
     let (width, height) = match &exif {
         Some(ExifSummary { orientation, .. }) if orientation.transposed() => (height, width),
-        _ => (width, height)
+        _ => (width, height),
     };
 
     let timestamp = timestamp_from_path(&item.relpath)
@@ -376,16 +375,19 @@ fn timestamp_from_path(path: &Path) -> Option<DateTime<Utc>> {
     });
 
     // check for whatsapp file naming
-    let whatsapp = || RE_TIMESTAMP_WA.with(|re| {
-        let m = re.captures(name)?;
-        let date = m.get(1)?.as_str();
+    let whatsapp = || {
+        RE_TIMESTAMP_WA.with(|re| {
+            let m = re.captures(name)?;
+            let date = m.get(1)?.as_str();
 
-        let date = NaiveDate::parse_from_str(date, "%Y%m%d").ok()?
-            .and_time(NaiveTime::from_hms_opt(12, 0, 0)?)
-            .and_utc();
+            let date = NaiveDate::parse_from_str(date, "%Y%m%d")
+                .ok()?
+                .and_time(NaiveTime::from_hms_opt(12, 0, 0)?)
+                .and_utc();
 
-        Some(date)
-    });
+            Some(date)
+        })
+    };
 
     android.or_else(whatsapp)
 }

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-
 use itertools::Itertools;
 
 use tokio::sync::RwLock;
@@ -19,11 +18,12 @@ pub struct MediaStore {
     state: Arc<RwLock<MediaItemsState>>,
 }
 
-
 impl MediaStore {
     pub fn empty() -> Self {
         let items = MediaItemsState { items: HashMap::new() };
-        Self { state: Arc::new(RwLock::new(items)) }
+        Self {
+            state: Arc::new(RwLock::new(items)),
+        }
     }
 
     /// Adds a new item to the media store.
@@ -52,4 +52,3 @@ impl MediaStore {
         state.items.values().cloned().collect_vec()
     }
 }
-

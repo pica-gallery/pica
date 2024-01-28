@@ -24,9 +24,7 @@ impl ScanQueue {
     }
 
     pub fn remove(&mut self, item: MediaId) {
-        let timestamp = self.queue.peek()
-            .map(|(_, ts)| *ts)
-            .unwrap_or_else(Utc::now);
+        let timestamp = self.queue.peek().map(|(_, ts)| *ts).unwrap_or_else(Utc::now);
 
         // push with a large timestamp (high priority)
         self.queue.push(item, timestamp);

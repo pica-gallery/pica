@@ -6,14 +6,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use image::{image_dimensions, io};
 use image::imageops::FilterType;
+use image::{image_dimensions, io};
 use sqlx::__rt::spawn_blocking;
 use tempfile::NamedTempFile;
 use tokio::sync::Semaphore;
 use tracing::instrument;
 
-use pica_image::exif::{Orientation, parse_exif};
+use pica_image::exif::{parse_exif, Orientation};
 
 pub struct Image {
     pub typ: ImageType,
@@ -65,14 +65,18 @@ impl MediaScaler {
         let memory = self.options.max_memory.get().min(width as u64 * height as u64 * 4);
 
         // reserve some bytes to load the image into memory
-        let _guard = self.memory
+        let _guard = self
+            .memory
             .acquire_many(u32::try_from(memory).unwrap_or(u32::MAX))
             .await?;
 
         // run resize in a different task to not block the executor
         let bytes = self.resize(path.as_ref(), size).await?;
 
-        let thumb = Image { typ: self.options.image_type.clone(), blob: bytes };
+        let thumb = Image {
+            typ: self.options.image_type.clone(),
+            blob: bytes,
+        };
         Ok(thumb)
     }
 
@@ -134,10 +138,7 @@ fn resize_imagemagick(source: &Path, format: &ImageType, size: u32) -> Result<Ve
 
 #[instrument(skip_all, fields(?source, format, size))]
 fn resize_rust(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> {
-    let rotate = parse_exif(source)
-        .ok()
-        .flatten()
-        .map(|r| r.orientation);
+    let rotate = parse_exif(source).ok().flatten().map(|r| r.orientation);
 
     let mut image = io::Reader::open(source)?.with_guessed_format()?.decode()?;
 
@@ -162,15 +163,15 @@ fn resize_rust(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> 
 
     match format {
         ImageType::Jpeg => {
-            scaled.write_with_encoder(
-                image::codecs::jpeg::JpegEncoder::new_with_quality(&mut writer, 60)
-            )?;
+            scaled.write_with_encoder(image::codecs::jpeg::JpegEncoder::new_with_quality(&mut writer, 60))?;
         }
 
         ImageType::Avif => {
-            scaled.write_with_encoder(
-                image::codecs::avif::AvifEncoder::new_with_speed_quality(&mut writer, 10, 60)
-            )?;
+            scaled.write_with_encoder(image::codecs::avif::AvifEncoder::new_with_speed_quality(
+                &mut writer,
+                10,
+                60,
+            ))?;
         }
     };
 

@@ -3,11 +3,11 @@ use std::path::Path;
 use axum::body::Body;
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::Router;
 use axum::routing::get;
-use include_dir::{Dir, include_dir};
-use tower_http::compression::CompressionLayer;
+use axum::Router;
+use include_dir::{include_dir, Dir};
 use tower_http::compression::predicate::SizeAbove;
+use tower_http::compression::CompressionLayer;
 use tracing::info;
 
 static FRONTEND: Dir = include_dir!("$CARGO_MANIFEST_DIR/frontend/dist/pica/browser/");
@@ -36,8 +36,7 @@ async fn serve(req: axum::extract::Request) -> Response {
 }
 
 async fn serve_index() -> Response {
-    build_response("index.html", CACHE_CONTROL_INDEX)
-        .unwrap_or_else(|| StatusCode::NOT_FOUND.into_response())
+    build_response("index.html", CACHE_CONTROL_INDEX).unwrap_or_else(|| StatusCode::NOT_FOUND.into_response())
 }
 
 fn build_response(path: impl AsRef<Path>, cache_control: &str) -> Option<Response> {
@@ -46,9 +45,7 @@ fn build_response(path: impl AsRef<Path>, cache_control: &str) -> Option<Respons
     let content_type = mime_guess::from_path(path)
         .first_raw()
         .map(HeaderValue::from_static)
-        .unwrap_or_else(|| {
-            HeaderValue::from_str(mime::APPLICATION_OCTET_STREAM.as_ref()).unwrap()
-        });
+        .unwrap_or_else(|| HeaderValue::from_str(mime::APPLICATION_OCTET_STREAM.as_ref()).unwrap());
 
     Response::builder()
         .status(StatusCode::OK)

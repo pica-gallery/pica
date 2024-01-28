@@ -16,12 +16,12 @@ use pica_image::MediaType;
 mod album;
 pub mod index;
 
-pub mod config;
-pub mod scale;
 pub mod accessor;
-pub mod store;
+pub mod config;
 pub mod db;
 pub mod queue;
+pub mod scale;
+pub mod store;
 
 #[derive(SerializeDisplay, DeserializeFromStr)]
 pub struct Id<T> {
@@ -61,7 +61,10 @@ impl<T> Eq for Id<T> {}
 
 impl<T> From<[u8; 8]> for Id<T> {
     fn from(value: [u8; 8]) -> Self {
-        Self { value, _marker: PhantomData }
+        Self {
+            value,
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -91,7 +94,6 @@ impl<T> Display for Id<T> {
 }
 
 pub type MediaId = Id<MediaItem>;
-
 
 #[derive(Clone, Debug)]
 pub struct MediaInfo {
@@ -124,19 +126,30 @@ impl MediaItem {
             .replace(core::char::REPLACEMENT_CHARACTER, "_")
             .into();
 
-        let typ = MediaType::from_path(&relpath)
-            .ok_or_else(|| anyhow!("unknown media type for file {:?}", relpath))?;
+        let typ = MediaType::from_path(&relpath).ok_or_else(|| anyhow!("unknown media type for file {:?}", relpath))?;
 
         let location = match (info.latitude, info.longitude) {
             (Some(latitude), Some(longitude)) => {
                 let city = pica_geo::nearest_city(latitude, longitude)?.map(City::from);
-                Some(Location { latitude, longitude, city })
+                Some(Location {
+                    latitude,
+                    longitude,
+                    city,
+                })
             }
 
-            _ => None
+            _ => None,
         };
 
-        Ok(Self { id, filesize, info, name, typ, location, relpath: relpath.into() })
+        Ok(Self {
+            id,
+            filesize,
+            info,
+            name,
+            typ,
+            location,
+            relpath: relpath.into(),
+        })
     }
 }
 

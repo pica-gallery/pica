@@ -1,10 +1,10 @@
 use anyhow::Result;
-use axum::Router;
 use axum::routing::get;
+use axum::Router;
 use tokio::net::ToSocketAddrs;
 use tower_http::compression::CompressionLayer;
-use tower_http::CompressionLevel;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use tower_http::CompressionLevel;
 use tracing::Level;
 
 use crate::pica::accessor::MediaAccessor;
@@ -19,10 +19,7 @@ pub struct AppState {
 }
 
 pub async fn serve(store: MediaStore, accessor: MediaAccessor, addr: impl ToSocketAddrs) -> Result<()> {
-    let state = AppState {
-        store,
-        accessor,
-    };
+    let state = AppState { store, accessor };
 
     let app = Router::new()
         .route("/api/stream", get(handlers::api::handle_stream_get))
@@ -36,9 +33,10 @@ pub async fn serve(store: MediaStore, accessor: MediaAccessor, addr: impl ToSock
         .route("/media/preview/hdr/:id/*path", get(handlers::media::handle_preview_hdr))
         .route("/media/fullsize/:id/*path", get(handlers::media::handle_fullsize))
         .nest_service("/", handlers::frontend::frontend())
-        .layer(TraceLayer::new_for_http()
-            .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-            .on_response(DefaultOnResponse::new().level(Level::INFO))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
         )
         .with_state(state);
 

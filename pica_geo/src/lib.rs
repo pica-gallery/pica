@@ -19,11 +19,9 @@ pub struct City {
 }
 
 pub fn nearest_city(latitude: f32, longitude: f32) -> Result<Option<&'static City>> {
-    Ok(
-        cities()?
-            .iter()
-            .min_by_key(|&city| OrderedFloat(distance_sqr(city, latitude, longitude))),
-    )
+    Ok(cities()?
+        .iter()
+        .min_by_key(|&city| OrderedFloat(distance_sqr(city, latitude, longitude))))
 }
 
 fn distance_sqr(city: &City, latitude: f32, longitude: f32) -> f32 {

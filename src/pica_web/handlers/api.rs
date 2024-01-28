@@ -7,8 +7,8 @@ use anyhow::anyhow;
 use arcstr::ArcStr;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::Json;
 use axum::response::{IntoResponse, Response};
+use axum::Json;
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use serde::Serialize;
@@ -16,9 +16,9 @@ use tracing::instrument;
 
 use pica_image::exif::parse_exif_generic;
 
-use crate::pica::{Album, AlbumId, by_directory, Location, MediaId, MediaItem};
-use crate::pica_web::AppState;
+use crate::pica::{by_directory, Album, AlbumId, Location, MediaId, MediaItem};
 use crate::pica_web::handlers::WebError;
+use crate::pica_web::AppState;
 
 #[derive(Serialize)]
 struct MediaItemView {
@@ -113,11 +113,7 @@ pub async fn handle_stream_get(state: State<AppState>) -> Result<Response, WebEr
 
     items.sort_unstable_by_key(|img| Reverse(img.info.timestamp));
 
-    let items = items
-        .into_iter()
-        .take(10000)
-        .map(MediaItemView::from)
-        .collect_vec();
+    let items = items.into_iter().take(10000).map(MediaItemView::from).collect_vec();
 
     encode_json(StreamView { items })
 }
@@ -137,10 +133,7 @@ async fn albums_get(state: State<AppState>, n: usize) -> Result<Response, WebErr
     let images = state.store.items().await;
     let albums = by_directory(images);
 
-    let albums = albums
-        .into_iter()
-        .map(|al| AlbumView::from_album(al, n))
-        .collect_vec();
+    let albums = albums.into_iter().map(|al| AlbumView::from_album(al, n)).collect_vec();
 
     encode_json(albums)
 }
@@ -150,7 +143,8 @@ pub async fn handle_album_get(Path(id): Path<AlbumId>, state: State<AppState>) -
     let images = state.store.items().await;
     let albums = by_directory(images);
 
-    let album = albums.into_iter()
+    let album = albums
+        .into_iter()
         .find(|a| a.info.id == id)
         .ok_or_else(|| anyhow!("no album found for id {:?}", id))?;
 
@@ -164,7 +158,10 @@ pub async fn handle_exif_get(Path(id): Path<MediaId>, state: State<AppState>) ->
     };
 
     let exif = parse_exif_generic(state.accessor.full(&media))?;
-    let result = ExifView { item: media.into(), exif: exif.map(|raw| raw.0) };
+    let result = ExifView {
+        item: media.into(),
+        exif: exif.map(|raw| raw.0),
+    };
 
     encode_json(result)
 }

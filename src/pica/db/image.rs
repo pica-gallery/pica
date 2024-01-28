@@ -3,8 +3,8 @@ use std::ops::DerefMut;
 use anyhow::Result;
 use sqlx::{FromRow, Sqlite, Transaction};
 
-use crate::pica::MediaId;
 use crate::pica::scale::{Image, ImageType};
+use crate::pica::MediaId;
 
 #[derive(FromRow)]
 struct ImageRow {
@@ -35,11 +35,12 @@ pub async fn store(tx: &mut Transaction<'_, Sqlite>, id: MediaId, size: u32, ima
 }
 
 pub async fn load(tx: &mut Transaction<'_, Sqlite>, id: MediaId, size: u32) -> Result<Option<Image>> {
-    let row: Option<ImageRow> = sqlx::query_as("SELECT type, content FROM pica_image WHERE media=? AND size=? AND content IS NOT NULL")
-        .bind(id)
-        .bind(size)
-        .fetch_optional(tx.deref_mut())
-        .await?;
+    let row: Option<ImageRow> =
+        sqlx::query_as("SELECT type, content FROM pica_image WHERE media=? AND size=? AND content IS NOT NULL")
+            .bind(id)
+            .bind(size)
+            .fetch_optional(tx.deref_mut())
+            .await?;
 
     Ok(row.map(Image::from))
 }

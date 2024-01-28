@@ -13,8 +13,8 @@ use tower_http::services::ServeFile;
 use tracing::{debug, instrument};
 
 use crate::pica::MediaId;
-use crate::pica_web::AppState;
 use crate::pica_web::handlers::WebError;
+use crate::pica_web::AppState;
 
 #[derive(Debug)]
 enum ImageType {
@@ -48,7 +48,10 @@ pub async fn handle_preview_hdr(
 
 #[instrument(skip_all, fields(? id, ? image_type))]
 async fn handle_image_scaled(id: MediaId, state: AppState, image_type: ImageType) -> Result<Response, WebError> {
-    let media = state.store.get(id).await
+    let media = state
+        .store
+        .get(id)
+        .await
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
 
     let image = match image_type {
@@ -70,20 +73,20 @@ pub async fn handle_fullsize(
     state: State<AppState>,
     request: Request<Body>,
 ) -> Result<Response, WebError> {
-    let media = state.store.get(id).await
+    let media = state
+        .store
+        .get(id)
+        .await
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
 
     debug!("Serve full image for {:?}", media.relpath);
 
     // guess mime from the media path
-    let mime = mime_guess::from_path(media.relpath.as_ref())
-        .first_or(Mime::from_str("image/jpeg")?);
+    let mime = mime_guess::from_path(media.relpath.as_ref()).first_or(Mime::from_str("image/jpeg")?);
 
     // serve file to response
     let path = state.accessor.full(&media);
-    let mut resp = ServeFile::new_with_mime(&path, &mime)
-        .oneshot(request)
-        .await?;
+    let mut resp = ServeFile::new_with_mime(&path, &mime).oneshot(request).await?;
 
     //  on success inject cache header into response
     if resp.status().is_success() {

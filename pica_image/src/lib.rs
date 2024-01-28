@@ -16,7 +16,7 @@ pub fn get(path: impl AsRef<Path> + Into<PathBuf>) -> Result<MediaFileRef> {
         Some(MediaType::GenericVideo) => todo!(),
         Some(MediaType::Arw) => extract_thumbnail_arw(path.as_ref()),
         Some(MediaType::Cr3) => extract_thumbnail_cr3(path.as_ref()),
-        None => Err(anyhow!("unknown media type for {:?}", path.as_ref()))
+        None => Err(anyhow!("unknown media type for {:?}", path.as_ref())),
     }
 }
 
@@ -25,13 +25,10 @@ fn extract_thumbnail_cr3(path: &Path) -> Result<MediaFileRef> {
     let fp = BufReader::new(File::open(path)?);
 
     // find preview in file
-    let mut preview = crx::read_preview(fp)?
-        .ok_or_else(|| anyhow!("no preview in {:?}", path))?;
+    let mut preview = crx::read_preview(fp)?.ok_or_else(|| anyhow!("no preview in {:?}", path))?;
 
     // copy it to a temporary file
-    let mut jpeg = tempfile::Builder::new()
-        .suffix(".jpg")
-        .tempfile()?;
+    let mut jpeg = tempfile::Builder::new().suffix(".jpg").tempfile()?;
 
     std::io::copy(&mut preview, &mut jpeg)?;
     jpeg.flush()?;
@@ -56,30 +53,31 @@ fn extract_thumbnail_arw(path: &Path) -> Result<MediaFileRef> {
     let tag_preview_start = Tag(Context::Tiff, 513);
     let tag_preview_len = Tag(Context::Tiff, 514);
 
-    let preview_start = parsed.get_field(tag_preview_start, In(0))
+    let preview_start = parsed
+        .get_field(tag_preview_start, In(0))
         .ok_or_else(|| anyhow!("PreviewImageStart not found"))?
-        .value.get_uint(0)
+        .value
+        .get_uint(0)
         .ok_or_else(|| anyhow!("no value for PreviewImageStart"))?;
 
-    let preview_len = parsed.get_field(tag_preview_len, In(0))
+    let preview_len = parsed
+        .get_field(tag_preview_len, In(0))
         .ok_or_else(|| anyhow!("PreviewImageLength not found"))?
-        .value.get_uint(0)
+        .value
+        .get_uint(0)
         .ok_or_else(|| anyhow!("no value for PreviewImageLength"))?;
 
     info!("Preview starts at {} with {} bytes", preview_start, preview_len);
 
     fp.seek(SeekFrom::Start(preview_start as u64))?;
 
-    let mut jpeg = tempfile::Builder::new()
-        .suffix(".jpg")
-        .tempfile()?;
+    let mut jpeg = tempfile::Builder::new().suffix(".jpg").tempfile()?;
 
     std::io::copy(&mut fp.take(preview_len as u64), &mut jpeg)?;
     jpeg.flush()?;
 
     Ok(MediaFileRef::Temporary(jpeg.into_temp_path()))
 }
-
 
 #[cfg(test)]
 mod test {
@@ -136,7 +134,6 @@ pub enum MediaType {
     Cr3,
 }
 
-
 impl MediaType {
     pub fn from_path(path: impl AsRef<Path>) -> Option<Self> {
         // get format from file extension
@@ -147,7 +144,7 @@ impl MediaType {
             "mp4" | "avi" | "mov" | "mkv" => MediaType::GenericVideo,
             "arw" => MediaType::Arw,
             "cr3" => MediaType::Cr3,
-            _ => return None
+            _ => return None,
         };
 
         Some(format)

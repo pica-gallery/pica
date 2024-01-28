@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use anyhow::Result;
 use sqlx::SqlitePool;
 use tokio::task::spawn_blocking;
-use tracing::{debug_span, Instrument, instrument};
+use tracing::{debug_span, instrument, Instrument};
 
-use crate::pica::{db, MediaId, MediaItem};
 use crate::pica::scale::{Image, MediaScaler};
+use crate::pica::{db, MediaId, MediaItem};
 
 #[derive(Clone)]
 pub struct MediaAccessor {
@@ -24,7 +24,12 @@ pub struct Sizes {
 
 impl MediaAccessor {
     pub fn new(storage: Storage, scaler: MediaScaler, sizes: Sizes, root: impl Into<PathBuf>) -> Self {
-        Self { storage, scaler, sizes, root: root.into() }
+        Self {
+            storage,
+            scaler,
+            sizes,
+            root: root.into(),
+        }
     }
 
     pub fn full(&self, item: &MediaItem) -> PathBuf {
@@ -33,13 +38,13 @@ impl MediaAccessor {
 
     pub async fn thumb(&self, item: &MediaItem) -> Result<Image> {
         self.scaled(item, self.sizes.thumb)
-            .instrument(debug_span!("scale", size=self.sizes.thumb))
+            .instrument(debug_span!("scale", size = self.sizes.thumb))
             .await
     }
 
     pub async fn preview(&self, item: &MediaItem) -> Result<Image> {
         self.scaled(item, self.sizes.preview)
-            .instrument(debug_span!("scale", size=self.sizes.preview))
+            .instrument(debug_span!("scale", size = self.sizes.preview))
             .await
     }
 
@@ -63,7 +68,6 @@ impl MediaAccessor {
         Ok(image)
     }
 }
-
 
 #[derive(Clone)]
 pub struct Storage {
