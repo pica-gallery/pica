@@ -25,6 +25,9 @@ pub struct PicaConfig {
 
     // Patterns to include. If not specified, everything will be included.
     pub sources: Vec<SourceConfig>,
+    
+    #[serde(default)]
+    pub jaeger_tracing: Option<String>,
 }
 
 #[derive(Clone, Deserialize)]

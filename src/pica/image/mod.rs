@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -5,27 +6,28 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
 use tempfile::TempPath;
 use tokio::task::block_in_place;
-use tracing::info;
+use tracing::{info, instrument};
 
 mod crx;
 
-pub async fn get(path: impl AsRef<Path> + Into<PathBuf>) -> Result<MediaFileRef> {
+pub async fn get(path: impl Debug + AsRef<Path> + Into<PathBuf>) -> Result<MediaFileRef> {
     match MediaType::from_path(path.as_ref()) {
         Some(MediaType::GenericImage) => Ok(MediaFileRef::Persistent(path.into())),
         Some(MediaType::GenericVideo) => todo!(),
-        Some(MediaType::Arw) => extract_thumbnail_arw(path).await,
-        Some(MediaType::Cr3) => extract_thumbnail_cr3(path).await,
+        Some(MediaType::Arw) => extract_thumbnail_arw(path.as_ref()).await,
+        Some(MediaType::Cr3) => extract_thumbnail_cr3(path.as_ref()).await,
         None => Err(anyhow!("unknown media type for {:?}", path.as_ref()))
     }
 }
 
-async fn extract_thumbnail_cr3(path: impl AsRef<Path>) -> Result<MediaFileRef> {
+#[instrument(skip_all, fields(? path))]
+async fn extract_thumbnail_cr3(path: &Path) -> Result<MediaFileRef> {
     block_in_place(|| {
-        let fp = BufReader::new(File::open(path.as_ref())?);
+        let fp = BufReader::new(File::open(path)?);
 
         // find preview in file
         let mut preview = crx::read_preview(fp)?
-            .ok_or_else(|| anyhow!("no preview in {:?}", path.as_ref()))?;
+            .ok_or_else(|| anyhow!("no preview in {:?}", path))?;
 
         // copy it to a temporary file
         let mut jpeg = tempfile::Builder::new()
@@ -39,7 +41,8 @@ async fn extract_thumbnail_cr3(path: impl AsRef<Path>) -> Result<MediaFileRef> {
     })
 }
 
-async fn extract_thumbnail_arw(path: impl AsRef<Path>) -> Result<MediaFileRef> {
+#[instrument(skip_all, fields(? path))]
+async fn extract_thumbnail_arw(path: &Path) -> Result<MediaFileRef> {
     use exif::*;
 
     block_in_place(|| {
@@ -152,7 +155,7 @@ impl MediaType {
 
         Some(format)
     }
-    
+
     pub fn is_raw(&self) -> bool {
         matches!(self, Self::Arw | Self::Cr3)
     }

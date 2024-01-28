@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::anyhow;
 use axum::extract::{Path, State};
@@ -9,6 +10,7 @@ use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use serde::Serialize;
+use tracing::instrument;
 
 use crate::pica::{Album, AlbumId, by_directory, Location, MediaId, MediaItem};
 use crate::pica::exif::{GenericExif, parse_exif_generic};
@@ -18,7 +20,7 @@ use crate::pica_web::handlers::WebError;
 #[derive(Serialize)]
 struct MediaItemView {
     id: MediaId,
-    name: String,
+    name: Arc<str>,
     timestamp: DateTime<Utc>,
     width: u32,
     height: u32,
@@ -31,19 +33,17 @@ struct MediaItemView {
 struct LocationView {
     latitude: f32,
     longitude: f32,
-    city: Option<String>,
-    country: Option<String>,
+    city: Option<Arc<str>>,
+    country: Option<Arc<str>>,
 }
 
 impl From<Location> for LocationView {
     fn from(value: Location) -> Self {
-        let mut city = value.city;
-
         Self {
             latitude: value.latitude,
             longitude: value.longitude,
-            city: city.as_mut().map(|city| std::mem::take(&mut city.name)),
-            country: city.as_mut().map(|city| std::mem::take(&mut city.country)),
+            city: value.city.as_ref().map(|city| Arc::clone(&city.name)),
+            country: value.city.as_ref().map(|city| Arc::clone(&city.country)),
         }
     }
 }
@@ -104,28 +104,32 @@ struct StreamView {
     items: Vec<MediaItemView>,
 }
 
+#[instrument(skip_all)]
 pub async fn handle_stream_get(state: State<AppState>) -> Result<Response, WebError> {
-    let items = state.store.items().await;
+    let mut items = state.store.items().await;
 
-    let items = items.into_iter()
-        .sorted_unstable_by_key(|img| Reverse(img.info.timestamp))
+    items.sort_unstable_by_key(|img| Reverse(img.info.timestamp));
+
+    let items = items
+        .into_iter()
         .take(10000)
         .map(MediaItemView::from)
         .collect_vec();
 
-    let stream = StreamView { items };
-    Ok(Json(stream).into_response())
+    encode_json(StreamView { items })
 }
 
-
+#[instrument(skip_all)]
 pub async fn handle_albums_get(state: State<AppState>) -> Result<Response, WebError> {
     albums_get(state, 0).await
 }
 
+#[instrument(skip_all)]
 pub async fn handle_albums_get_full(state: State<AppState>) -> Result<Response, WebError> {
     albums_get(state, usize::MAX).await
 }
 
+#[instrument(skip_all)]
 async fn albums_get(state: State<AppState>, n: usize) -> Result<Response, WebError> {
     let images = state.store.items().await;
     let albums = by_directory(images);
@@ -135,9 +139,10 @@ async fn albums_get(state: State<AppState>, n: usize) -> Result<Response, WebErr
         .map(|al| AlbumView::from_album(al, n))
         .collect_vec();
 
-    Ok(Json(albums).into_response())
+    encode_json(albums)
 }
 
+#[instrument(skip_all, fields(? id))]
 pub async fn handle_album_get(Path(id): Path<AlbumId>, state: State<AppState>) -> Result<Response, WebError> {
     let images = state.store.items().await;
     let albums = by_directory(images);
@@ -146,10 +151,10 @@ pub async fn handle_album_get(Path(id): Path<AlbumId>, state: State<AppState>) -
         .find(|a| a.id == id)
         .ok_or_else(|| anyhow!("no album found for id {:?}", id))?;
 
-    let view = AlbumView::from(album);
-    Ok(Json(view).into_response())
+    encode_json(AlbumView::from(album))
 }
 
+#[instrument(skip_all, fields(? id))]
 pub async fn handle_exif_get(Path(id): Path<MediaId>, state: State<AppState>) -> Result<Response, WebError> {
     let Some(media) = state.store.get(id).await else {
         return Ok(StatusCode::NOT_FOUND.into_response());
@@ -158,5 +163,10 @@ pub async fn handle_exif_get(Path(id): Path<MediaId>, state: State<AppState>) ->
     let exif = parse_exif_generic(state.accessor.full(&media))?;
     let result = ExifView { item: media.into(), exif };
 
-    Ok(Json(result).into_response())
+    encode_json(result)
+}
+
+#[instrument(skip_all)]
+fn encode_json<T: Serialize>(value: T) -> Result<Response, WebError> {
+    Ok(Json(value).into_response())
 }

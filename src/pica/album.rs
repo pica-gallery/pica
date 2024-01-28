@@ -4,9 +4,11 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
 use itertools::Itertools;
+use tracing::instrument;
 
 use crate::pica::{Album, AlbumId, MediaItem};
 
+#[instrument(skip_all)]
 pub fn by_directory(items: impl IntoIterator<Item=MediaItem>) -> Vec<Album> {
     let re_album = regex::bytes::Regex::new(r#"Sony|staging|20\d\d-[01]\d-[0123]\d "#).unwrap();
     let re_clean = regex::Regex::new(r#"^20\d\d-[01]\d-[0123]\d\s+"#).unwrap();
@@ -14,21 +16,14 @@ pub fn by_directory(items: impl IntoIterator<Item=MediaItem>) -> Vec<Album> {
     let mut albums = HashMap::<PathBuf, Album>::new();
 
     for item in items {
-        // let name = item.relpath.iter().rev().skip(1).find_map(|segment| {
-        //     let is_match = re_album.is_match_at(segment.as_bytes(), 0);
-        //     if is_match { std::str::from_utf8(segment.as_bytes()).ok() } else { None }
-        // });
-
         let Some(parent) = item.relpath.parent() else {
             continue;
         };
 
-        let relpath = parent.ancestors().find(|path| {
+        let Some(relpath) = parent.ancestors().find(|path| {
             let name = path.file_name().map(|path| path.as_bytes());
             name.map(|name| re_album.is_match_at(name, 0)).unwrap_or_default()
-        });
-
-        let Some(relpath) = relpath else {
+        }) else {
             continue;
         };
 

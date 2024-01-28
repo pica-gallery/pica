@@ -3,6 +3,7 @@ use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use anyhow::{anyhow, ensure};
 use chrono::{DateTime, Utc};
@@ -108,9 +109,9 @@ pub struct MediaInfo {
 #[derive(Clone, Debug)]
 pub struct MediaItem {
     pub id: MediaId,
-    pub relpath: PathBuf,
+    pub relpath: Arc<PathBuf>,
     pub filesize: u64,
-    pub name: String,
+    pub name: Arc<str>,
     pub typ: MediaType,
     pub info: MediaInfo,
     pub location: Option<Location>,
@@ -123,7 +124,8 @@ impl MediaItem {
             .file_name()
             .ok_or_else(|| anyhow!("no file name in {:?}", relpath))?
             .to_string_lossy()
-            .replace(core::char::REPLACEMENT_CHARACTER, "_");
+            .replace(core::char::REPLACEMENT_CHARACTER, "_")
+            .into();
 
         let typ = MediaType::from_path(&relpath)
             .ok_or_else(|| anyhow!("unknown media type for file {:?}", relpath))?;
@@ -137,15 +139,7 @@ impl MediaItem {
             _ => None
         };
 
-        Ok(Self {
-            id,
-            relpath,
-            filesize,
-            info,
-            name,
-            typ,
-            location,
-        })
+        Ok(Self { id, filesize, info, name, typ, location, relpath: relpath.into() })
     }
 }
 
@@ -160,15 +154,15 @@ pub struct Location {
 pub struct City {
     pub latitude: f32,
     pub longitude: f32,
-    pub name: String,
-    pub country: String,
+    pub name: Arc<str>,
+    pub country: Arc<str>,
 }
 
 impl From<&geo::City> for City {
     fn from(value: &geo::City) -> Self {
         Self {
-            name: value.name.to_owned(),
-            country: value.country.to_owned(),
+            name: Arc::from(value.name.as_str()),
+            country: Arc::from(value.country.as_str()),
             latitude: value.latitude,
             longitude: value.longitude,
         }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -7,6 +8,7 @@ use anyhow::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use exif::{Exif, Field, In, Tag, Value};
 use serde::Serialize;
+use tracing::instrument;
 
 pub enum Orientation {
     Original,
@@ -39,7 +41,8 @@ pub struct ExifInfo {
     pub longitude: Option<f32>,
 }
 
-pub fn parse_exif(path: impl AsRef<Path>) -> anyhow::Result<Option<ExifInfo>> {
+#[instrument(skip_all, fields(?path))]
+pub fn parse_exif(path: impl AsRef<Path> + Debug) -> anyhow::Result<Option<ExifInfo>> {
     let mut fp = BufReader::new(File::open(path)?);
 
     let parsed = match exif::Reader::new().read_from_container(&mut fp) {
@@ -112,7 +115,8 @@ fn parse_orientation(value: Option<u32>) -> Orientation {
 #[serde(transparent)]
 pub struct GenericExif(HashMap<String, String>);
 
-pub fn parse_exif_generic(path: impl AsRef<Path>) -> Result<Option<GenericExif>> {
+#[instrument(skip_all, fields(?path))]
+pub fn parse_exif_generic(path: impl AsRef<Path> + Debug) -> Result<Option<GenericExif>> {
     let mut fp = BufReader::new(File::open(path)?);
 
     let parsed = match exif::Reader::new().read_from_container(&mut fp) {

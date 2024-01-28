@@ -3,9 +3,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
+use opentelemetry::global;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tracing::info;
+use tracing_subscriber::{EnvFilter, Layer};
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 use crate::pica::{accessor, scale};
 use crate::pica::accessor::{MediaAccessor, Storage};
@@ -18,11 +23,45 @@ use crate::pica::store::MediaStore;
 pub mod pica;
 pub mod pica_web;
 
+fn initialize_tracing(jaeger_endpoint: Option<String>) -> Result<()> {
+    let opentelemetry = jaeger_endpoint
+        .map(|jaeger_endpoint| -> Result<_> {
+            // Allows you to pass along context (i.e., trace IDs) across services
+            global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
+
+            // Sets up the machinery needed to export data to Jaeger
+            let tracer = opentelemetry_jaeger::new_agent_pipeline()
+                .with_endpoint(jaeger_endpoint)
+                .with_service_name("pica")
+                .install_simple()?;
+
+            // Create a tracing layer with the configured tracer
+            Ok(tracing_opentelemetry::layer().with_tracer(tracer))
+        })
+        .transpose()?;
+
+    // The SubscriberExt and SubscriberInitExt traits are needed to extend the
+    // Registry to accept `opentelemetry (the OpenTelemetryLayer type).
+    let env_filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .from_env_lossy();
+
+    let fmt = tracing_subscriber::fmt::Layer::default().with_filter(env_filter);
+
+    tracing_subscriber::registry()
+        .with(opentelemetry)
+        .with(fmt)
+        .try_init()?;
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
-
     let config = pica::config::load("./pica.config.yaml")?;
+
+    initialize_tracing(config.jaeger_tracing)?;
+
 
     info!("Open database");
     let db = sqlx::sqlite::SqlitePoolOptions::new()

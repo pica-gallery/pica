@@ -14,7 +14,7 @@ use regex::Regex;
 use tokio::sync::Mutex;
 use tokio::task::block_in_place;
 use tokio::time::sleep;
-use tracing::{debug, info, Instrument, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 use walkdir::WalkDir;
 
 use crate::pica;
@@ -352,7 +352,6 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
     MediaItem::from_media_info(item.id, item.relpath.clone(), item.filesize, info)
 }
 
-#[instrument(skip_all)]
 fn timestamp_from_metadata(metadata: &Metadata) -> Result<DateTime<Utc>> {
     let modified = metadata.modified().or_else(|_| metadata.created())?;
     let epoch_seconds = modified.duration_since(SystemTime::UNIX_EPOCH)?.as_secs();

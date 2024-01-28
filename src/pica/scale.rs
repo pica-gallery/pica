@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::fmt::Debug;
 use std::fs;
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
@@ -10,6 +11,7 @@ use image::imageops::FilterType;
 use sqlx::__rt::spawn_blocking;
 use tempfile::NamedTempFile;
 use tokio::sync::Semaphore;
+use tracing::instrument;
 
 use crate::pica::exif::{Orientation, parse_exif};
 
@@ -18,7 +20,7 @@ pub struct Image {
     pub blob: Vec<u8>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ImageType {
     Jpeg,
     Avif,
@@ -55,7 +57,8 @@ impl MediaScaler {
     }
 
     /// Generate a resized version of an image
-    pub async fn image(&self, path: impl AsRef<Path>, size: u32) -> Result<Image> {
+    #[instrument(skip_all, fields(?path, size))]
+    pub async fn image(&self, path: impl AsRef<Path> + Debug, size: u32) -> Result<Image> {
         let (width, height) = image_dimensions(path.as_ref())?;
 
         // memory to reserve
@@ -85,13 +88,14 @@ impl MediaScaler {
                 resize_rust(&path, &format, size)
             }
         };
-        
+
         spawn_blocking(task).await
     }
 }
 
 /// Resizes the image using image magick.
-fn resize_imagemagick(source: impl AsRef<Path>, format: &ImageType, size: u32) -> Result<Vec<u8>> {
+#[instrument(skip_all, fields(?source, format, size))]
+fn resize_imagemagick(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> {
     use std::process::Command;
 
     let format = match format {
@@ -114,7 +118,7 @@ fn resize_imagemagick(source: impl AsRef<Path>, format: &ImageType, size: u32) -
         .arg("-quality")
         .arg("60")
         .arg("-strip")
-        .arg(source.as_ref())
+        .arg(source)
         .arg(target_avif)
         .output()?;
 
@@ -128,8 +132,9 @@ fn resize_imagemagick(source: impl AsRef<Path>, format: &ImageType, size: u32) -
     Ok(bytes)
 }
 
-fn resize_rust(source: impl AsRef<Path>, format: &ImageType, size: u32) -> Result<Vec<u8>> {
-    let rotate = parse_exif(source.as_ref())
+#[instrument(skip_all, fields(?source, format, size))]
+fn resize_rust(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> {
+    let rotate = parse_exif(source)
         .ok()
         .flatten()
         .map(|r| r.orientation);

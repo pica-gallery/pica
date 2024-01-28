@@ -14,7 +14,7 @@ COPY . /app/
 
 COPY --from=js-builder /app/dist/pica/browser/ /app/frontend/dist/pica/browser/
 
-RUN cd /app && cargo build --release
+RUN cd /app && cargo build --target-cpu x86-64-v3 --release
 
 FROM debian:bookworm-20240110
 

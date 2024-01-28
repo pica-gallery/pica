@@ -3,6 +3,7 @@ use axum::Router;
 use axum::routing::get;
 use tokio::net::ToSocketAddrs;
 use tower_http::compression::CompressionLayer;
+use tower_http::CompressionLevel;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
@@ -29,7 +30,7 @@ pub async fn serve(store: MediaStore, accessor: MediaAccessor, addr: impl ToSock
         .route("/api/albums/full", get(handlers::api::handle_albums_get_full))
         .route("/api/albums/:id", get(handlers::api::handle_album_get))
         .route("/api/media/:id/exif", get(handlers::api::handle_exif_get))
-        .layer(CompressionLayer::new().gzip(true))
+        .layer(CompressionLayer::new().gzip(true).quality(CompressionLevel::Fastest))
         .route("/media/thumb/:id/*path", get(handlers::media::handle_thumbnail))
         .route("/media/preview/sdr/:id/*path", get(handlers::media::handle_preview_sdr))
         .route("/media/preview/hdr/:id/*path", get(handlers::media::handle_preview_hdr))

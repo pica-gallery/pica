@@ -10,17 +10,19 @@ use axum::response::{IntoResponse, Response};
 use mime::Mime;
 use tower::ServiceExt;
 use tower_http::services::ServeFile;
-use tracing::debug;
+use tracing::{debug, instrument};
 
-use crate::pica::{MediaId};
+use crate::pica::MediaId;
 use crate::pica_web::AppState;
 use crate::pica_web::handlers::WebError;
 
+#[derive(Debug)]
 enum ImageType {
     Thumbnail,
     Preview,
 }
 
+#[instrument(skip_all, fields(? id))]
 pub async fn handle_thumbnail(
     Path((id, _)): Path<(MediaId, String)>,
     State(state): State<AppState>,
@@ -28,6 +30,7 @@ pub async fn handle_thumbnail(
     handle_image_scaled(id, state, ImageType::Thumbnail).await
 }
 
+#[instrument(skip_all, fields(? id))]
 pub async fn handle_preview_sdr(
     Path((id, _)): Path<(MediaId, String)>,
     State(state): State<AppState>,
@@ -35,6 +38,7 @@ pub async fn handle_preview_sdr(
     handle_image_scaled(id, state, ImageType::Preview).await
 }
 
+#[instrument(skip_all, fields(? id))]
 pub async fn handle_preview_hdr(
     Path((id, _)): Path<(MediaId, String)>,
     State(state): State<AppState>,
@@ -42,6 +46,7 @@ pub async fn handle_preview_hdr(
     handle_image_scaled(id, state, ImageType::Preview).await
 }
 
+#[instrument(skip_all, fields(? id, ? image_type))]
 async fn handle_image_scaled(id: MediaId, state: AppState, image_type: ImageType) -> Result<Response, WebError> {
     let media = state.store.get(id).await
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
@@ -59,19 +64,19 @@ async fn handle_image_scaled(id: MediaId, state: AppState, image_type: ImageType
     Ok(resp)
 }
 
+#[instrument(skip_all, fields(? id))]
 pub async fn handle_fullsize(
     Path((id, _)): Path<(MediaId, String)>,
     state: State<AppState>,
     request: Request<Body>,
 ) -> Result<Response, WebError> {
-
     let media = state.store.get(id).await
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
 
     debug!("Serve full image for {:?}", media.relpath);
 
     // guess mime from the media path
-    let mime = mime_guess::from_path(&media.relpath)
+    let mime = mime_guess::from_path(media.relpath.as_ref())
         .first_or(Mime::from_str("image/jpeg")?);
 
     // serve file to response
