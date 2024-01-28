@@ -1,6 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::anyhow;
 use arcstr::ArcStr;
@@ -74,10 +75,10 @@ struct ExifView {
 #[serde(rename_all = "camelCase")]
 struct AlbumView {
     id: AlbumId,
-    name: String,
+    name: ArcStr,
     items: Vec<MediaItemView>,
     timestamp: DateTime<Utc>,
-    relpath: Option<PathBuf>,
+    relpath: Option<Arc<PathBuf>>,
     cover: MediaItemView,
 }
 
@@ -90,10 +91,10 @@ impl From<Album> for AlbumView {
 impl AlbumView {
     fn from_album(album: Album, n: usize) -> AlbumView {
         Self {
-            id: album.id,
-            name: album.name,
+            id: album.info.id,
+            name: album.info.name,
+            timestamp: album.info.timestamp,
             items: album.items.into_iter().take(n).map(MediaItemView::from).collect(),
-            timestamp: album.timestamp,
             relpath: album.relpath,
             cover: album.cover.into(),
         }
@@ -150,7 +151,7 @@ pub async fn handle_album_get(Path(id): Path<AlbumId>, state: State<AppState>) -
     let albums = by_directory(images);
 
     let album = albums.into_iter()
-        .find(|a| a.id == id)
+        .find(|a| a.info.id == id)
         .ok_or_else(|| anyhow!("no album found for id {:?}", id))?;
 
     encode_json(AlbumView::from(album))

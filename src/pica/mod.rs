@@ -171,18 +171,16 @@ pub type AlbumId = Id<Album>;
 #[derive(Clone, Debug)]
 pub struct AlbumInfo {
     pub id: AlbumId,
-    pub name: String,
+    pub name: ArcStr,
     pub timestamp: DateTime<Utc>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Album {
-    pub id: AlbumId,
-    pub name: String,
-    pub timestamp: DateTime<Utc>,
+    pub info: AlbumInfo,
 
     // the album has a relpath if it is based on the file system
-    pub relpath: Option<PathBuf>,
+    pub relpath: Option<Arc<PathBuf>>,
 
     // a copy of the media items in this album
     pub items: Vec<MediaItem>,
