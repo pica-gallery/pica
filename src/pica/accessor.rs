@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use sqlx::SqlitePool;
+use tokio::task::spawn_blocking;
 use tracing::{debug_span, Instrument, instrument};
 
-use crate::pica;
 use crate::pica::{db, MediaId, MediaItem};
 use crate::pica::scale::{Image, MediaScaler};
 
@@ -43,7 +43,7 @@ impl MediaAccessor {
             .await
     }
 
-    #[instrument(skip_all, fields(?media.relpath, size))]
+    #[instrument(skip_all, fields(? media.relpath, size))]
     async fn scaled(&self, media: &MediaItem, size: u32) -> Result<Image> {
         // check if the thumbnail is already in the database
         if let Some(image) = self.storage.load(media.id, size).await? {
@@ -53,7 +53,7 @@ impl MediaAccessor {
         let path = self.root.join(media.relpath.as_ref());
 
         // extract an image we can process from the media file.
-        let path = pica::image::get(path).await?;
+        let path = spawn_blocking(|| pica_image::get(path)).await??;
 
         let image = self.scaler.image(path, size).await?;
 
@@ -75,7 +75,7 @@ impl Storage {
         Self { db }
     }
 
-    #[instrument(skip_all, fields(?id, size))]
+    #[instrument(skip_all, fields(? id, size))]
     pub async fn store(&self, id: MediaId, size: u32, image: &Image) -> Result<()> {
         let mut tx = self.db.begin().await?;
         db::image::store(&mut tx, id, size, image).await?;
@@ -84,7 +84,7 @@ impl Storage {
         Ok(())
     }
 
-    #[instrument(skip_all, fields(?id, size))]
+    #[instrument(skip_all, fields(? id, size))]
     pub async fn load(&self, id: MediaId, size: u32) -> Result<Option<Image>> {
         let mut tx = self.db.begin().await?;
         db::image::load(&mut tx, id, size).await

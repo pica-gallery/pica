@@ -4,9 +4,9 @@ use std::io::{Read, Seek, SeekFrom};
 use anyhow::{anyhow, Result};
 use byteorder::{BigEndian, ReadBytesExt};
 use hex_literal::hex;
-use tracing::{debug};
+use tracing::debug;
 
-struct Box<'a, R> {
+struct Atom<'a, R> {
     name: [u8; 4],
     uuid: Option<[u8; 16]>,
     payload: &'a mut R,
@@ -14,17 +14,17 @@ struct Box<'a, R> {
     payload_end: u64,
 }
 
-impl<'a, R> Box<'a, R> {
+impl<'a, R> Atom<'a, R> {
     pub fn name(&self) -> Option<&str> {
         std::str::from_utf8(&self.name).ok()
     }
 }
 
-impl<'a, R> Box<'a, R>
+impl<'a, R> Atom<'a, R>
     where R: Read + Seek,
 {
-    pub fn into_iter(self, offset: u64) -> BoxIter<'a, R> {
-        BoxIter {
+    pub fn into_iter(self, offset: u64) -> AtomIter<'a, R> {
+        AtomIter {
             stream: self.payload,
             next: self.payload_start + offset,
             end: Some(self.payload_end),
@@ -32,22 +32,22 @@ impl<'a, R> Box<'a, R>
     }
 }
 
-struct BoxIter<'a, R> {
+struct AtomIter<'a, R> {
     stream: &'a mut R,
     next: u64,
     end: Option<u64>,
 }
 
-impl<'a, R> BoxIter<'a, R> {
+impl<'a, R> AtomIter<'a, R> {
     pub fn new(stream: &'a mut R) -> Self {
         Self { stream, next: 0, end: None }
     }
 }
 
-impl<'a, R> BoxIter<'a, R>
+impl<'a, R> AtomIter<'a, R>
     where R: Read + Seek,
 {
-    pub fn next(&mut self) -> Result<Option<Box<R>>> {
+    pub fn next(&mut self) -> Result<Option<Atom<R>>> {
         // seek to start of the next box
         self.stream.seek(SeekFrom::Start(self.next))?;
 
@@ -97,17 +97,17 @@ impl<'a, R> BoxIter<'a, R>
         }
 
         // and return the box
-        Ok(Some(Box { payload_start, payload_end, name, uuid, payload: self.stream }))
+        Ok(Some(Atom { payload_start, payload_end, name, uuid, payload: self.stream }))
     }
 }
 
 pub fn read_preview(mut fp: impl Read + Seek) -> Result<Option<impl Read>> {
-    let mut iter = BoxIter::new(&mut fp);
+    let mut iter = AtomIter::new(&mut fp);
 
-    while let Some(bxx) = iter.next()? {
-        if &bxx.name == b"uuid" && bxx.uuid == Some(hex!("eaf42b5e1c984b88b9fbb7dc406e4d16")) {
+    while let Some(atom) = iter.next()? {
+        if &atom.name == b"uuid" && atom.uuid == Some(hex!("eaf42b5e1c984b88b9fbb7dc406e4d16")) {
             // found the preview chunk, get iter over children
-            let mut iter = bxx.into_iter(8);
+            let mut iter = atom.into_iter(8);
 
             // get first child box
             let prvw_box = iter.next()?.ok_or_else(|| anyhow!("expected one subbox"))?;
@@ -139,9 +139,9 @@ mod test {
     use anyhow::Result;
     use hex_literal::hex;
 
-    use crate::pica::image::crx::{Box, BoxIter, read_preview};
+    use crate::crx::{Atom, AtomIter, read_preview};
 
-    fn has_children<R>(b: &Box<R>) -> Option<u64> {
+    fn has_children<R>(b: &Atom<R>) -> Option<u64> {
         match b.name.as_slice() {
             b"moov" | b"trak" | b"mdia" | b"dinf" | b"stbl" | b"minf" | b"url " => Some(0),
             // container for preview image
@@ -150,14 +150,14 @@ mod test {
         }
     }
 
-    fn print_tree<>(mut iter: BoxIter<impl Read + Seek>, depth: usize) -> Result<()> {
+    fn print_tree<>(mut iter: AtomIter<impl Read + Seek>, depth: usize) -> Result<()> {
         let indent = "                                                               ";
         let mut idx = 0;
-        while let Some(bxx) = iter.next()? {
-            println!("{}{:?} at {}", &indent[..depth], bxx.name(), bxx.payload_start);
+        while let Some(atom) = iter.next()? {
+            println!("{}{:?} at {}", &indent[..depth], atom.name(), atom.payload_start);
 
-            if let Some(offset) = has_children(&bxx) {
-                print_tree(bxx.into_iter(offset), depth + 2)?;
+            if let Some(offset) = has_children(&atom) {
+                print_tree(atom.into_iter(offset), depth + 2)?;
             }
 
             idx += 1;
@@ -171,16 +171,16 @@ mod test {
 
     #[test]
     pub fn test_moov() -> Result<()> {
-        let mut fp = File::open("_test/CR6_1519 (1).CR3")?;
-
-        print_tree(BoxIter::new(&mut fp), 0)?;
-
+        // TODO provide test files in the repository
+        let mut fp = File::open("../../_test/CR6_1519 (1).CR3")?;
+        print_tree(AtomIter::new(&mut fp), 0)?;
         Ok(())
     }
 
     #[test]
     pub fn test_parse_crx() -> Result<()> {
-        let mut preview = read_preview(File::open("_test/CR6_1519 (1).CR3")?)?.unwrap();
+        // TODO provide test files in the repository
+        let mut preview = read_preview(File::open("../../_test/CR6_1519 (1).CR3")?)?.unwrap();
         std::io::copy(&mut preview, &mut File::create("/tmp/preview.jpg")?)?;
         Ok(())
     }

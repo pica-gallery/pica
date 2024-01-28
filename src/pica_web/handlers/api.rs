@@ -1,8 +1,9 @@
 use std::cmp::Reverse;
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use anyhow::anyhow;
+use arcstr::ArcStr;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -12,15 +13,16 @@ use itertools::Itertools;
 use serde::Serialize;
 use tracing::instrument;
 
+use pica_image::exif::parse_exif_generic;
+
 use crate::pica::{Album, AlbumId, by_directory, Location, MediaId, MediaItem};
-use crate::pica::exif::{GenericExif, parse_exif_generic};
 use crate::pica_web::AppState;
 use crate::pica_web::handlers::WebError;
 
 #[derive(Serialize)]
 struct MediaItemView {
     id: MediaId,
-    name: Arc<str>,
+    name: ArcStr,
     timestamp: DateTime<Utc>,
     width: u32,
     height: u32,
@@ -33,8 +35,8 @@ struct MediaItemView {
 struct LocationView {
     latitude: f32,
     longitude: f32,
-    city: Option<Arc<str>>,
-    country: Option<Arc<str>>,
+    city: Option<ArcStr>,
+    country: Option<ArcStr>,
 }
 
 impl From<Location> for LocationView {
@@ -42,8 +44,8 @@ impl From<Location> for LocationView {
         Self {
             latitude: value.latitude,
             longitude: value.longitude,
-            city: value.city.as_ref().map(|city| Arc::clone(&city.name)),
-            country: value.city.as_ref().map(|city| Arc::clone(&city.country)),
+            city: value.city.as_ref().map(|city| city.name.clone()),
+            country: value.city.as_ref().map(|city| city.country.clone()),
         }
     }
 }
@@ -65,7 +67,7 @@ impl From<MediaItem> for MediaItemView {
 #[serde(rename_all = "camelCase")]
 struct ExifView {
     item: MediaItemView,
-    exif: Option<GenericExif>,
+    exif: Option<HashMap<String, String>>,
 }
 
 #[derive(Serialize)]
@@ -161,7 +163,7 @@ pub async fn handle_exif_get(Path(id): Path<MediaId>, state: State<AppState>) ->
     };
 
     let exif = parse_exif_generic(state.accessor.full(&media))?;
-    let result = ExifView { item: media.into(), exif };
+    let result = ExifView { item: media.into(), exif: exif.map(|raw| raw.0) };
 
     encode_json(result)
 }

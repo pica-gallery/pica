@@ -12,16 +12,15 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use itertools::Itertools;
 use regex::Regex;
 use tokio::sync::Mutex;
-use tokio::task::block_in_place;
+use tokio::task::{block_in_place};
 use tokio::time::sleep;
 use tracing::{debug, info, instrument, warn};
 use walkdir::WalkDir;
+use pica_image::exif::ExifSummary;
 
-use crate::pica;
 use crate::pica::{db, MediaId, MediaInfo, MediaItem};
 use crate::pica::accessor::MediaAccessor;
-use crate::pica::exif::ExifInfo;
-use crate::pica::image::MediaType;
+use pica_image::MediaType;
 use crate::pica::queue::{QueueItem, ScanQueue};
 use crate::pica::store::MediaStore;
 
@@ -314,7 +313,7 @@ impl Indexer {
 /// Parses a [ScanItem] into a new [MediaItem]
 #[instrument(skip_all, fields(? item.relpath))]
 async fn parse(item: &ScanItem) -> Result<MediaItem> {
-    let path = pica::image::get(&item.path).await?;
+    let path = block_in_place(|| pica_image::get(&item.path))?;
 
     let reader = image::io::Reader::open(path.as_ref())?;
 
@@ -322,7 +321,7 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
         .with_guessed_format()?
         .into_dimensions()?;
 
-    let exif = match block_in_place(|| pica::exif::parse_exif(&path)) {
+    let exif = match block_in_place(|| pica_image::exif::parse_exif(&path)) {
         Ok(Some(exif)) => Some(exif),
         Ok(None) => None,
         Err(err) => {
@@ -333,7 +332,7 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
 
     // if we have information about the orientation, rotate width + height
     let (width, height) = match &exif {
-        Some(ExifInfo { orientation, .. }) if orientation.transposed() => (height, width),
+        Some(ExifSummary { orientation, .. }) if orientation.transposed() => (height, width),
         _ => (width, height)
     };
 

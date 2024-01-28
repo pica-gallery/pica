@@ -6,12 +6,12 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{anyhow, ensure};
+use arcstr::ArcStr;
 use chrono::{DateTime, Utc};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 
 pub use album::by_directory;
-
-use crate::pica::image::MediaType;
+use pica_image::MediaType;
 
 mod album;
 pub mod index;
@@ -22,9 +22,6 @@ pub mod accessor;
 pub mod store;
 pub mod db;
 pub mod queue;
-pub mod exif;
-mod geo;
-mod image;
 
 #[derive(SerializeDisplay, DeserializeFromStr)]
 pub struct Id<T> {
@@ -111,7 +108,7 @@ pub struct MediaItem {
     pub id: MediaId,
     pub relpath: Arc<PathBuf>,
     pub filesize: u64,
-    pub name: Arc<str>,
+    pub name: ArcStr,
     pub typ: MediaType,
     pub info: MediaInfo,
     pub location: Option<Location>,
@@ -132,7 +129,7 @@ impl MediaItem {
 
         let location = match (info.latitude, info.longitude) {
             (Some(latitude), Some(longitude)) => {
-                let city = geo::nearest_city(latitude, longitude)?.map(City::from);
+                let city = pica_geo::nearest_city(latitude, longitude)?.map(City::from);
                 Some(Location { latitude, longitude, city })
             }
 
@@ -154,15 +151,15 @@ pub struct Location {
 pub struct City {
     pub latitude: f32,
     pub longitude: f32,
-    pub name: Arc<str>,
-    pub country: Arc<str>,
+    pub name: ArcStr,
+    pub country: ArcStr,
 }
 
-impl From<&geo::City> for City {
-    fn from(value: &geo::City) -> Self {
+impl From<&pica_geo::City> for City {
+    fn from(value: &pica_geo::City) -> Self {
         Self {
-            name: Arc::from(value.name.as_str()),
-            country: Arc::from(value.country.as_str()),
+            name: value.name.clone(),
+            country: value.country.clone(),
             latitude: value.latitude,
             longitude: value.longitude,
         }

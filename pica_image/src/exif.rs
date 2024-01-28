@@ -6,45 +6,36 @@ use std::path::Path;
 
 use anyhow::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use exif::{Exif, Field, In, Tag, Value};
-use serde::Serialize;
+use exif::{Field, In, Tag, Value};
 use tracing::instrument;
 
-pub enum Orientation {
-    Original,
-    FlipH,
-    Rotate180,
-    FlipHRotate180,
-    FlipHRotate270,
-    Rotate90,
-    FlipHRotate90,
-    Rotate270,
-}
+/// raw field/value exif data.
+pub struct ExifRaw(pub HashMap<String, String>);
 
-impl Orientation {
-    pub fn transposed(&self) -> bool {
-        matches!(self,
-            | Orientation::Rotate180
-            | Orientation::FlipHRotate270
-            | Orientation::Rotate90
-            | Orientation::FlipHRotate90
-            | Orientation::Rotate270
-        )
-    }
-}
-
-pub struct ExifInfo {
-    pub exif: Exif,
-    pub orientation: Orientation,
-    pub timestamp: Option<DateTime<Utc>>,
-    pub latitude: Option<f32>,
-    pub longitude: Option<f32>,
-}
-
-#[instrument(skip_all, fields(?path))]
-pub fn parse_exif(path: impl AsRef<Path> + Debug) -> anyhow::Result<Option<ExifInfo>> {
+#[instrument(skip_all, fields(? path))]
+pub fn parse_exif_generic(path: impl AsRef<Path> + Debug) -> Result<Option<ExifRaw>> {
     let mut fp = BufReader::new(File::open(path)?);
 
+    let parsed = match exif::Reader::new().read_from_container(&mut fp) {
+        Ok(data) => data,
+        Err(exif::Error::NotFound(_)) => return Ok(None),
+        Err(err) => return Err(err.into()),
+    };
+
+    let fields = parsed.fields()
+        .filter(|field| field.ifd_num == In::PRIMARY)
+        .map(|field| (field.tag.to_string(), field.display_value().to_string()))
+        .collect();
+
+    Ok(Some(ExifRaw(fields)))
+}
+
+#[instrument(skip_all, fields(? path))]
+pub fn parse_exif(path: impl AsRef<Path> + Debug) -> anyhow::Result<Option<ExifSummary>> {
+    let mut fp = BufReader::new(File::open(path)?);
+
+    // TODO needs to be optimized, read_from_container sometimes read the full file
+    //  into memory, which is not really that good
     let parsed = match exif::Reader::new().read_from_container(&mut fp) {
         Ok(data) => data,
         Err(exif::Error::NotFound(_)) => return Ok(None),
@@ -73,7 +64,7 @@ pub fn parse_exif(path: impl AsRef<Path> + Debug) -> anyhow::Result<Option<ExifI
         .map(|f| parse_orientation(f.value.get_uint(0)))
         .unwrap_or(Orientation::Original);
 
-    Ok(Some(ExifInfo { exif: parsed, timestamp, orientation, latitude, longitude }))
+    Ok(Some(ExifSummary { timestamp, orientation, latitude, longitude }))
 }
 
 fn parse_gps_coordinate_value(field: Option<&Field>) -> Option<f32> {
@@ -111,24 +102,32 @@ fn parse_orientation(value: Option<u32>) -> Orientation {
     }
 }
 
-#[derive(Serialize)]
-#[serde(transparent)]
-pub struct GenericExif(HashMap<String, String>);
+pub enum Orientation {
+    Original,
+    FlipH,
+    Rotate180,
+    FlipHRotate180,
+    FlipHRotate270,
+    Rotate90,
+    FlipHRotate90,
+    Rotate270,
+}
 
-#[instrument(skip_all, fields(?path))]
-pub fn parse_exif_generic(path: impl AsRef<Path> + Debug) -> Result<Option<GenericExif>> {
-    let mut fp = BufReader::new(File::open(path)?);
+impl Orientation {
+    pub fn transposed(&self) -> bool {
+        matches!(self,
+            | Orientation::Rotate180
+            | Orientation::FlipHRotate270
+            | Orientation::Rotate90
+            | Orientation::FlipHRotate90
+            | Orientation::Rotate270
+        )
+    }
+}
 
-    let parsed = match exif::Reader::new().read_from_container(&mut fp) {
-        Ok(data) => data,
-        Err(exif::Error::NotFound(_)) => return Ok(None),
-        Err(err) => return Err(err.into()),
-    };
-
-    let fields = parsed.fields()
-        .filter(|field| field.ifd_num == In::PRIMARY)
-        .map(|field| (field.tag.to_string(), field.display_value().to_string()))
-        .collect();
-
-    Ok(Some(GenericExif(fields)))
+pub struct ExifSummary {
+    pub orientation: Orientation,
+    pub timestamp: Option<DateTime<Utc>>,
+    pub latitude: Option<f32>,
+    pub longitude: Option<f32>,
 }

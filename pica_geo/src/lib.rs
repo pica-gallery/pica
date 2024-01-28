@@ -1,6 +1,7 @@
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use anyhow::{anyhow, Result};
+use arcstr::ArcStr;
 use ordered_float::OrderedFloat;
 use serde::Deserialize;
 
@@ -9,8 +10,8 @@ static DATA: &[u8] = include_bytes!("./worldcities.csv.gz");
 #[derive(Deserialize)]
 pub struct City {
     #[serde(rename = "city")]
-    pub name: String,
-    pub country: String,
+    pub name: ArcStr,
+    pub country: ArcStr,
     #[serde(rename = "lat")]
     pub latitude: f32,
     #[serde(rename = "lng")]

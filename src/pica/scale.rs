@@ -13,7 +13,7 @@ use tempfile::NamedTempFile;
 use tokio::sync::Semaphore;
 use tracing::instrument;
 
-use crate::pica::exif::{Orientation, parse_exif};
+use pica_image::exif::{Orientation, parse_exif};
 
 pub struct Image {
     pub typ: ImageType,
