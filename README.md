@@ -1,7 +1,6 @@
 # pica
 
-
 ## Attribution
 
-Pica uses the worldcity database by  (https://simplemaps.com/data/world-cities)[simplemaps.com]
+Pica uses the worldcity database by  [simplemaps.com](https://simplemaps.com/data/world-cities)
 which is provided under the Creative Commons Attribution 4.0 license.
