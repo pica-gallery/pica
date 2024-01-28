@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
 FROM node:21.5.0-bookworm AS js-builder
+
 COPY frontend/ /app/
 
 RUN --mount=type=cache,target=/app/node_modules/ \
@@ -24,11 +25,12 @@ RUN --mount=type=cache,target=/app/target/ \
     cd /app && env RUSTFLAGS="-C target-cpu=x86-64-v3" cargo build --release \
  && cp /app/target/release/pica /app/pica
 
-FROM debian:bookworm-20240110
+FROM debian:bookworm-20240110-slim
 
-RUN apt update \
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt update \
  && apt install -y imagemagick \
- && rm -rf /var/lib/apt/lists/
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/
 
