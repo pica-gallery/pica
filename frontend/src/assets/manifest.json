@@ -18,5 +18,5 @@
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "scope": "/"
+  "scope": "$SCOPE"
 }
