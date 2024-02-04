@@ -7,6 +7,7 @@ import {popstate} from '../history';
 const NO_MEDIA = {outlets: {media: null}}
 
 export type NavAction =
+  | { action: 'login' }
   | { action: 'top' }
   | { action: 'albums' }
   | { action: 'search' }
@@ -79,7 +80,7 @@ export class NavigationService {
     console.info('[history] navStack after navigating to "%s"', name, currentStack())
   }
 
-  async navigate(navAction: NavAction) {
+  public async navigate(navAction: NavAction) {
     switch (navAction.action) {
       case 'top':
         return await this.stream();
@@ -89,6 +90,8 @@ export class NavigationService {
         return await this.search();
       case 'album':
         return await this.album(navAction.albumId);
+      case 'login':
+        return await this.login();
     }
   }
 
@@ -102,6 +105,10 @@ export class NavigationService {
 
   public async search() {
     await this.navToTop('search', '/search')
+  }
+
+  public async login() {
+    await this.navToTop('login', '/login')
   }
 
   public async album(id: AlbumId) {
@@ -159,6 +166,8 @@ export class NavigationService {
         return this.router.createUrlTree(['search']);
       case 'album':
         return this.router.createUrlTree(['album', navAction.albumId]);
+      case 'login':
+        return this.router.createUrlTree(['login'])
     }
   }
 }

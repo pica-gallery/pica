@@ -1,0 +1,22 @@
+<form class="login-form" (ngSubmit)="onSubmit()">
+  @if (failure()) {
+    <div class="failure">
+      Login failed
+    </div>
+  }
+
+  <label>
+    <input placeholder="Username" type="text" name="username"
+           autocomplete="username"
+           autofocus
+           required [formControl]="credentials.controls.username">
+  </label>
+
+  <label>
+    <input placeholder="Password" type="password" name="password"
+           autocomplete="current-password"
+           required [formControl]="credentials.controls.password">
+  </label>
+
+  <button type="submit" [disabled]="!canSubmit()">Login</button>
+</form>

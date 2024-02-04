@@ -1,0 +1,54 @@
+:host {
+  display: grid;
+  place-items: center;
+  height: 100dvh;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  width: 300px;
+}
+
+label {
+  display: block;
+  background: #eee;
+  border-radius: 32px;
+
+  padding-left: 16px;
+  padding-right: 16px;
+
+  input {
+    background: transparent;
+    border: 0 none;
+    outline: none;
+    padding: 16px 0;
+    color: #000;
+  }
+}
+
+button {
+  border-radius: 32px;
+  padding: 16px;
+  border: 0 none;
+
+  background: #ff4488;
+  color: white;
+
+  &:disabled {
+    background: #eee;
+    color: #555;
+  }
+}
+
+input, button {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.failure {
+  color: #a00;
+}
