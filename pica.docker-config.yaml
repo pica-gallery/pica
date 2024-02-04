@@ -1,0 +1,42 @@
+# image metadata and thumbnails are stored here
+database: /db/pica.db?mode=rwc
+
+# size of thumbnails
+thumbSize: 256
+
+# size of preview images
+previewSize: 2048
+
+# Create thumbnails and preview images on first access
+lazyThumbs: true
+
+# number of threads to use for indexing
+indexerThreads: 4
+
+# Use image magick to generate thumbnails. This is generally faster than using
+# the inbuilt encoder, especially for encoding avif files.
+# It requires 'convert' on the PATH.
+useImageMagick: true
+
+# The image codec to use to encode thumbnails.
+# This can be jpeg or avif.
+imageCodec: avif
+
+# Maximum amount of memory to use.
+# This is an approximation used when encoding images. Each image that is currently being encoded
+# is counted with (width * height * 4) byte to this limit.
+maxMemoryInMegabytes: 1024
+
+# Time between two consecutive scans of the filesystem for new files to index.
+scanIntervalInSeconds: 30
+
+# Address to bind the http server to.
+httpAddress: 0.0.0.0:3000
+
+# Specify jaeger tracing endpoint, or comment out for no tracing
+# jaegerTracing: 192.168.86.5:6831
+
+sources:
+  - name: Photos
+    access: [ user ]
+    path: /photos
