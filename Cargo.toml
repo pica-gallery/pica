@@ -20,7 +20,7 @@ pica_geo = { path = "./pica_geo" }
 pica_image = { path = "./pica_image" }
 
 anyhow = "1.0.76"
-axum = "0.7.2"
+axum = "0.7.4"
 chrono = { version = "0.4.31", features = ["serde"] }
 derive_more = "0.99.17"
 hex = "0.4.3"
@@ -47,3 +47,7 @@ tracing-subscriber = { version = "0.3.18", features = ["fmt", "env-filter"] }
 walkdir = "2.4.0"
 tempfile = "3.9.0"
 arcstr = { version = "1.1.5", default-features = false, features = ["serde"] }
+axum-login = "0.13.1"
+async-trait = "0.1.75"
+tower-sessions-sqlx-store = { version = "0.10.0", features = ["sqlite"] }
+htpasswd-verify = "0.3.0"

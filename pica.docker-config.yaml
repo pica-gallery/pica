@@ -36,6 +36,13 @@ httpAddress: 0.0.0.0:3000
 # Specify jaeger tracing endpoint, or comment out for no tracing
 # jaegerTracing: 192.168.86.5:6831
 
+users:
+  - name: admin
+
+    # the password hash as given by `htpasswd -n -B -C 7 ignored | cut -d: -f2-`
+    # default value is 'docker'.
+    passwd: $2y$07$vhLM7t39q9VNvc7m5r9cgeSFgFrOIMbHtXIxT.ZiNiuKmIsfUH.5u
+
 sources:
   - name: Photos
     access: [ user ]

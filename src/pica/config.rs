@@ -26,6 +26,8 @@ pub struct PicaConfig {
     // Patterns to include. If not specified, everything will be included.
     pub sources: Vec<SourceConfig>,
 
+    pub users: Vec<UserConfig>,
+
     #[serde(default)]
     pub jaeger_tracing: Option<String>,
 }
@@ -36,6 +38,17 @@ pub struct SourceConfig {
     /// The name of this media source
     pub name: String,
     pub path: PathBuf,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserConfig {
+    /// The login name of this user
+    pub name: String,
+
+    /// The password encrypted using htpasswd.
+    /// For example: `htpasswd -n -B -C 7 ignored | cut -d: -f2-`
+    pub passwd: String,
 }
 
 #[derive(Clone, Deserialize)]
@@ -50,3 +63,4 @@ pub fn load(path: impl AsRef<Path>) -> Result<PicaConfig> {
     let config = serde_yaml::from_reader(fp)?;
     Ok(config)
 }
+

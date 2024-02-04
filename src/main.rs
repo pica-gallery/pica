@@ -7,18 +7,18 @@ use opentelemetry::global;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tracing::info;
+use tracing_subscriber::{EnvFilter, Layer};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{EnvFilter, Layer};
 
+use crate::pica::{accessor, scale};
 use crate::pica::accessor::{MediaAccessor, Storage};
 use crate::pica::config::ImageCodecConfig;
 use crate::pica::index::{Indexer, Scanner};
 use crate::pica::queue::ScanQueue;
 use crate::pica::scale::{ImageType, MediaScaler};
 use crate::pica::store::MediaStore;
-use crate::pica::{accessor, scale};
 
 pub mod pica;
 pub mod pica_web;
@@ -61,6 +61,11 @@ async fn main() -> Result<()> {
     let config = pica::config::load("./pica.config.yaml")?;
 
     initialize_tracing(config.jaeger_tracing)?;
+
+    // parse users from config
+    let users: Vec<_> = config.users.into_iter()
+        .map(|user| pica_web::User::new(user.name, user.passwd))
+        .collect();
 
     info!("Open database");
     let db = sqlx::sqlite::SqlitePoolOptions::new()
@@ -118,8 +123,15 @@ async fn main() -> Result<()> {
         tokio::task::spawn(indexer.run());
     }
 
-    info!("Starting webserver on http://{}/", config.http_address);
-    pica_web::serve(store, media, config.http_address).await?;
+    let opts = pica_web::Options {
+        accessor: media,
+        addr: config.http_address,
+        store,
+        users,
+        db,
+    };
+
+    pica_web::serve(opts).await?;
 
     Ok(())
 }

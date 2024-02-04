@@ -3,6 +3,7 @@ use axum::response::{IntoResponse, Response};
 pub mod api;
 pub mod frontend;
 pub mod media;
+pub mod auth;
 
 pub struct WebError(anyhow::Error);
 

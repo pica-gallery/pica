@@ -1,4 +1,4 @@
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 
 use anyhow::{anyhow, Result};
 use arcstr::ArcStr;
