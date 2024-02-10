@@ -21,8 +21,8 @@ impl<'a, R> Atom<'a, R> {
 }
 
 impl<'a, R> Atom<'a, R>
-where
-    R: Read + Seek,
+    where
+        R: Read + Seek,
 {
     pub fn into_iter(self, offset: u64) -> AtomIter<'a, R> {
         AtomIter {
@@ -50,8 +50,8 @@ impl<'a, R> AtomIter<'a, R> {
 }
 
 impl<'a, R> AtomIter<'a, R>
-where
-    R: Read + Seek,
+    where
+        R: Read + Seek,
 {
     pub fn next(&mut self) -> Result<Option<Atom<R>>> {
         // seek to start of the next box
@@ -146,12 +146,13 @@ pub fn read_preview(mut fp: impl Read + Seek) -> Result<Option<impl Read>> {
 #[cfg(test)]
 mod test {
     use std::fs::File;
+    use std::io;
     use std::io::{Read, Seek};
 
     use anyhow::Result;
     use hex_literal::hex;
 
-    use crate::crx::{read_preview, Atom, AtomIter};
+    use crate::crx::{Atom, AtomIter, read_preview};
 
     fn has_children<R>(b: &Atom<R>) -> Option<u64> {
         match b.name.as_slice() {
@@ -183,16 +184,16 @@ mod test {
 
     #[test]
     pub fn test_moov() -> Result<()> {
-        // TODO provide test files in the repository
-        let mut fp = File::open("../../_test/CR6_1519 (1).CR3")?;
-        print_tree(AtomIter::new(&mut fp), 0)?;
+        let fp = include_bytes!("../data/test.CR3").as_slice();
+        print_tree(AtomIter::new(&mut io::Cursor::new(fp)), 0)?;
         Ok(())
     }
 
     #[test]
     pub fn test_parse_crx() -> Result<()> {
-        // TODO provide test files in the repository
-        let mut preview = read_preview(File::open("../../_test/CR6_1519 (1).CR3")?)?.unwrap();
+        let fp = include_bytes!("../data/test.CR3");
+        let mut cursor = io::Cursor::new(fp);
+        let mut preview = read_preview(&mut cursor)?.unwrap();
         std::io::copy(&mut preview, &mut File::create("/tmp/preview.jpg")?)?;
         Ok(())
     }

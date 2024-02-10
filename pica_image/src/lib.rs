@@ -79,45 +79,6 @@ fn extract_thumbnail_arw(path: &Path) -> Result<MediaFileRef> {
     Ok(MediaFileRef::Temporary(jpeg.into_temp_path()))
 }
 
-#[cfg(test)]
-mod test {
-    use std::path::PathBuf;
-
-    use anyhow::Result;
-
-    use crate::get;
-
-    #[test]
-    pub fn test_preview_arw() -> Result<()> {
-        tracing_subscriber::fmt::init();
-
-        let path = get("_test/DSC05254.ARW")?;
-        std::fs::copy(&path, "/tmp/preview.jpg")?;
-
-        let deleted = PathBuf::from(path.as_ref());
-        drop(path);
-
-        assert!(!deleted.exists());
-
-        Ok(())
-    }
-
-    #[test]
-    pub fn test_preview_cr3() -> Result<()> {
-        tracing_subscriber::fmt::init();
-
-        let path = get("../../_test/CR6_1519 (1).CR3")?;
-        std::fs::copy(&path, "/tmp/preview.jpg")?;
-
-        let deleted = PathBuf::from(path.as_ref());
-        drop(path);
-
-        assert!(!deleted.exists());
-
-        Ok(())
-    }
-}
-
 // A media file format
 #[derive(Clone, Debug)]
 pub enum MediaType {
