@@ -60,7 +60,7 @@ impl MediaAccessor {
         // extract an image we can process from the media file.
         let path = spawn_blocking(|| pica_image::get(path)).await??;
 
-        let image = self.scaler.image(path, size).await?;
+        let image = self.scaler.scaled(path, size).await?;
 
         // save it for next time
         self.storage.store(media.id, size, &image).await?;

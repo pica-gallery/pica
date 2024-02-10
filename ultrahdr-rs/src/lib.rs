@@ -1,21 +1,18 @@
 use std::fmt::{Debug, Formatter};
-use std::io::{Read, Write};
+use std::io;
+use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
 
 use anyhow::{anyhow, Result};
 use byteorder::{BigEndian, WriteBytesExt};
 use tee_readwrite::TeeReader;
 
-use crate::jfif::SegmentKind;
+pub use crate::jfif::SegmentKind;
 use crate::readcount::WriteWithCount;
 
 mod xmp;
 mod jfif;
 mod readcount;
 mod mpf;
-
-pub struct Jpeg {
-    pub segments: Vec<SerializedSegment>,
-}
 
 pub struct SerializedSegment {
     pub kind: SegmentKind,
@@ -27,6 +24,11 @@ impl Debug for SerializedSegment {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "SerializedSegment({:?}, offset={}, len={})", self.kind, self.offset, self.bytes.len())
     }
+}
+
+#[derive(Debug)]
+pub struct Jpeg {
+    pub segments: Vec<SerializedSegment>,
 }
 
 impl Jpeg {
@@ -91,6 +93,63 @@ impl Jpeg {
 
         Ok(())
     }
+
+    pub fn as_read<'a>(&'a self) -> impl Read + Seek + 'a {
+        let bytes: Vec<_> = self.segments.iter()
+            .flat_map(|seg| seg.bytes.iter().copied())
+            .collect();
+
+        io::Cursor::new(bytes)
+
+        // JpegRead {
+        //     position: 0,
+        //     jpeg: self,
+        // }
+    }
+}
+
+struct JpegRead<'a> {
+    position: usize,
+    jpeg: &'a Jpeg,
+}
+
+impl<'a> Read for JpegRead<'a> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let Some(curr) = self.jpeg.segments.iter().rev().find(|seg| seg.offset <= self.position) else {
+            // we're at the end of the stream
+            return Ok(0);
+        };
+
+        let offset_in_segment = self.position - curr.offset;
+
+        // get the rest of the jpeg. The slice also implements Read
+        let mut bytes = &curr.bytes[offset_in_segment..];
+
+        // and read the data into the target buffer
+        let n = bytes.read(buf)?;
+        self.position += n;
+
+        Ok(n)
+    }
+}
+
+impl<'a> Seek for JpegRead<'a> {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        match pos {
+            SeekFrom::Start(pos) => {
+                self.position = pos as usize;
+                Ok(self.position as u64)
+            }
+            SeekFrom::Current(offset) => {
+                self.position = self.position.saturating_add_signed(offset as isize);
+                Ok(self.position as u64)
+            }
+            SeekFrom::End(_) => {
+                // TODO implement if needed
+                return Err(io::Error::from(ErrorKind::Unsupported));
+            }
+        }
+    }
 }
 
 // Writes an ultra hdr image based on two input images.
@@ -118,36 +177,48 @@ pub fn write_ultra_hdr<W>(write: W, primary: &Jpeg, gainmap: &Jpeg) -> Result<()
     // keep track of the current writer position
     let mut write = WriteWithCount::new(write);
 
+    let mut metadata_written = false;
+
     // write segments from primary image
     for segment in &segments {
-        if let SegmentKind::App(app) = &segment.kind {
-            if app.has_prefix(b"http://ns.adobe.com/xmp/extension/\0") {
-                // write xmp as app1 marker
-                write_segment(&mut write, 0xe1, &xmp_segment)?;
+        let write_metadata = !metadata_written && match &segment.kind {
+            SegmentKind::App(app) => {
+                app.has_prefix(b"http://ns.adobe.com/xmp/extension/\0")
             }
+
+            SegmentKind::StartOfFrame(_) => true,
+            SegmentKind::StartOfScan => true,
+            SegmentKind::DefineHuffmanTable => true,
+            SegmentKind::DefineQuantizationTable => true,
+            SegmentKind::DefineRestartInterval => true,
+
+            _ => false,
+        };
+
+        if write_metadata {
+            // write xmp as app1 marker
+            write_segment(&mut write, 0xe1, &xmp_segment)?;
+
+            // generate the mpf segment
+            let mpf_primary = mpf::Picture {
+                offset: 0,
+                len: primary_image_len as u32,
+            };
+
+            let mpf_gainmap = mpf::Picture {
+                offset: primary_image_len as u32 - write.position() as u32 - 8,
+                len: gainmap.bytes_len() as _,
+            };
+
+            // write mpf as app2 marker
+            let mpf_segment = mpf::generate(mpf_primary, mpf_gainmap);
+            write_segment(&mut write, 0xE2, &mpf_segment)?;
+
+            metadata_written = true;
         }
 
         // copy this segment directly to the target
         write.write_all(&segment.bytes)?;
-
-        if let SegmentKind::App(app) = &segment.kind {
-            if app.has_prefix(b"http://ns.adobe.com/xmp/extension/\0") {
-                // generate the mpf segment
-                let mpf_primary = mpf::Picture {
-                    offset: 0,
-                    len: primary_image_len as u32,
-                };
-
-                let mpf_gainmap = mpf::Picture {
-                    offset: primary_image_len as u32 - write.position() as u32 - 8,
-                    len: gainmap.bytes_len() as _,
-                };
-
-                // write mpf as app2 marker
-                let mpf_segment = mpf::generate(mpf_primary, mpf_gainmap);
-                write_segment(&mut write, 0xE2, &mpf_segment)?;
-            }
-        }
     }
 
     // append the gainmap to the image file
@@ -209,6 +280,42 @@ fn write_segment<W>(mut w: W, marker: u8, data: &[u8]) -> Result<()>
     w.write_all(data)?;
 
     Ok(())
+}
+
+pub fn is_ultrahdr<R>(r: R) -> Result<bool>
+    where R: Read,
+{
+    let mut reader = jfif::Reader::new(r)?;
+
+    let mut has_mpf = false;
+    let mut has_xmp_container = false;
+
+    while let Some(segment) = reader.next()? {
+        match &segment.kind {
+            SegmentKind::StartOfImage | SegmentKind::Comment => {
+                continue;
+            }
+
+            SegmentKind::App(app) => {
+                // test if it might be xmp data
+                if let Some(data) = app.data.strip_prefix(b"http://ns.adobe.com/xap/1.0/\0") {
+                    // this looks like some xmp metadata. we'll try to parse its xml value
+                    if let Ok(xmp) = xmp::parse_container(data) {
+                        has_xmp_container = xmp.rdf.description.directory.seq.li.len() >= 2;
+                    }
+                };
+
+                // test if it might be mpf data
+                if let Some(_data) = app.data.strip_prefix(b"MPF\0") {
+                    has_mpf = true;
+                };
+            }
+
+            _ => break
+        }
+    }
+
+    Ok(has_mpf && has_xmp_container)
 }
 
 pub struct UltraHDR {

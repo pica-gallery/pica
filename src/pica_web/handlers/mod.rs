@@ -1,3 +1,4 @@
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 
 pub mod api;
@@ -9,7 +10,8 @@ pub struct WebError(anyhow::Error);
 
 impl IntoResponse for WebError {
     fn into_response(self) -> Response {
-        self.0.to_string().into_response()
+        let formatted = format!("{:?}", self.0);
+        (StatusCode::INTERNAL_SERVER_ERROR, formatted).into_response()
     }
 }
 

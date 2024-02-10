@@ -93,6 +93,7 @@ async fn main() -> Result<()> {
 
     let scaler_options = scale::Options {
         use_image_magick: config.use_image_magick,
+        prefer_ultrahdr: config.prefer_ultrahdr,
 
         max_memory: NonZeroU64::from(config.max_memory_in_megabytes)
             .checked_mul(NonZeroU64::new(1024 * 1024).unwrap())

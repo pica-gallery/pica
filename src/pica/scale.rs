@@ -1,19 +1,23 @@
 use std::ffi::OsString;
 use std::fmt::Debug;
 use std::fs;
+use std::fs::File;
+use std::io::BufReader;
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
+use image::{image_dimensions, ImageFormat, io};
+use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
-use image::{image_dimensions, io};
 use sqlx::__rt::spawn_blocking;
 use tempfile::NamedTempFile;
 use tokio::sync::Semaphore;
 use tracing::instrument;
 
-use pica_image::exif::{parse_exif, Orientation};
+use pica_image::exif::{Orientation, parse_exif};
+use ultrahdr_rs::{Jpeg, SegmentKind};
 
 pub struct Image {
     pub typ: ImageType,
@@ -37,6 +41,7 @@ impl ImageType {
 
 #[derive(Clone)]
 pub struct Options {
+    pub prefer_ultrahdr: bool,
     pub use_image_magick: bool,
     pub image_type: ImageType,
     pub max_memory: NonZeroU64,
@@ -57,8 +62,8 @@ impl MediaScaler {
     }
 
     /// Generate a resized version of an image
-    #[instrument(skip_all, fields(?path, size))]
-    pub async fn image(&self, path: impl AsRef<Path> + Debug, size: u32) -> Result<Image> {
+    #[instrument(skip_all, fields(? path, size))]
+    pub async fn scaled(&self, path: impl AsRef<Path> + Debug, size: u32) -> Result<Image> {
         let (width, height) = image_dimensions(path.as_ref())?;
 
         // memory to reserve
@@ -82,14 +87,19 @@ impl MediaScaler {
 
     async fn resize(&self, path: impl AsRef<Path>, size: u32) -> Result<Vec<u8>> {
         let path = PathBuf::from(path.as_ref());
-        let format = self.options.image_type.clone();
-        let use_image_magick = self.options.use_image_magick;
+        let options = self.options.clone();
 
         let task = move || {
-            if use_image_magick {
-                resize_imagemagick(&path, &format, size)
+            if options.prefer_ultrahdr {
+                if ultrahdr_rs::is_ultrahdr(BufReader::new(File::open(&path)?))? {
+                    return resize_ultrahdr(&path, size);
+                }
+            }
+
+            if options.use_image_magick {
+                resize_imagemagick(&path, &options.image_type, size)
             } else {
-                resize_rust(&path, &format, size)
+                resize_rust(&path, &options.image_type, size)
             }
         };
 
@@ -98,7 +108,7 @@ impl MediaScaler {
 }
 
 /// Resizes the image using image magick.
-#[instrument(skip_all, fields(?source, format, size))]
+#[instrument(skip_all, fields(? source, format, size))]
 fn resize_imagemagick(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> {
     use std::process::Command;
 
@@ -136,7 +146,7 @@ fn resize_imagemagick(source: &Path, format: &ImageType, size: u32) -> Result<Ve
     Ok(bytes)
 }
 
-#[instrument(skip_all, fields(?source, format, size))]
+#[instrument(skip_all, fields(? source, format, size))]
 fn resize_rust(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> {
     let rotate = parse_exif(source).ok().flatten().map(|r| r.orientation);
 
@@ -163,7 +173,7 @@ fn resize_rust(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> 
 
     match format {
         ImageType::Jpeg => {
-            scaled.write_with_encoder(image::codecs::jpeg::JpegEncoder::new_with_quality(&mut writer, 60))?;
+            scaled.write_with_encoder(JpegEncoder::new_with_quality(&mut writer, 60))?;
         }
 
         ImageType::Avif => {
@@ -176,4 +186,69 @@ fn resize_rust(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> 
     };
 
     Ok(writer)
+}
+
+#[instrument(skip_all, fields(? source, format, size))]
+fn resize_ultrahdr(source: &Path, size: u32) -> Result<Vec<u8>> {
+    // check if the image needs rotating
+    let rotate = parse_exif(source).ok().flatten().map(|r| r.orientation);
+
+    // load the ultra hdr image to memory
+    let r = BufReader::new(File::open(source)?);
+    let uhdr = ultrahdr_rs::UltraHDR::from_reader(r)?;
+
+    let primary = resize_jpeg(&uhdr.primary, &rotate, size)?;
+    let mut gainmap = resize_jpeg(&uhdr.gainmap, &rotate, size / 4)?;
+
+    // copy gainmap xmp info from original gainmap
+    // TODO make this nicer
+    let xmp = uhdr.gainmap.segments
+        .into_iter()
+        .find(|seg| matches!(&seg.kind, SegmentKind::App(app) if app.has_prefix(b"http://ns.adobe.com/xap/1.0/\0")))
+        .ok_or_else(|| anyhow!("did not find gainmap in source"))?;
+
+    // put it after app0 tag
+    gainmap.segments.insert(2, xmp);
+
+    dbg!(&gainmap);
+
+    // write a new uhdr image
+    //  TODO add the necessary segments to the jpegs
+    let mut buf = Vec::new();
+    ultrahdr_rs::write_ultra_hdr(&mut buf, &primary, &gainmap)?;
+
+    Ok(buf)
+}
+
+fn resize_jpeg(jpeg: &Jpeg, rotate: &Option<Orientation>, size: u32) -> Result<Jpeg> {
+    // resize the primary image
+    let image = BufReader::new(jpeg.as_read());
+    let image = image::load(image, ImageFormat::Jpeg)?;
+
+    // rotate image if required
+    let image = match rotate {
+        Some(Orientation::FlipH) => image.fliph(),
+        Some(Orientation::Rotate180) => image.rotate180(),
+        Some(Orientation::FlipHRotate180) => image.fliph().rotate180(),
+        Some(Orientation::FlipHRotate270) => image.fliph().rotate270(),
+        Some(Orientation::Rotate90) => image.rotate90(),
+        Some(Orientation::FlipHRotate90) => image.fliph().rotate90(),
+        Some(Orientation::Rotate270) => image.rotate270(),
+        _ => image,
+    };
+
+    let scaled = if size >= 512 {
+        image.resize(size, size, FilterType::Gaussian)
+    } else {
+        image.thumbnail(size, size)
+    };
+
+    // encode image as jpeg to a Vec
+    let mut encoded = Vec::new();
+    scaled.write_with_encoder(JpegEncoder::new_with_quality(&mut encoded, 60))?;
+
+    // parse image back into a jpeg
+    let result = Jpeg::from_bytes(encoded)?;
+
+    Ok(result)
 }

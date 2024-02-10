@@ -67,7 +67,6 @@ impl<R> Reader<R>
         // wrap into a reader to do position tracking
         let mut reader = ReadWithCount::new(reader);
 
-
         // expect to read a jpeg header
         if reader.read_u16::<BigEndian>()? != 0xffd8 {
             bail!("jpeg start of image not found")

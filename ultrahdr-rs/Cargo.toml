@@ -8,12 +8,9 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.79"
 byteorder = "1.5.0"
-minidom = "0.15.2"
 quick-xml = { version = "0.31.0", features = ["serialize"] }
 serde = { version = "1.0.196", features = ["derive"] }
 tee_readwrite = "0.2.0"
-thiserror = "1.0.56"
-yaserde = { version = "0.10.0", features = ["yaserde_derive"] }
 
 [dev-dependencies]
 hex-literal = "0.4.1"
