@@ -22,6 +22,10 @@ useImageMagick: true
 # This can be jpeg or avif.
 imageCodec: avif
 
+# If the original file is an UltraHDR file, we might prefer to create thumbnail and preview
+# image as ultra hdr too. This takes preferences over the configured imageCodec.
+preferUltraHdr: true
+
 # Maximum amount of memory to use.
 # This is an approximation used when encoding images. Each image that is currently being encoded
 # is counted with (width * height * 4) byte to this limit.

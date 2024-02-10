@@ -41,7 +41,7 @@ impl ImageType {
 
 #[derive(Clone)]
 pub struct Options {
-    pub prefer_ultrahdr: bool,
+    pub prefer_ultra_hdr: bool,
     pub use_image_magick: bool,
     pub image_type: ImageType,
     pub max_memory: NonZeroU64,
@@ -90,7 +90,7 @@ impl MediaScaler {
         let options = self.options.clone();
 
         let task = move || {
-            if options.prefer_ultrahdr {
+            if options.prefer_ultra_hdr {
                 if ultrahdr_rs::is_ultrahdr(BufReader::new(File::open(&path)?))? {
                     return resize_ultrahdr(&path, size);
                 }

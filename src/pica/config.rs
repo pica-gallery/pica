@@ -18,8 +18,7 @@ pub struct PicaConfig {
     // use image magick to generate thumbnails and preview images
     pub use_image_magick: bool,
     pub image_codec: ImageCodecConfig,
-    #[serde(rename = "preferUltraHDR")]
-    pub prefer_ultrahdr: bool,
+    pub prefer_ultra_hdr: bool,
     pub max_memory_in_megabytes: NonZeroU32,
 
     // sqlite database url

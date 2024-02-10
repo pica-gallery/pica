@@ -9,6 +9,7 @@ import {NavigationService} from '../../service/navigation';
 import {ActivatedRoute} from '@angular/router';
 import {ExifDialogComponent} from '../../components/exif-dialog/exif-dialog.component';
 import {BottomSheetComponent} from '../../components/bottom-sheet/bottom-sheet.component';
+import {iterActivatedRoute} from '../../util/utils';
 
 @Component({
   selector: 'app-media-page',
@@ -33,7 +34,7 @@ export class MediaPageComponent {
   ) {
     let albumId: AlbumId | null = null;
 
-    for (const child of routeSnapshot.root.children) {
+    for (const child of iterActivatedRoute(routeSnapshot.root)) {
       if (child.outlet === 'primary') {
         const value = child.snapshot.params['albumId'] as unknown;
         if (typeof value === 'string') {
