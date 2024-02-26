@@ -1,7 +1,21 @@
 {
   inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11";
+
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix/e504621290a1fd896631ddbc5e9c16f4366c9f65";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
+
     nixpkgs-cross-overlay = {
       url = "github:alekseysidorov/nixpkgs-cross-overlay";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        rust-overlay.follows = "rust-overlay";
+        treefmt-nix.follows = "treefmt-nix";
+      };
     };
 
     rust-overlay = {
