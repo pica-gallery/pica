@@ -38,7 +38,7 @@ jobs:
         uses: cachix/install-nix-action@v24
 
       - name: Build docker image
-        run: nix build --print-build-logs ".#dockerImage"
+        run: nix build ".#dockerImage"
 
       - name: Push docker image
         run: result/bin/push
