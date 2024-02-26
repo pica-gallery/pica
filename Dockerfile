@@ -22,7 +22,7 @@ COPY --from=js-builder /app/dist/pica/browser/ /app/frontend/dist/pica/browser/
 
 RUN --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/.cargo/ \
-    cd /app && env RUSTFLAGS="-C target-cpu=x86-64-v3" cargo build --release \
+    cd /app && cargo build --release \
  && cp /app/target/release/pica /app/pica
 
 FROM debian:bookworm-20240110-slim
