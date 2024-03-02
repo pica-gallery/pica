@@ -1,6 +1,7 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use sqlx::SqlitePool;
 use tokio::task::spawn_blocking;
 use tracing::{debug_span, instrument, Instrument};
@@ -12,8 +13,8 @@ use crate::pica::{db, MediaId, MediaItem};
 pub struct MediaAccessor {
     storage: Storage,
     scaler: MediaScaler,
-    root: PathBuf,
     sizes: Sizes,
+    sources: HashMap<String, PathBuf>,
 }
 
 #[derive(Clone)]
@@ -23,17 +24,21 @@ pub struct Sizes {
 }
 
 impl MediaAccessor {
-    pub fn new(storage: Storage, scaler: MediaScaler, sizes: Sizes, root: impl Into<PathBuf>) -> Self {
+    pub fn new(storage: Storage, scaler: MediaScaler, sizes: Sizes, sources: HashMap<String, PathBuf>) -> Self {
         Self {
             storage,
             scaler,
             sizes,
-            root: root.into(),
+            sources,
         }
     }
 
-    pub fn full(&self, item: &MediaItem) -> PathBuf {
-        self.root.join(item.relpath.as_ref())
+    pub fn full(&self, item: &MediaItem) -> Result<PathBuf> {
+        let root = self.sources
+            .get(item.source.as_str())
+            .ok_or_else(|| anyhow!("source {:?} not found", item.source))?;
+        
+        Ok(root.join(item.relpath.as_ref()))
     }
 
     pub async fn thumb(&self, item: &MediaItem) -> Result<Image> {
@@ -55,7 +60,7 @@ impl MediaAccessor {
             return Ok(image);
         }
 
-        let path = self.root.join(media.relpath.as_ref());
+        let path = self.full(media)?;
 
         // extract an image we can process from the media file.
         let path = spawn_blocking(|| pica_image::get(path)).await??;

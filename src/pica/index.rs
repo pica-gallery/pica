@@ -31,6 +31,7 @@ thread_local! {
 
 pub struct ScanItem {
     pub id: MediaId,
+    pub source: String,
     pub path: PathBuf,
     pub relpath: PathBuf,
 
@@ -48,14 +49,16 @@ pub struct Scanner {
     root: PathBuf,
     queue: Arc<Mutex<ScanQueue>>,
     known: HashSet<MediaId>,
+    source: String,
 }
 
 impl Scanner {
-    pub fn new(root: impl Into<PathBuf>, queue: Arc<Mutex<ScanQueue>>) -> Self {
+    pub fn new(root: impl Into<PathBuf>, queue: Arc<Mutex<ScanQueue>>, source: impl Into<String>) -> Self {
         Self {
             root: root.into(),
             queue,
             known: HashSet::new(),
+            source: source.into(),
         }
     }
 
@@ -68,7 +71,7 @@ impl Scanner {
 
         let mut seen = HashSet::new();
 
-        let items = block_in_place(|| scan_path_for_items(&self.root));
+        let items = block_in_place(|| scan_path_for_items(&self.source, &self.root));
 
         info!(
             "Scan of {:?} finished in {:?}, found {} media files",
@@ -120,7 +123,7 @@ fn collapse_raw_with_jpeg(items: Vec<ScanItem>) -> impl Iterator<Item = ScanItem
 
 /// Returns an iterator over files we might want to index
 #[instrument]
-fn scan_path_for_items(root: &Path) -> Vec<ScanItem> {
+fn scan_path_for_items(source: &str, root: &Path) -> Vec<ScanItem> {
     let files_iter = WalkDir::new(root)
         .same_file_system(true)
         .follow_links(false)
@@ -146,6 +149,7 @@ fn scan_path_for_items(root: &Path) -> Vec<ScanItem> {
             // hash the relative path and file size into an id
             let hash = {
                 let mut hasher = sha1_smol::Sha1::new();
+                hasher.update(source.as_bytes());
                 hasher.update(relpath.as_os_str().as_bytes());
                 hasher.update(meta.size().to_be_bytes().as_slice());
                 hasher.digest().bytes()
@@ -163,6 +167,7 @@ fn scan_path_for_items(root: &Path) -> Vec<ScanItem> {
                 timestamp,
                 relpath,
                 typ,
+                source: source.to_owned(),
                 filesize: meta.size(),
                 path: entry.into_path(),
             })
@@ -347,7 +352,7 @@ async fn parse(item: &ScanItem) -> Result<MediaItem> {
         longitude: exif.as_ref().and_then(|exif| exif.longitude),
     };
 
-    MediaItem::from_media_info(item.id, item.relpath.clone(), item.filesize, info)
+    MediaItem::from_media_info(item.id, item.source.clone(), item.path.clone(), item.filesize, info)
 }
 
 fn timestamp_from_metadata(metadata: &Metadata) -> Result<DateTime<Utc>> {

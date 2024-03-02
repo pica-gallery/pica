@@ -23,10 +23,12 @@ mod handlers;
 mod auth;
 
 pub use auth::User;
+use crate::pica::config::SourceConfig;
 
 pub struct Options<A> {
     pub store: MediaStore,
     pub accessor: MediaAccessor,
+    pub sources: Vec<SourceConfig>,
     pub addr: A,
     pub db: SqlitePool,
     pub users: Vec<User>,
@@ -36,6 +38,7 @@ pub struct Options<A> {
 pub struct AppState {
     pub store: MediaStore,
     pub accessor: MediaAccessor,
+    pub sources: Vec<SourceConfig>,
 }
 
 pub async fn serve<A>(opts: Options<A>) -> Result<()>
@@ -44,6 +47,7 @@ pub async fn serve<A>(opts: Options<A>) -> Result<()>
     let state = AppState {
         store: opts.store,
         accessor: opts.accessor,
+        sources: opts.sources,
     };
 
     info!("Create session store in database");

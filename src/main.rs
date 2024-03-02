@@ -75,16 +75,17 @@ async fn main() -> Result<()> {
 
     sqlx::migrate!("./sql").run(&db).await?;
 
-    let source = config.sources.first().ok_or_else(|| anyhow!("no sources defined"))?;
-
     let queue = Arc::new(Mutex::new(ScanQueue::default()));
 
-    info!("Starting scanner");
-    let scanner = Scanner::new(&source.path, queue.clone());
-    tokio::task::spawn(scanner_loop(
-        scanner,
-        Duration::from_secs(config.scan_interval_in_seconds.get() as _),
-    ));
+    for source in &config.sources {
+        info!("Starting scanner for source {:?}", source.name);
+        let scanner = Scanner::new(&source.path, queue.clone(), &source.name);
+
+        tokio::task::spawn(scanner_loop(
+            scanner,
+            Duration::from_secs(config.scan_interval_in_seconds.get() as _),
+        ));
+    }
 
     let sizes = accessor::Sizes {
         thumb: config.thumb_size,
@@ -108,9 +109,13 @@ async fn main() -> Result<()> {
     // put images into some extra storage space
     let storage = Storage::new(db.clone());
 
+    let sources = config.sources.iter()
+        .map(|s| (s.name.clone(), s.path.clone()))
+        .collect();
+
     let store = MediaStore::empty();
     let scaler = MediaScaler::new(scaler_options);
-    let media = MediaAccessor::new(storage, scaler, sizes, &source.path);
+    let media = MediaAccessor::new(storage, scaler, sizes, sources);
 
     // start four indexer queues
     info!("Starting {} indexers", config.indexer_threads.get());
@@ -127,6 +132,7 @@ async fn main() -> Result<()> {
     let opts = pica_web::Options {
         accessor: media,
         addr: config.http_address,
+        sources: config.sources,
         store,
         users,
         db,

@@ -3,11 +3,14 @@ PRAGMA page_size=16384;
 CREATE TABLE pica_media_cache
 (
     -- the unique id of this media info item. This is derived from
-    -- the relpath and the byte size of the file.
+    -- the source and relpath and the byte size of the file.
     id        integer PRIMARY KEY,
 
+    -- source id of this media info item.
+    source    text      NOT NULL,
+    
     -- relative path of this media item.
-    -- Stored as a blob as the tHe path is not necessarily utf8
+    -- Stored as a blob as the path is not necessarily utf8
     relpath   blob      NOT NULL,
 
     -- file size of the media item

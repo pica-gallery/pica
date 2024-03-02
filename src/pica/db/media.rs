@@ -12,6 +12,7 @@ use crate::pica::{MediaId, MediaInfo, MediaItem};
 #[derive(sqlx::FromRow)]
 struct MediaRow {
     pub id: MediaId,
+    pub source: String,
     pub relpath: Vec<u8>,
     pub bytesize: i64,
     pub width: u32,
@@ -23,8 +24,9 @@ struct MediaRow {
 
 /// Stores a scanned MediaItem into the database.
 pub async fn store_media_item(tx: &mut Transaction<'_, Sqlite>, item: &MediaItem) -> Result<()> {
-    sqlx::query("INSERT OR IGNORE INTO pica_media_cache (id, relpath, bytesize, width, height, timestamp, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+    sqlx::query("INSERT OR IGNORE INTO pica_media_cache (id, source, relpath, bytesize, width, height, timestamp, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(item.id)
+        .bind(item.source.as_str())
         .bind(item.relpath.as_os_str().as_bytes())
         .bind(item.filesize as i64)
         .bind(item.info.width)
@@ -52,7 +54,7 @@ impl TryFrom<MediaRow> for MediaItem {
             longitude: row.longitude,
         };
 
-        MediaItem::from_media_info(row.id, relpath, row.bytesize as u64, info)
+        MediaItem::from_media_info(row.id, row.source, relpath, row.bytesize as u64, info)
     }
 }
 

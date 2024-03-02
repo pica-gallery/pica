@@ -15,6 +15,7 @@ use tracing::{debug, instrument};
 use crate::pica::MediaId;
 use crate::pica_web::handlers::WebError;
 use crate::pica_web::AppState;
+use crate::pica_web::auth::AuthSession;
 
 #[derive(Debug)]
 enum ImageType {
@@ -25,29 +26,32 @@ enum ImageType {
 #[instrument(skip_all, fields(? id))]
 pub async fn handle_thumbnail(
     Path((id, _)): Path<(MediaId, String)>,
+    auth_session: AuthSession,
     State(state): State<AppState>,
 ) -> Result<Response, WebError> {
-    handle_image_scaled(id, state, ImageType::Thumbnail).await
+    handle_image_scaled(id, auth_session, state, ImageType::Thumbnail).await
 }
 
 #[instrument(skip_all, fields(? id))]
 pub async fn handle_preview_sdr(
     Path((id, _)): Path<(MediaId, String)>,
+    auth_session: AuthSession,
     State(state): State<AppState>,
 ) -> Result<Response, WebError> {
-    handle_image_scaled(id, state, ImageType::Preview).await
+    handle_image_scaled(id, auth_session, state, ImageType::Preview).await
 }
 
 #[instrument(skip_all, fields(? id))]
 pub async fn handle_preview_hdr(
     Path((id, _)): Path<(MediaId, String)>,
+    auth_session: AuthSession,
     State(state): State<AppState>,
 ) -> Result<Response, WebError> {
-    handle_image_scaled(id, state, ImageType::Preview).await
+    handle_image_scaled(id, auth_session, state, ImageType::Preview).await
 }
 
 #[instrument(skip_all, fields(? id, ? image_type))]
-async fn handle_image_scaled(id: MediaId, state: AppState, image_type: ImageType) -> Result<Response, WebError> {
+async fn handle_image_scaled(id: MediaId, _auth: AuthSession, state: AppState, image_type: ImageType) -> Result<Response, WebError> {
     let media = state
         .store
         .get(id)
@@ -85,7 +89,7 @@ pub async fn handle_fullsize(
     let mime = mime_guess::from_path(media.relpath.as_ref()).first_or(Mime::from_str("image/jpeg")?);
 
     // serve file to response
-    let path = state.accessor.full(&media);
+    let path = state.accessor.full(&media)?;
     let mut resp = ServeFile::new_with_mime(&path, &mime).oneshot(request).await?;
 
     //  on success inject cache header into response

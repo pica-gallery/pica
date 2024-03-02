@@ -39,6 +39,9 @@ pub struct SourceConfig {
     /// The name of this media source
     pub name: String,
     pub path: PathBuf,
+    
+    /// List of users that can access this source
+    pub access: Vec<String>,
 }
 
 #[derive(Clone, Deserialize)]

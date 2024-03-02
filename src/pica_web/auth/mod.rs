@@ -3,6 +3,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::async_trait;
+use axum::extract::FromRequestParts;
+use axum::http::request::Parts;
+use axum::http::StatusCode;
 use axum_login::{AuthnBackend, AuthUser, UserId};
 use htpasswd_verify::{Hash, MD5Hash};
 
@@ -44,6 +47,23 @@ impl AuthUser for User {
 
     fn session_auth_hash(&self) -> &[u8] {
         &self.pw_hash
+    }
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for User
+    where
+        S: Send + Sync,
+{
+    type Rejection = (StatusCode, &'static str);
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let session = AuthSession::from_request_parts(parts, state).await?;
+
+        match session.user {
+            Some(user) => Ok(user),
+            None => Err((StatusCode::UNAUTHORIZED, "not authorized"))
+        }
     }
 }
 

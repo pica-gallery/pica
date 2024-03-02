@@ -108,6 +108,7 @@ pub struct MediaInfo {
 #[derive(Clone, Debug)]
 pub struct MediaItem {
     pub id: MediaId,
+    pub source: ArcStr,
     pub relpath: Arc<PathBuf>,
     pub filesize: u64,
     pub name: ArcStr,
@@ -117,7 +118,7 @@ pub struct MediaItem {
 }
 
 impl MediaItem {
-    pub fn from_media_info(id: MediaId, relpath: PathBuf, filesize: u64, info: MediaInfo) -> anyhow::Result<Self> {
+    pub fn from_media_info(id: MediaId, source: String, relpath: PathBuf, filesize: u64, info: MediaInfo) -> anyhow::Result<Self> {
         // take the file name and clear any invalid characters from it
         let name = relpath
             .file_name()
@@ -149,6 +150,7 @@ impl MediaItem {
             typ,
             location,
             relpath: relpath.into(),
+            source: source.into(),
         })
     }
 }
