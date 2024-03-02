@@ -141,7 +141,7 @@
           packages.dockerImage-aarch64 = buildForCrossSytem {
             inherit (inputs) nixpkgs rust-overlay nixpkgs-cross-overlay;
             crossSystem = {
-              config = "aarch64-unknown-linux-musl";
+              config = "aarch64-unknown-linux-gnu";
               useLLVM = true;
             };
           };
@@ -149,7 +149,7 @@
           packages.dockerImage-x86_64 = buildForCrossSytem {
             inherit (inputs) nixpkgs rust-overlay nixpkgs-cross-overlay;
             crossSystem = {
-              config = "x86_64-unknown-linux-musl";
+              config = "x86_64-unknown-linux-gnu";
               useLLVM = true;
             };
           };
