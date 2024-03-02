@@ -122,6 +122,7 @@
               contents = with pkgsCross; [
                 servicePackage
                 dockerTools.caCertificates
+                imagemagick
                 ./docker
                 # Utilites like ldd and bash to help image debugging
                 # stdenv.cc.libc_bin
@@ -165,31 +166,26 @@
             ''
               set -euxo pipefail
               docker=${pkgs.docker}/bin/docker
-              
+
               docker load -qi ${packages.dockerImage-aarch64}
               docker load -qi ${packages.dockerImage-x86_64}
               docker load -qi ${packages.dockerImage-armv7}
 
               for arch in aarch64-unknown-linux-musl x86_64-unknown-linux-musl armv7l-unknown-linux-gnueabihf ; do
-                docker tag pica:$arch pica-gallery/pica:$arch
-                docker push pica-gallery/pica:$arch
+                docker tag pica:$arch ghcr.io/pica-gallery/pica:$arch
+                docker push ghcr.io/pica-gallery/pica:$arch
               done
 
-              # $docker manifest create --amend pica-gallery/pica:latest  \
-              #   pica-gallery/pica:aarch64-unknown-linux-musl \
-              #   pica-gallery/pica:x86_64-unknown-linux-musl \
-              #   pica-gallery/pica:armv7l-unknown-linux-gnueabihf
-              # 
-              # $docker manifest push pica-gallery/pica:latest
+              $docker manifest create --amend ghcr.io/pica-gallery/pica:latest  \
+                ghcr.io/pica-gallery/pica:aarch64-unknown-linux-musl \
+                ghcr.io/pica-gallery/pica:x86_64-unknown-linux-musl \
+                ghcr.io/pica-gallery/pica:armv7l-unknown-linux-gnueabihf
+
+              $docker manifest push ghcr.io/pica-gallery/pica:latest
             '';
 
           packages.default = packages.dockerImage;
         };
 
-
-
     };
 }
-
-# $docker manifest create --amend ${dockerImage.imageName}:${dockerImage.imageTag} ${imageNames (genSystems systems dockerImage)}
-# $docker manifest push ${dockerImage.imageName}:${dockerImage.imageTag}
