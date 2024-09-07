@@ -61,4 +61,4 @@ jobs:
 
       - name: Push docker image
         if: ${{ github.event_name != 'pull_request' }}
-        run: result/bin/pushImage
+        run: result/bin/dockerImage
