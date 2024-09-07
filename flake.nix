@@ -110,13 +110,16 @@
           tag = "latest-${arch}";
           enableFakechroot = true;
           contents = [
-            # pkgs.cacert
+            pkgs.dockerTools.caCertificates
+            pkgs.imagemagick
             backend
+            ./docker
           ];
           architecture = arch;
           config = {
             Workdir = "/";
             Entrypoint = [ "${backend}/bin/pica" ];
+            Expose = 3000;
           };
         };
 
