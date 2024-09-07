@@ -1,20 +1,11 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11";
+    nixpkgs.url = "github:nixos/nixpkgs/805a384895c696f802a9bf5bf4720f37385df547";
 
     treefmt-nix = {
       url = "github:numtide/treefmt-nix/e504621290a1fd896631ddbc5e9c16f4366c9f65";
       inputs = {
         nixpkgs.follows = "nixpkgs";
-      };
-    };
-
-    nixpkgs-cross-overlay = {
-      url = "github:alekseysidorov/nixpkgs-cross-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        rust-overlay.follows = "rust-overlay";
-        treefmt-nix.follows = "treefmt-nix";
       };
     };
 
@@ -57,24 +48,20 @@
             '';
           };
 
-          buildForCrossSytem = { crossSystem, nixpkgs, rust-overlay, nixpkgs-cross-overlay }:
+          buildForCrossSytem = { crossSystem, nixpkgs, rust-overlay }:
             let
               # Manual packages initialization, because the flake parts does not
               # yet come with an endoursed module.
               pkgs = import nixpkgs {
                 inherit system;
-                overlays = [
-                  nixpkgs-cross-overlay.overlays.default
-                ];
               };
 
-              pkgsCross = pkgs.mkCrossPkgs {
+              pkgsCross = import nixpkgs {
                 src = nixpkgs;
                 inherit localSystem crossSystem;
 
                 overlays = [
                   rust-overlay.overlays.default
-                  nixpkgs-cross-overlay.overlays.default
                 ];
               };
 
@@ -106,7 +93,7 @@
                 # Libraries essential to build the service binaries
                 buildInputs = with pkgsCross; [
                   # Enable Rust cross-compilation support
-                  rustCrossHook
+                  # rustCrossHook
                   pkgsCross.sqlite
                 ];
 
@@ -139,7 +126,7 @@
         in
         rec {
           packages.dockerImage-aarch64 = buildForCrossSytem {
-            inherit (inputs) nixpkgs rust-overlay nixpkgs-cross-overlay;
+            inherit (inputs) nixpkgs rust-overlay;
             crossSystem = {
               config = "aarch64-unknown-linux-gnu";
               useLLVM = true;
@@ -147,7 +134,7 @@
           };
 
           packages.dockerImage-x86_64 = buildForCrossSytem {
-            inherit (inputs) nixpkgs rust-overlay nixpkgs-cross-overlay;
+            inherit (inputs) nixpkgs rust-overlay;
             crossSystem = {
               config = "x86_64-unknown-linux-gnu";
               useLLVM = true;
@@ -155,7 +142,7 @@
           };
 
           packages.dockerImage-armv7 = buildForCrossSytem {
-            inherit (inputs) nixpkgs rust-overlay nixpkgs-cross-overlay;
+            inherit (inputs) nixpkgs rust-overlay;
             crossSystem = {
               config = "armv7l-unknown-linux-gnueabihf";
               useLLVM = true;
