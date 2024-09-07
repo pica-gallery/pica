@@ -1,7 +1,7 @@
 import {Injectable} from '@angular/core';
 import {array, nullable, number, object, optional, record, string, transform, type TypeOf} from 'fud-ts';
 import {map, Observable} from 'rxjs';
-import {HttpClient} from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 
 export type MediaId = string;
 const fMediaId = string()

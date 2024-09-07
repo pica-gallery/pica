@@ -3,7 +3,7 @@ import {FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} fr
 import {AuthService} from '../../service/auth';
 import {firstValueFrom, map} from 'rxjs';
 import {NavigationService} from '../../service/navigation';
-import {computedAsync} from 'ngxtension/computed-async';
+import {derivedAsync} from 'ngxtension/derived-async';
 
 @Component({
   selector: 'app-login-page',
@@ -22,7 +22,7 @@ export class LoginPageComponent {
 
   protected readonly failure = signal(false);
 
-  protected readonly canSubmit = computedAsync(() => {
+  protected readonly canSubmit = derivedAsync(() => {
     return this.credentials
       .statusChanges
       .pipe(map(st => st === 'VALID'))
