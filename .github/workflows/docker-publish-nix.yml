@@ -7,18 +7,15 @@ name: Docker (nix)
 
 on:
   push:
-    branches: [ "main", "test-nix" ]
+    branches: ["main", "test-nix"]
     # Publish semver tags as releases.
-    tags: [ 'v*.*.*' ]
+    tags: ["v*.*.*"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   # Use docker.io for Docker Hub if empty
   REGISTRY: ghcr.io
-  # github.repository as <account>/<repo>
-  IMAGE_NAME: ${{ github.repository }}
-
 
 jobs:
   build:
@@ -40,7 +37,7 @@ jobs:
             sudo rm -rf /opt/hostedtoolcache/CodeQL
             sudo docker image prune --all --force
           echo "... done"
-          
+
           df -h
 
       - name: Checkout repository
@@ -64,4 +61,4 @@ jobs:
 
       - name: Push docker image
         if: ${{ github.event_name != 'pull_request' }}
-        run: result/bin/push
+        run: result/bin/pushImage
