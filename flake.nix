@@ -105,13 +105,13 @@
         backend-amd64 = backend "x86_64-unknown-linux-gnu" pkgs.pkgsCross.gnu64;
         backend-aarch64 = backend "aarch64-unknown-linux-gnu" pkgs.pkgsCross.aarch64-multiplatform;
 
-        dockerImage-arch = backend: arch: pkgs: pkgs.dockerTools.streamLayeredImage {
+        dockerImage-arch = backend: arch: pkgs: system: pkgs.dockerTools.streamLayeredImage {
           name = "pica";
           tag = "latest-${arch}";
           enableFakechroot = true;
-          contents = [
+          contents = with (import nixpkgs { inherit system; }); [
             pkgs.dockerTools.caCertificates
-            pkgs.imagemagick
+            imagemagick
             backend
             ./docker
           ];
@@ -123,8 +123,8 @@
           };
         };
 
-        dockerImage-aarch64 = dockerImage-arch backend-aarch64 "aarch64" pkgs.pkgsCross.aarch64-multiplatform;
-        dockerImage-amd64 = dockerImage-arch backend-amd64 "amd64" pkgs.pkgsCross.gnu64;
+        dockerImage-aarch64 = dockerImage-arch backend-aarch64 "aarch64" pkgs.pkgsCross.aarch64-multiplatform "aarch64-linux";
+        dockerImage-amd64 = dockerImage-arch backend-amd64 "amd64" pkgs.pkgsCross.gnu64 "x86_64-linux";
 
         dockerImage = pkgs.writeShellScriptBin "dockerImage" ''
           set -ex
