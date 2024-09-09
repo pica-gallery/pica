@@ -54,6 +54,7 @@
         src = pkgs.lib.cleanSourceWith {
           src = ./.;
           filter = path: type:
+            (pkgs.lib.hasSuffix ".sql" path) ||
             (pkgs.lib.hasSuffix "worldcities.csv.gz" path) ||
             (pkgs.lib.hasInfix "/frontend/dist/pica/browser/" path) ||
             (craneLib.filterCargoSources path type);
