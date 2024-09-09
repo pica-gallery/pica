@@ -39,7 +39,7 @@ pub struct SourceConfig {
     /// The name of this media source
     pub name: String,
     pub path: PathBuf,
-    
+
     /// List of users that can access this source
     pub access: Vec<String>,
 }
@@ -67,4 +67,3 @@ pub fn load(path: impl AsRef<Path>) -> Result<PicaConfig> {
     let config = serde_yaml::from_reader(fp)?;
     Ok(config)
 }
-

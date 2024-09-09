@@ -109,17 +109,21 @@
           name = "pica";
           tag = "latest-${arch}";
           enableFakechroot = true;
-          contents = with (import nixpkgs { inherit system; }); [
-            pkgs.dockerTools.caCertificates
-            imagemagick
-            backend
-            ./docker
-          ];
+          contents =
+            let
+              pkgsTarget = import nixpkgs { inherit system; };
+            in
+            [
+              pkgs.dockerTools.caCertificates
+              pkgsTarget.imagemagick
+              backend
+              ./docker
+            ];
           architecture = arch;
           config = {
-            Workdir = "/";
+            WorkingDir = "/app/";
             Entrypoint = [ "${backend}/bin/pica" ];
-            Expose = 3000;
+            ExposedPorts = {"3000/tcp" = {};};
           };
         };
 

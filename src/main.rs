@@ -7,18 +7,18 @@ use opentelemetry::global;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tracing::info;
-use tracing_subscriber::{EnvFilter, Layer};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{EnvFilter, Layer};
 
-use crate::pica::{accessor, scale};
 use crate::pica::accessor::{MediaAccessor, Storage};
 use crate::pica::config::ImageCodecConfig;
 use crate::pica::index::{Indexer, Scanner};
 use crate::pica::queue::ScanQueue;
 use crate::pica::scale::{ImageType, MediaScaler};
 use crate::pica::store::MediaStore;
+use crate::pica::{accessor, scale};
 
 pub mod pica;
 pub mod pica_web;
@@ -63,11 +63,13 @@ async fn main() -> Result<()> {
     initialize_tracing(config.jaeger_tracing)?;
 
     // parse users from config
-    let users: Vec<_> = config.users.into_iter()
+    let users: Vec<_> = config
+        .users
+        .into_iter()
         .map(|user| pica_web::User::new(user.name, user.passwd))
         .collect();
 
-    info!("Open database");
+    info!("Open database at {:?}", config.database);
     let db = sqlx::sqlite::SqlitePoolOptions::new()
         .max_connections(8)
         .connect(&config.database)
@@ -109,7 +111,9 @@ async fn main() -> Result<()> {
     // put images into some extra storage space
     let storage = Storage::new(db.clone());
 
-    let sources = config.sources.iter()
+    let sources = config
+        .sources
+        .iter()
         .map(|s| (s.name.clone(), s.path.clone()))
         .collect();
 
