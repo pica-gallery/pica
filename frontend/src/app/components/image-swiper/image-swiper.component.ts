@@ -361,16 +361,7 @@ class Touch {
         ? this.idxCurrent + this.swipeFlingTo
         : this.indexOfSwipeX(this.swipeTranslateX);
 
-      this.idxCurrent = targetIndex;
-
-      this.events.emit({
-        type: 'animateSwipe',
-        transformX: this.swipeXOfIndex(targetIndex),
-      })
-
-      // block input until animation finishes
-      this.state = 'blocked';
-      return;
+      this.animateToInner(targetIndex);
     }
 
     if (this.state === 'zooming') {
@@ -386,6 +377,27 @@ class Touch {
     }
 
     this.state = 'undecided';
+  }
+
+  animateTo(targetIndex: number) {
+    if(this.state !== "undecided") {
+      return
+    }
+
+    this.animateToInner(targetIndex);
+  }
+
+  private animateToInner(targetIndex: number) {
+    this.idxCurrent = targetIndex;
+
+    this.events.emit({
+      type: 'animateSwipe',
+      transformX: this.swipeXOfIndex(targetIndex),
+    })
+
+    // block input until animation finishes
+    this.state = 'blocked';
+    return;
   }
 
   transitionEnd(): void {
