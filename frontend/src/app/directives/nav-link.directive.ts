@@ -1,4 +1,4 @@
-import {Directive, ElementRef, HostListener, Input, type OnChanges, Renderer2, type SimpleChanges} from '@angular/core';
+import {Directive, effect, ElementRef, HostListener, input, Renderer2} from '@angular/core';
 import {UrlTree} from '@angular/router';
 import {type NavAction, NavigationService} from '../service/navigation';
 
@@ -6,26 +6,24 @@ import {type NavAction, NavigationService} from '../service/navigation';
   standalone: true,
   selector: '[appNavLink]'
 })
-export class NavLinkDirective implements OnChanges {
+export class NavLinkDirective {
   public tree!: UrlTree;
 
-  @Input({alias: 'appNavLink'})
-  public action!: NavAction
+  public readonly action = input.required<NavAction>({alias: 'appNavLink'});
 
   constructor(
     private readonly navigationService: NavigationService,
     private readonly host: ElementRef,
     private readonly renderer2: Renderer2,
   ) {
+    effect(() => {
+      this.tree = this.navigationService.urlTreeOf(this.action());
+      this.renderer2.setAttribute(this.host.nativeElement, 'href', this.tree.toString());
+    });
   }
 
-  ngOnChanges(_changes: SimpleChanges) {
-    this.tree = this.navigationService.urlTreeOf(this.action);
-    this.renderer2.setAttribute(this.host.nativeElement, 'href', this.tree.toString());
-  }
-
-  @HostListener("click")
+  @HostListener('click')
   public onClick() {
-    this.navigationService.navigate(this.action);
+    this.navigationService.navigate(this.action());
   }
 }

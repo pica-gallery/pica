@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
+import {ChangeDetectionStrategy, Component, input} from '@angular/core';
 import {IconComponent, type IconName} from '../icon/icon.component';
 
 @Component({
@@ -12,9 +12,6 @@ import {IconComponent, type IconName} from '../icon/icon.component';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class NavbarItemComponent {
-  @Input({required: true})
-  public icon!: IconName;
-
-  @Input({required: true})
-  public label!: string;
+  public readonly icon = input.required<IconName>();
+  public readonly label = input.required<string>();
 }

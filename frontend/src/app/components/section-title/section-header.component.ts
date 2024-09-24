@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
+import {ChangeDetectionStrategy, Component, input, Input} from '@angular/core';
 import {DatePipe} from '@angular/common';
 
 
@@ -20,6 +20,5 @@ export type SectionHeader = {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SectionHeaderComponent {
-  @Input({required: true})
-  public header!: SectionHeader;
+  public readonly header = input.required<SectionHeader>();
 }

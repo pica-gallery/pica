@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, EventEmitter, Output} from '@angular/core';
+import {ChangeDetectionStrategy, Component, EventEmitter, output, Output} from '@angular/core';
 import {IconComponent} from '../icon/icon.component';
 
 @Component({
@@ -12,6 +12,5 @@ import {IconComponent} from '../icon/icon.component';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BottomSheetComponent {
-  @Output()
-  readonly close = new EventEmitter<void>();
+  readonly close = output<void>();
 }

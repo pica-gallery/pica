@@ -1,10 +1,10 @@
-<h1>{{ header.name }}</h1>
+<h1>{{ header().name }}</h1>
 <div class="info">
 
-  @if (header.location) {
-    {{ header.mediaCount }} images, {{ header.timestamp|date:'shortDate' }} in {{ header.location }}
+  @if (header().location) {
+    {{ header().mediaCount }} images, {{ header().timestamp|date:'shortDate' }} in {{ header().location }}
   } @else {
-    {{ header.mediaCount }} images, {{ header.timestamp|date:'shortDate' }}
+    {{ header().mediaCount }} images, {{ header().timestamp|date:'shortDate' }}
   }
 
 </div>

@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, input} from '@angular/core';
 import {ThumbnailComponent} from '../thumbnail/thumbnail.component';
 import type {MediaItem} from '../../service/gallery';
 
@@ -13,16 +13,17 @@ import type {MediaItem} from '../../service/gallery';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MediaItemComponent {
-  @Input({required: true})
-  public media!: MediaItem;
+  public readonly media = input.required<MediaItem>();
 
-  protected get altText(): string {
-    let text = this.media.name;
+  protected readonly altText = computed(() => {
+    let media = this.media();
 
-    if (this.media.location) {
-      text += ` in ${this.media.location.city}, ${this.media.location.country}`
+    let text = media.name;
+
+    if (media.location) {
+      text += ` in ${media.location.city}, ${media.location.country}`
     }
 
     return text;
-  }
+  })
 }

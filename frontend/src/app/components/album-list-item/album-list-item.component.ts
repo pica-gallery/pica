@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, HostListener, inject, Input} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, HostListener, inject, input, Input} from '@angular/core';
 import type {Album} from '../../service/gallery';
 import {DatePipe} from '@angular/common';
 import {NavigationService} from '../../service/navigation';
@@ -18,14 +18,13 @@ import {ThumbnailComponent} from '../thumbnail/thumbnail.component';
 export class AlbumListItemComponent {
   private readonly navigationService = inject(NavigationService);
 
-  @Input({required: true})
-  public album!: Album;
+  public readonly album = input.required<Album>();
 
   @HostListener('click')
   protected onClick() {
     void this.navigationService.navigate({
       action: 'album',
-      albumId: this.album.id,
+      albumId: this.album().id,
     });
   }
 }

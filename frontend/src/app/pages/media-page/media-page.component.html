@@ -1,7 +1,7 @@
 @if (items$|async; as items) {
   <app-image-swiper
     [items]="items"
-    [mediaToShowOnInit]="mediaId"
+    [mediaToShowOnInit]="mediaId()"
     (itemChanged)="itemChanged($event)"
   ></app-image-swiper>
 }

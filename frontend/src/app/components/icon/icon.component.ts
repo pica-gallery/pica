@@ -1,9 +1,9 @@
-import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, input} from '@angular/core';
 import {
   mdiArrowLeft,
-  mdiClose,
   mdiChevronLeft,
   mdiChevronRight,
+  mdiClose,
   mdiDownload,
   mdiFolderImage,
   mdiFolderOutline,
@@ -38,11 +38,10 @@ export type IconName =
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class IconComponent {
-  @Input({required: true})
-  public name: IconName = 'unknown';
+  public readonly name = input.required<IconName>();
 
-  protected get path(): string {
-    switch (this.name) {
+  protected readonly path = computed(() => {
+    switch (this.name()) {
       case 'arrow-left':
         return mdiArrowLeft;
 
@@ -82,5 +81,5 @@ export class IconComponent {
       case 'unknown':
         return mdiInformationOutline;
     }
-  }
+  });
 }

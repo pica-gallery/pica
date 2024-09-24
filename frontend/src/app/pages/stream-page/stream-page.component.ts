@@ -23,9 +23,6 @@ export class StreamPageComponent {
   private readonly gallery = inject(Gallery);
   private readonly router = inject(NavigationService);
 
-  constructor() {
-  }
-
   protected sections = toSignal(
     this.gallery.stream().pipe(map(st => st.sections)),
   );

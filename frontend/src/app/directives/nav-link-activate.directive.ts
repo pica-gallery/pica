@@ -1,7 +1,7 @@
 import {
-  Directive,
+  Directive, effect,
   ElementRef,
-  Input,
+  input,
   type OnChanges,
   type OnDestroy,
   Renderer2,
@@ -10,16 +10,14 @@ import {
 import {NavigationEnd, Router} from '@angular/router';
 import type {Subscription} from 'rxjs';
 import {NavLinkDirective} from './nav-link.directive';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 
 @Directive({
   standalone: true,
   selector: '[appNavLinkActive]'
 })
-export class NavLinkActivateDirective implements OnChanges, OnDestroy {
-  private readonly subscription: Subscription;
-
-  @Input({alias: 'appNavLinkActive'})
-  public activeClass: string = '';
+export class NavLinkActivateDirective {
+  public readonly activeClass = input('', {alias: 'appNavLinkActive'});
 
   constructor(
     private readonly host: ElementRef<HTMLElement>,
@@ -27,19 +25,17 @@ export class NavLinkActivateDirective implements OnChanges, OnDestroy {
     private readonly router: Router,
     private readonly link: NavLinkDirective,
   ) {
-    this.subscription = router.events.subscribe(event => {
+    router.events.pipe(takeUntilDestroyed()).subscribe(event => {
       if (event instanceof NavigationEnd) {
         this.update();
       }
     });
-  }
 
-  ngOnChanges(_changes: SimpleChanges) {
-    this.update();
-  }
-
-  ngOnDestroy(): void {
-    this.subscription.unsubscribe();
+    effect(() => {
+      // force read the signal to run updates on changes
+      this.activeClass();
+      this.update()
+    });
   }
 
   private update() {
@@ -55,9 +51,9 @@ export class NavLinkActivateDirective implements OnChanges, OnDestroy {
     });
 
     if (isActive) {
-      this.renderer.addClass(this.host.nativeElement, this.activeClass);
+      this.renderer.addClass(this.host.nativeElement, this.activeClass());
     } else {
-      this.renderer.removeClass(this.host.nativeElement, this.activeClass);
+      this.renderer.removeClass(this.host.nativeElement, this.activeClass());
     }
   }
 }

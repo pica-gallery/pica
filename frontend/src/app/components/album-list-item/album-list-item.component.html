@@ -1,11 +1,11 @@
-<app-thumbnail [src]="album.cover.urls.thumb" class="thumb"/>
+<app-thumbnail [src]="album().cover.urls.thumb" class="thumb"/>
 
 <div class="info">
   <div class="title">
-    {{ album.name }}
+    {{ album().name }}
   </div>
 
   <div class="subtitle">
-    {{ album.timestamp|date:'shortDate' }}
+    {{ album().timestamp|date:'shortDate' }}
   </div>
 </div>

@@ -1,4 +1,14 @@
-import {ChangeDetectionStrategy, Component, EventEmitter, inject, Input, Output, ViewChild} from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component, effect,
+  EventEmitter,
+  inject,
+  input,
+  Input,
+  Output,
+  signal,
+  ViewChild
+} from '@angular/core';
 import {
   type ListItem,
   ListViewComponent,
@@ -35,6 +45,8 @@ export type ResultListItem =
   | AlbumListItem
   ;
 
+// looks like this is actually slower?
+const disableItemComparator = true;
 
 @Component({
   selector: 'app-search-results',
@@ -52,7 +64,7 @@ export type ResultListItem =
 export class SearchResultsComponent {
   private readonly navigation = inject(NavigationService);
 
-  protected readonly dataSource = new ArrayDataSource<ResultListItem>(null && {
+  protected readonly dataSource = new ArrayDataSource<ResultListItem>(disableItemComparator ? null : {
     sameItem(lhs: ResultListItem, rhs: ResultListItem): boolean {
       return lhs.id === rhs.id;
     },
@@ -67,8 +79,7 @@ export class SearchResultsComponent {
     this.dataSource.items = newItems
   }
 
-  @Input()
-  public initialScrollState: SavedScroll | null = null;
+  public readonly initialScrollState = input<SavedScroll| null>(null);
 
   @Output()
   public readonly scrollChanged = new EventEmitter<SavedScroll>();

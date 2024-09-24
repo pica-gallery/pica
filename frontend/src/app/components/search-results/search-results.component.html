@@ -1,7 +1,7 @@
 <app-list-view
   [dataSource]="dataSource"
   [layout]="layout"
-  [initialScroll]="initialScrollState"
+  [initialScroll]="initialScrollState()"
   (scrollChanged)="scrollChanged.emit($event)">
 
   <ng-template listViewItem="Media" let-item>

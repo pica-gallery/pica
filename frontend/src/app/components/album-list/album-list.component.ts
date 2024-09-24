@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, computed, EventEmitter, input, Input, Output, signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, EventEmitter, input, output, Output} from '@angular/core';
 import type {Album} from '../../service/gallery';
 import {type ListItem, ListViewComponent, type SavedScroll} from '../list-view/list-view.component';
 import {AlbumListItemComponent} from '../album-list-item/album-list-item.component';
@@ -38,12 +38,8 @@ export class AlbumListComponent {
   });
 
   public readonly albums = input.required<Album[]>()
-
-  @Input()
-  public initialScrollState : SavedScroll | null = null;
-
-  @Output()
-  public readonly scrollChanged = new EventEmitter<SavedScroll>();
+  public readonly initialScrollState = input<SavedScroll | null>(null);
+  public readonly scrollChanged = output<SavedScroll>();
 }
 
 let firstVisible: number;

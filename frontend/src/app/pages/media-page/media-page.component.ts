@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, inject, Input, signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, inject, input, Input, signal} from '@angular/core';
 import {Gallery, type MediaItem} from '../../service/gallery';
 import {map, type Observable} from 'rxjs';
 import {AsyncPipe} from '@angular/common';
@@ -23,8 +23,7 @@ export class MediaPageComponent {
   protected readonly currentItem = signal<MediaItem | null>(null);
   protected readonly exifViewerMediaId = signal<MediaId | null>(null);
 
-  @Input()
-  public mediaId!: MediaId;
+  public readonly mediaId = input<MediaId>();
 
   protected readonly items$: Observable<MediaItem[]>;
 
