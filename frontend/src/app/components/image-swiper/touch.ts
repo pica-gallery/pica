@@ -2,11 +2,12 @@ import {EventEmitter} from '@angular/core';
 import PointerTracker, {type Pointer} from 'pointer-tracker';
 import type {Size} from '../../util';
 
-export type TouchState =
+type TouchState =
   | 'blocked'
   | 'undecided'
   | 'zooming'
-  | 'swiping'
+  | 'swiping-horizontal'
+  | 'swiping-vertical'
 
 export type AnimationEvent =
   | { type: 'animateSwipe', transformX: number }
@@ -16,6 +17,9 @@ export type AnimationEvent =
   | { type: 'updateCurrent', currentIndex: number }
   | { type: 'stopAnimation' }
 
+type ClickArea =
+  | 'prev'
+  | 'next'
 
 export class Touch {
   private state: TouchState = 'undecided';
@@ -58,12 +62,12 @@ export class Touch {
       return false;
     }
 
-    if (this.state === 'swiping' && tracker.currentPointers.length >= 1) {
+    if (pointerCount(this.state) === 1 && tracker.currentPointers.length >= 1) {
       // only track the first pointer
       return false;
     }
 
-    // in general, track only two pointers
+    // in general, track at most two pointers
     return tracker.currentPointers.length < 2;
   }
 
@@ -76,7 +80,7 @@ export class Touch {
 
       console.info('Comitted to state:', this.state);
 
-      if (newState === 'swiping') {
+      if (newState === 'swiping-horizontal') {
         this.swipeTranslateXStart = this.swipeXOfIndex(this.idxCurrent);
       }
     }
@@ -84,7 +88,7 @@ export class Touch {
     const initial = tracker.startPointers;
     const current = tracker.currentPointers;
 
-    if (this.state === 'swiping') {
+    if (this.state === 'swiping-horizontal') {
       const dxSinceStart = current[0].clientX - initial[0].clientX;
       this.swipeTranslateX = this.swipeTranslateXStart + dxSinceStart;
 
@@ -140,14 +144,14 @@ export class Touch {
     }
   }
 
-  end(tracker: PointerTracker, _pointer: Pointer): void {
+  end(tracker: PointerTracker, pointer: Pointer): void {
     if (tracker.currentPointers.length !== 0) {
       return
     }
 
     console.info('No more active pointers.')
 
-    if (this.state === 'swiping') {
+    if (this.state === 'swiping-horizontal') {
       const targetIndex = this.swipeFlingTo
         ? this.idxCurrent + this.swipeFlingTo
         : this.indexOfSwipeX(this.swipeTranslateX);
@@ -168,7 +172,25 @@ export class Touch {
       }
     }
 
+    if (this.state === 'undecided') {
+      if (this.inClickArea(pointer.clientX, 'prev')) {
+        this.animateToPrevious()
+        return;
+      }
+
+      if (this.inClickArea(pointer.clientX, 'next')) {
+        this.animateToNext();
+        return
+      }
+    }
+
     this.state = 'undecided';
+  }
+
+  private inClickArea(mouseX: number, area: ClickArea): boolean {
+    const areaWidth = 0.25;
+    return area === 'prev' && mouseX < this.containerWidth * areaWidth
+      || area === 'next' && mouseX > this.containerWidth * (1 - areaWidth);
   }
 
   animateToNext() {
@@ -181,7 +203,7 @@ export class Touch {
 
   private animateTo(targetIndex: number) {
     if (this.state !== 'undecided') {
-      console.log("Schedule animation to", targetIndex);
+      console.log('Schedule animation to', targetIndex);
       this.scheduleAnimateTo = targetIndex;
       return
     }
@@ -190,7 +212,7 @@ export class Touch {
   }
 
   private animateToInner(targetIndex: number) {
-    console.log("Animate to", targetIndex);
+    console.log('Animate to', targetIndex);
     this.idxCurrent = targetIndex;
 
     this.events.emit({
@@ -269,10 +291,19 @@ export class Touch {
     }
 
     if (current.length === 1 && !this.zoomed) {
-      // we have one pointer. if it moved at least 16px on x axis, we have a swipe
+      // we have one pointer.
       const dx = current[0].clientX - initial[0].clientX;
-      if (Math.abs(dx) > 16) {
-        return this.state = 'swiping';
+      const dy = current[0].clientY - initial[0].clientY;
+
+      // if it moved at least 16px on x axis (and less than 16 on y axis),
+      // we have a swipe
+      if (Math.abs(dx) > 16 && Math.abs(dy) < 16) {
+        return this.state = 'swiping-horizontal';
+      }
+
+      // check for vertical swipe too
+      if (Math.abs(dx) < 16 && Math.abs(dy) > 16) {
+        return this.state = 'swiping-vertical';
       }
     }
 
@@ -416,4 +447,16 @@ function midpoint(lhs: Pointer, rhs: Pointer): Point {
 
 function identity(): DOMMatrix {
   return new DOMMatrix([1, 0, 0, 1, 0, 0]);
+}
+
+function pointerCount(state: TouchState): number | undefined {
+  if (state === 'swiping-horizontal' || state === 'swiping-vertical') {
+    return 1
+  }
+
+  if (state === 'zooming') {
+    return 2
+  }
+
+  return;
 }
