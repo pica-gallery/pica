@@ -1,4 +1,6 @@
-<img class="thumbnail" decoding="async" loading="eager" alt="Thumbnail" [src]="media.urls.thumb">
+<img class="thumbnail" decoding="async" loading="eager" alt="Thumbnail"
+     draggable="false"
+     [src]="media.urls.thumb">
 
 @if (focusSignal()) {
   @if (loaderIsVisible$|async) {
@@ -10,6 +12,7 @@
   <!-- we take over lazy loading here, so we load 'eager'. -->
   <img class="image" decoding="async" loading="eager"
        fetchPriority="high"
+       draggable="false"
        (load)="onImageLoad()"
        [alt]="media.name" [src]="media.urls.preview">
 }

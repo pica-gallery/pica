@@ -70,10 +70,11 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     const container = this.container.nativeElement!;
     const containerWidth = container.getBoundingClientRect().width
+    const containerHeight = container.getBoundingClientRect().height
 
     // jump to the selected image
     const initialIndex = Math.max(0, this.items.findIndex(img => img.id === this.mediaToShowOnInit));
-    const touch = new Touch(containerWidth, initialIndex);
+    const touch = new Touch(containerWidth, containerHeight, initialIndex);
 
     this.ngZone.runOutsideAngular(() => {
       // when an animation stops, we update the visibility
@@ -83,9 +84,9 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
 
       this.tracker = new PointerTracker(container, {
         // avoidPointerEvents: true,
-        start: (pointer, event) => touch.start(this.tracker, pointer),
-        move: (previous, changed, event) => touch.move(this.tracker, previous),
-        end: (pointer, event, cancelled) => touch.end(this.tracker, pointer),
+        start: (pointer, _event) => touch.start(this.tracker, pointer),
+        move: (previous, _changed, _event) => touch.move(this.tracker, previous),
+        end: (pointer, _event, _cancelled) => touch.end(this.tracker, pointer),
       })
 
       observeElementSize(this.container.nativeElement)
@@ -243,6 +244,7 @@ class Touch {
 
   constructor(
     private containerWidth: number,
+    private containerHeight: number,
     private idxCurrent: number,
   ) {
   }
@@ -403,9 +405,8 @@ class Touch {
   }
 
   public onWindowResize(size: Size) {
-    console.log(size)
-
     this.containerWidth = size.width;
+    this.containerHeight = size.height;
 
     if (this.zoomed) {
       this.zoomTransform = identity();
@@ -449,6 +450,8 @@ class Touch {
     }
 
     if (current.length === 1 && !this.zoomed) {
+      console.log(current[0].clientX, initial[0].clientX)
+
       // we have one pointer. if it moved at least 16px on x axis, we have a swipe
       const dx = current[0].clientX - initial[0].clientX;
       if (Math.abs(dx) > 16) {
@@ -549,8 +552,8 @@ class Touch {
     // transform the center point of the screen to the transformed image so we know what exactly
     // we are currently looking at.
     this.zoomLookingAt = this.zoomTransform.inverse().transformPoint({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2
+      x: this.containerWidth / 2,
+      y: this.containerHeight / 2
     });
 
     this.zoomLookingAt.x -= width / 2 - widthOfImage / 2;
@@ -558,8 +561,8 @@ class Touch {
   }
 
   private zoomConfig() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+    const width = this.containerWidth;
+    const height = this.containerHeight;
 
     // aspect ratio of image
     const aspect = this.currentAspectRatio;
