@@ -1,9 +1,9 @@
 <img class="thumbnail" decoding="async" loading="eager" alt="Thumbnail"
      draggable="false"
-     [src]="media.urls.thumb">
+     [src]="media().urls.thumb">
 
-@if (focusSignal()) {
-  @if (loaderIsVisible$|async) {
+@if (focus()) {
+  @if (loaderIsVisible()) {
     <div class="progress-container">
       <app-progress-bar class="progress"></app-progress-bar>
     </div>
@@ -14,5 +14,5 @@
        fetchPriority="high"
        draggable="false"
        (load)="onImageLoad()"
-       [alt]="media.name" [src]="media.urls.preview">
+       [alt]="media().name" [src]="media().urls.preview">
 }

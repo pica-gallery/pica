@@ -10,7 +10,7 @@ import {
   ElementRef,
   EnvironmentInjector,
   EventEmitter,
-  inject,
+  inject, input,
   Input,
   NgZone,
   numberAttribute,
@@ -82,8 +82,7 @@ export type SavedScroll = {
   selector: '[listViewItem]',
 })
 export class ListViewItemDirective {
-  @Input({required: true, alias: 'listViewItem'})
-  name!: string
+  public readonly name = input.required<string>({alias: "listViewItem"})
 
   constructor(
     readonly templateRef: TemplateRef<unknown>,
@@ -104,7 +103,7 @@ class TemplateLookup {
   }
 
   private update() {
-    const pairs = this.templates.map(item => [item.name, item.templateRef] as const);
+    const pairs = this.templates.map(item => [item.name(), item.templateRef] as const);
     this.lookup = new Map(pairs);
   }
 }

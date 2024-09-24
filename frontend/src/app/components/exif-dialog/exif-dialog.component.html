@@ -1,4 +1,4 @@
-@if (info$|async; as info) {
+@if (info(); as info) {
   <table>
     @for (field of info.exif; track field.tag) {
       <tr>

@@ -1,12 +1,13 @@
-import {ChangeDetectionStrategy, Component, inject, Input, type OnInit} from '@angular/core';
+import {ChangeDetectionStrategy, Component, inject, input} from '@angular/core';
 import {RouterOutlet} from '@angular/router';
 import type {AlbumId} from '../../service/api';
 import {type Album, Gallery, type MediaItem, type Section} from '../../service/gallery';
-import {map, type Observable} from 'rxjs';
+import {map} from 'rxjs';
 import {AsyncPipe} from '@angular/common';
 import {AlbumComponent} from '../../components/album/album.component';
 import {NavigationService} from '../../service/navigation';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
+import {derivedAsync} from 'ngxtension/derived-async';
 
 function convertToSections(album: Album): Section[] {
   return [{
@@ -25,17 +26,17 @@ function convertToSections(album: Album): Section[] {
   styleUrls: ['./album-page.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class AlbumPageComponent implements OnInit {
+export class AlbumPageComponent {
   private readonly gallery = inject(Gallery);
   private readonly navigationService = inject(NavigationService);
-  protected sections$!: Observable<Section[]>;
 
-  @Input({required: true})
-  albumId!: AlbumId;
+  public readonly albumId = input.required<AlbumId>();
 
-  ngOnInit() {
-    this.sections$ = this.gallery.album(this.albumId).pipe(map(convertToSections))
-  }
+  public readonly sections = derivedAsync(() => {
+    return this.gallery.album(this.albumId()).pipe(
+      map(convertToSections),
+    );
+  })
 
   mediaClicked(item: MediaItem) {
     void this.navigationService.media(item.id);

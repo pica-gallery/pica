@@ -1,8 +1,9 @@
-import {ChangeDetectionStrategy, Component, computed, HostBinding, Input, signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, effect, input, signal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import type {MediaItem} from '../../service/gallery';
 import {ProgressBarComponent} from '../progressbar/progress-bar.component';
-import {BehaviorSubject, concatWith, distinctUntilChanged, filter, map, startWith, switchMap, timer} from 'rxjs';
+import {concatWith, map, startWith, timer} from 'rxjs';
+import {derivedAsync} from 'ngxtension/derived-async';
 import {toObservable} from '@angular/core/rxjs-interop';
 
 @Component({
@@ -11,43 +12,44 @@ import {toObservable} from '@angular/core/rxjs-interop';
   imports: [CommonModule, ProgressBarComponent],
   templateUrl: './image-view.component.html',
   styleUrls: ['./image-view.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[style.--aspect-ratio]': 'aspectRatioValue()'
+  }
 })
 export class ImageViewComponent {
-  private readonly loadedSubject = new BehaviorSubject(false);
-  protected readonly focusSignal = signal(false);
-  
-  protected readonly loaderIsVisible$ = toObservable(this.focusSignal).pipe(
-    distinctUntilChanged(),
-    filter(focus => focus),
-    switchMap(() => {
-      const notYetLoaded$ = this.loadedSubject.pipe(map(loaded => !loaded));
+  private readonly loaded = signal(false);
+  private readonly notYetLoaded$ = toObservable(this.loaded).pipe(map(loaded => !loaded));
 
+  public readonly media = input.required<MediaItem>({alias: 'media'});
+  public readonly focus = input(false);
+
+  protected readonly loaderIsVisible = derivedAsync(() => {
+    if (this.focus()) {
       return timer(250).pipe(
         startWith(false),
-        concatWith(notYetLoaded$),
-        distinctUntilChanged(),
+        concatWith(this.notYetLoaded$),
       )
-    })
-  )
-
-  @Input({required: true})
-  public media!: MediaItem;
-
-  @Input()
-  public set focus(focus: boolean) {
-    if (this.focusSignal() !== focus) {
-      this.loadedSubject.next(false);
-      this.focusSignal.set(focus);
     }
-  }
 
-  @HostBinding('style.--aspect-ratio')
-  protected get aspectRatioValue(): number {
-    return this.media.width / this.media.height;
+    return false;
+  })
+
+  protected readonly aspectRatioValue = computed(() => {
+    return this.media().width / this.media().height
+  })
+
+  constructor() {
+    effect(() => {
+      // if we unfocus, we need to mark the image as not loaded again,
+      // was we might need to re-load the image the next time we focus it again
+      if (!this.focus()) {
+        this.loaded.set(false);
+      }
+    }, {allowSignalWrites: true});
   }
 
   protected onImageLoad() {
-    this.loadedSubject.next(true);
+    this.loaded.set(true);
   }
 }

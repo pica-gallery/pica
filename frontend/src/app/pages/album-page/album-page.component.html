@@ -1,4 +1,4 @@
-@if (sections$|async; as sections) {
+@if (sections(); as sections) {
   <app-album [sections]="sections" (mediaClicked)="mediaClicked($event)"></app-album>
 } @else {
   <app-busy-full/>
