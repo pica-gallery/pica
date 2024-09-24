@@ -1,5 +1,5 @@
 <div class="container" #Container>
-  @for (item of visibleItems$|async; track item.id) {
+  @for (item of visibleItems(); track item.id) {
     <div class="child" [ngStyle]="{'--index': item.index}" [attr.data-media-id]="item.id">
       <app-image-view [media]="item.media" [focus]="item.focus"></app-image-view>
     </div>
