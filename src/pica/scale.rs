@@ -132,6 +132,7 @@ fn resize_imagemagick(source: &Path, format: &ImageType, size: u32) -> Result<Ve
         .arg("-quality")
         .arg("60")
         .arg("-strip")
+        .arg("-interlace").arg("Plane")
         .arg(source)
         .arg(target_avif)
         .output()?;
