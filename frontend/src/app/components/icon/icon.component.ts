@@ -2,6 +2,8 @@ import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
 import {
   mdiArrowLeft,
   mdiClose,
+  mdiChevronLeft,
+  mdiChevronRight,
   mdiDownload,
   mdiFolderImage,
   mdiFolderOutline,
@@ -17,6 +19,8 @@ export type IconName =
   | 'albums'
   | 'albums-outline'
   | 'arrow-left'
+  | 'chevron-left'
+  | 'chevron-right'
   | 'download'
   | 'image'
   | 'image-outline'
@@ -68,6 +72,12 @@ export class IconComponent {
 
       case 'info':
         return mdiInformation;
+
+      case 'chevron-left':
+        return mdiChevronLeft
+
+      case 'chevron-right':
+        return mdiChevronRight
 
       case 'unknown':
         return mdiInformationOutline;

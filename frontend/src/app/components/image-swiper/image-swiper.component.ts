@@ -15,9 +15,10 @@ import {CommonModule} from '@angular/common';
 import type {MediaId} from '../../service/api';
 import {ImageViewComponent} from '../image-view/image-view.component';
 import type {MediaItem} from '../../service/gallery';
-import {BehaviorSubject, distinctUntilChanged, fromEvent, ReplaySubject, tap} from 'rxjs';
+import {BehaviorSubject, distinctUntilChanged, ReplaySubject, tap} from 'rxjs';
 import PointerTracker, {type Pointer} from 'pointer-tracker';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+import {observeElementSize, type Size} from '../../util';
 
 type ViewItem = {
   id: MediaId,
@@ -68,10 +69,11 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     const container = this.container.nativeElement!;
+    const containerWidth = container.getBoundingClientRect().width
 
     // jump to the selected image
     const initialIndex = Math.max(0, this.items.findIndex(img => img.id === this.mediaToShowOnInit));
-    const touch = new Touch(initialIndex);
+    const touch = new Touch(containerWidth, initialIndex);
 
     this.ngZone.runOutsideAngular(() => {
       // when an animation stops, we update the visibility
@@ -86,9 +88,9 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
         end: (pointer, event, cancelled) => touch.end(this.tracker, pointer),
       })
 
-      fromEvent(window, 'resize')
+      observeElementSize(this.container.nativeElement)
         .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe(() => touch.onWindowResize());
+        .subscribe(size => touch.onWindowResize(size))
 
       const findCurrentChild = (idx: number): HTMLElement => {
         const media = this.items[idx];
@@ -239,7 +241,10 @@ class Touch {
 
   public currentAspectRatio: number = 1;
 
-  constructor(private idxCurrent: number) {
+  constructor(
+    private containerWidth: number,
+    private idxCurrent: number,
+  ) {
   }
 
   initialize() {
@@ -397,7 +402,11 @@ class Touch {
     });
   }
 
-  public onWindowResize() {
+  public onWindowResize(size: Size) {
+    console.log(size)
+
+    this.containerWidth = size.width;
+
     if (this.zoomed) {
       this.zoomTransform = identity();
 
@@ -419,7 +428,7 @@ class Touch {
   }
 
   private get width(): number {
-    return window.innerWidth + 16;
+    return this.containerWidth + 16;
   }
 
   private indexOfSwipeX(x: number): number {

@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, HostBinding, Input, signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, HostBinding, Input, signal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import type {MediaItem} from '../../service/gallery';
 import {ProgressBarComponent} from '../progressbar/progress-bar.component';
@@ -16,7 +16,7 @@ import {toObservable} from '@angular/core/rxjs-interop';
 export class ImageViewComponent {
   private readonly loadedSubject = new BehaviorSubject(false);
   protected readonly focusSignal = signal(false);
-
+  
   protected readonly loaderIsVisible$ = toObservable(this.focusSignal).pipe(
     distinctUntilChanged(),
     filter(focus => focus),
