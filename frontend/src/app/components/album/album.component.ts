@@ -1,13 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  EventEmitter,
-  input,
-  Output,
-  type TemplateRef,
-  ViewChild
-} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, EventEmitter, input, output, Output} from '@angular/core';
 import type {MediaItem, Section} from '../../service/gallery';
 import {
   type Child,
@@ -52,14 +43,8 @@ type RowListItem =
 export class AlbumComponent {
   public readonly sections = input.required<Section[]>();
 
-  @Output()
-  readonly mediaClicked = new EventEmitter<MediaItem>();
-
-  @Output()
-  readonly scrollChanged = new EventEmitter<SavedScroll>();
-
-  @ViewChild('MediaItem')
-  protected readonly mediaItemTemplate!: TemplateRef<unknown>;
+  public readonly mediaClicked = output<MediaItem>();
+  public readonly scrollChanged = output<SavedScroll>();
 
   protected readonly layout = columnsLayout;
 

@@ -9,7 +9,7 @@ import {
   NgZone,
   type OnDestroy,
   output,
-  signal,
+  signal, viewChild,
   ViewChild
 } from '@angular/core';
 import {CommonModule} from '@angular/common';
@@ -43,8 +43,7 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
 
   public readonly mediaToShowOnInit = input<MediaId>();
 
-  @ViewChild('Container', {static: true})
-  protected container!: ElementRef<HTMLElement>;
+  protected container = viewChild.required<ElementRef<HTMLElement>>("Container");
 
   protected readonly itemChanged = output<MediaItem>();
   protected readonly visibleItems = signal<ViewItem[]>([], {equal: itemsAreEqual})
@@ -60,7 +59,7 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    const container = this.container.nativeElement!;
+    const container = this.container().nativeElement!;
     const containerWidth = container.getBoundingClientRect().width
     const containerHeight = container.getBoundingClientRect().height
 
@@ -82,7 +81,7 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
         end: (pointer, _event, _cancelled) => touch.end(this.tracker, pointer),
       })
 
-      observeElementSize(this.container.nativeElement)
+      observeElementSize(container)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe(size => touch.onWindowResize(size))
 

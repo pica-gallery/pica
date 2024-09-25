@@ -33,8 +33,8 @@ export function predicateOf(term: string): Predicate {
     if (term.startsWith('date:')) {
       const dateTerm = term.slice(5);
       return {
-        album: album => album.timestamp.toDateString().includes(dateTerm),
-        media: (_album, media) => media.timestamp.toDateString().includes(dateTerm),
+        album: album => album.timestamp.toISOString().includes(dateTerm),
+        media: (_album, media) => media.timestamp.toISOString().includes(dateTerm),
       }
     }
 

@@ -10,18 +10,19 @@ import {
   ElementRef,
   EnvironmentInjector,
   EventEmitter,
-  inject, input,
+  inject,
+  input,
   Input,
   NgZone,
   numberAttribute,
   type OnChanges,
-  type OnDestroy,
+  type OnDestroy, output,
   Output,
   QueryList,
   type SimpleChanges,
   TemplateRef,
   type Type,
-  ViewChild
+  viewChild
 } from '@angular/core';
 import {observeElementSize} from '../../util';
 import {distinctUntilChanged, filter, map, Subscription} from 'rxjs';
@@ -82,7 +83,7 @@ export type SavedScroll = {
   selector: '[listViewItem]',
 })
 export class ListViewItemDirective {
-  public readonly name = input.required<string>({alias: "listViewItem"})
+  public readonly name = input.required<string>({alias: 'listViewItem'})
 
   constructor(
     readonly templateRef: TemplateRef<unknown>,
@@ -123,8 +124,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
 
   private readonly root: ElementRef<HTMLElement> = inject(ElementRef);
 
-  @ViewChild('Canvas')
-  private canvas!: ElementRef<HTMLElement>;
+  private canvas = viewChild.required<ElementRef<HTMLElement>>('Canvas');
 
   @ContentChildren(ListViewItemDirective, {descendants: false})
   private templates!: QueryList<ListViewItemDirective>
@@ -177,8 +177,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
   @Input()
   public layout: ((layouter: LayoutHelper) => void) | null = null;
 
-  @Output()
-  scrollChanged = new EventEmitter<SavedScroll>();
+  public readonly scrollChanged = output<SavedScroll>();
 
   constructor() {
     this.offsetY = 0;
@@ -266,7 +265,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
     this.dataSourceSubscription?.unsubscribe();
     this.dataSourceSubscription = null;
 
-    if (this.canvas == null) {
+    if (this.canvas() == null) {
       return;
     }
 
@@ -543,8 +542,10 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
   }
 
   private updateCanvasSize() {
+    const canvas = this.canvas().nativeElement;
+
     if (this.children.length === 0) {
-      this.canvas.nativeElement.style.height = '200%';
+      canvas.style.height = '200%';
       return;
     }
 
@@ -559,7 +560,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
       this.canvasHeight = Math.max(this.canvasHeight, maxChild.top + maxChild.height + extraSpace);
     }
 
-    this.canvas.nativeElement.style.height = this.canvasHeight + 'px';
+    canvas.style.height = this.canvasHeight + 'px';
   }
 
   private attachChild(detachedChild: DetachedChild, idx: number, item: ListItem): Child {
@@ -582,7 +583,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
 
     // check for the next child so we can insert this one before
     const next = this.findChild(child.index + 1);
-    this.canvas.nativeElement.insertBefore(child.node, next?.node ?? null);
+    this.canvas().nativeElement.insertBefore(child.node, next?.node ?? null);
     child.view.attach(this.applicationRef);
     this.observer.observe(child.node, {box: 'border-box'});
 
@@ -607,7 +608,7 @@ export class ListViewComponent implements AfterViewInit, AfterContentInit, OnCha
     this.observer.unobserve(child.node);
     child.view.detach(this.applicationRef);
 
-    this.canvas.nativeElement.removeChild(child.node);
+    this.canvas().nativeElement.removeChild(child.node);
 
     // measure child now
     child.height = child.node.offsetHeight;

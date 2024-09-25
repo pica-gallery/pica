@@ -1,14 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component, effect,
-  EventEmitter,
-  inject,
-  input,
-  Input,
-  Output,
-  signal,
-  ViewChild
-} from '@angular/core';
+import {ChangeDetectionStrategy, Component, EventEmitter, inject, input, Input, output, Output} from '@angular/core';
 import {
   type ListItem,
   ListViewComponent,
@@ -79,13 +69,9 @@ export class SearchResultsComponent {
     this.dataSource.items = newItems
   }
 
-  public readonly initialScrollState = input<SavedScroll| null>(null);
+  public readonly initialScrollState = input<SavedScroll | null>(null);
 
-  @Output()
-  public readonly scrollChanged = new EventEmitter<SavedScroll>();
-
-  @ViewChild(ListViewComponent)
-  protected listView!: ListViewComponent;
+  public readonly scrollChanged = output<SavedScroll>();
 
   protected readonly layout = gridLayout({
     maxColumnWidth: 200,
