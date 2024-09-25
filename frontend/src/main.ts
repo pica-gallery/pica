@@ -1,7 +1,7 @@
 import { bootstrapApplication } from "@angular/platform-browser";
 import { AppComponent } from "./app/app.component";
 import { provideHttpClient, withFetch, withInterceptors } from "@angular/common/http";
-import { provideRouter, type Route, withComponentInputBinding } from "@angular/router";
+import {PreloadAllModules, provideRouter, type Route, withComponentInputBinding, withPreloading} from '@angular/router';
 
 import "./app/history";
 import { instrumentHistoryTracking } from "./app/history";
@@ -63,6 +63,7 @@ void bootstrapApplication(AppComponent, {
     provideHttpClient(withFetch(), withInterceptors([AuthInterceptor])),
     provideRouter(
       routes,
+      withPreloading(PreloadAllModules),
       withComponentInputBinding(),
       // withDebugTracing(),
       // withInMemoryScrolling({scrollPositionRestoration: 'enabled'}),
