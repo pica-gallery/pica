@@ -121,7 +121,7 @@ impl ScaleQueue {
         Self { notify: Notify::new(), tasks: Mutex::new(Vec::new()), accessor }
     }
 
-    pub async fn scale(&self, media: MediaItem, image_type: ImageType) -> Result<Image> {
+    async fn scale(&self, media: MediaItem, image_type: ImageType) -> Result<Image> {
         let (send, recv) = oneshot::channel();
 
         let task = ThumbnailTask {
