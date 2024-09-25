@@ -8,6 +8,7 @@ import {AlbumComponent} from '../../components/album/album.component';
 import {NavigationService} from '../../service/navigation';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
 import {derivedAsync} from 'ngxtension/derived-async';
+import {ScrollStateUpdater} from '../../service/scroll-state';
 
 function convertToSections(album: Album): Section[] {
   return [{
@@ -38,7 +39,9 @@ export class AlbumPageComponent {
     );
   })
 
-  mediaClicked(item: MediaItem) {
+  protected readonly scrollState = new ScrollStateUpdater()
+
+  protected mediaClicked(item: MediaItem) {
     void this.navigationService.media(item.id);
   }
 }

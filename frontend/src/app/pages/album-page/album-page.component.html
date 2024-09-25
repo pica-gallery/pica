@@ -1,5 +1,8 @@
 @if (sections(); as sections) {
-  <app-album [sections]="sections" (mediaClicked)="mediaClicked($event)"></app-album>
+  <app-album [sections]="sections"
+             [initialScrollState]="scrollState.initial"
+             (mediaClicked)="mediaClicked($event)"
+             (scrollChanged)="scrollState.update($event)"/>
 } @else {
   <app-busy-full/>
 }

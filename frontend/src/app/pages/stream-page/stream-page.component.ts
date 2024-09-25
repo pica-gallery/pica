@@ -6,6 +6,7 @@ import {map} from 'rxjs';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {NavigationService} from '../../service/navigation';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
+import {ScrollStateUpdater} from '../../service/scroll-state';
 
 @Component({
   selector: 'app-stream-page',
@@ -22,6 +23,8 @@ import {BusyFullComponent} from '../../components/busy-full/busy-full.component'
 export class StreamPageComponent {
   private readonly gallery = inject(Gallery);
   private readonly router = inject(NavigationService);
+
+  protected readonly scrollState = new ScrollStateUpdater();
 
   protected sections = toSignal(
     this.gallery.stream().pipe(map(st => st.sections)),

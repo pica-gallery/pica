@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, computed, EventEmitter, input, output, Output} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, EventEmitter, Input, input, output, Output} from '@angular/core';
 import type {MediaItem, Section} from '../../service/gallery';
 import {
   type Child,
@@ -42,6 +42,7 @@ type RowListItem =
 })
 export class AlbumComponent {
   public readonly sections = input.required<Section[]>();
+  public readonly initialScrollState = input<SavedScroll | null>(null);
 
   public readonly mediaClicked = output<MediaItem>();
   public readonly scrollChanged = output<SavedScroll>();
@@ -77,6 +78,9 @@ export class AlbumComponent {
 
     return this.sections().flatMap(section => convertSection(section));
   });
+
+  constructor() {
+  }
 }
 
 

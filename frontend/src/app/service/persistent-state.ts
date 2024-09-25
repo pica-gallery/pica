@@ -1,6 +1,6 @@
 import {inject} from '@angular/core';
 import {ActivatedRoute, NavigationStart, type Router} from '@angular/router';
-import {object, string, transform, type Type, type TypeOf} from 'fud-ts';
+import {type Type} from 'fud-ts';
 import {auditTime, BehaviorSubject, filter} from 'rxjs';
 
 type VersionedState<T> = {
@@ -77,10 +77,3 @@ export function updateQueryValues(state: Record<string, string | number>, prefix
   // update url state
   history.replaceState(history.state, '', url.toString());
 }
-
-export const fUrlScrollState = object({
-  id: string(),
-  offset: string().pipe(transform(value => parseInt(value, 10))),
-});
-
-export type UrlScrollState = TypeOf<typeof fUrlScrollState>;
