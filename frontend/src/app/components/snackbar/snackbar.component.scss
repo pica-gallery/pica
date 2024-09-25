@@ -1,0 +1,31 @@
+:host {
+  display: block;
+  padding: 8px;
+  width: 100vw;
+  box-sizing: border-box;
+}
+
+.snackbar {
+  display: flex;
+  flex-wrap: nowrap;
+
+  background: #555;
+  color: white;
+  border-radius: 4px;
+
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+.text {
+  flex-grow: 1;
+  padding: 16px 0 16px 16px;
+}
+
+.action {
+  color: antiquewhite;
+  padding: 16px;
+  background: transparent;
+  outline: none;
+  border: 0 none;
+  font-weight: bold;
+}

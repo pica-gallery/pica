@@ -18,3 +18,7 @@ export function* iterActivatedRoute(route: ActivatedRoute): Generator<ActivatedR
     }
   }
 }
+
+export async function idleCallback(): Promise<IdleDeadline> {
+  return await new Promise(resolve => requestIdleCallback(resolve));
+}

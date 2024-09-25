@@ -1,0 +1,9 @@
+<div class="snackbar">
+  <div class="text">
+    <ng-content></ng-content>
+  </div>
+
+  @if (action(); as action) {
+    <button class="action" (click)="actionClicked.emit()">{{ action }}</button>
+  }
+</div>

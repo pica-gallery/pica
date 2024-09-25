@@ -1,9 +1,9 @@
-import {ChangeDetectionStrategy, Component, computed, inject, signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, inject, signal} from '@angular/core';
 import {SearchInputComponent} from '../../components/search-input/search-input.component';
 import {Gallery} from '../../service/gallery';
 import {AlbumListComponent} from '../../components/album-list/album-list.component';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
-import {iterSearch, predicateOf} from '../../service/search';
+import {iterSearchAsync, predicateOf} from '../../service/search';
 import {type ResultListItem, SearchResultsComponent} from '../../components/search-results/search-results.component';
 import {parseQuery, UrlStateUpdater} from '../../service/persistent-state';
 import {Router} from '@angular/router';
@@ -11,6 +11,7 @@ import type {SavedScroll} from '../../components/list-view/list-view.component';
 import {object, string, transform, type TypeOf} from 'fud-ts';
 import {type State, toStateSignal} from '../../util';
 import {ErrorSnackbarComponent} from '../../components/error-snackbar/error-snackbar.component';
+import {derivedAsync} from 'ngxtension/derived-async';
 
 
 @Component({
@@ -45,7 +46,7 @@ export class SearchPageComponent {
     }
   }
 
-  protected readonly itemsState = computed((): State<ResultListItem[]> => {
+  protected readonly itemsState = derivedAsync(async (): Promise<State<ResultListItem[]>> => {
     const albums = this.albumsState();
     if (albums.state !== 'success') {
       return albums;
@@ -60,7 +61,7 @@ export class SearchPageComponent {
 
     const results: ResultListItem[] = [];
 
-    for (const item of iterSearch(albums.data, predicateOf(term))) {
+    for (const item of await iterSearchAsync(albums.data, predicateOf(term))) {
       if (item.type === 'album') {
         results.push({
           viewType: 'Album',

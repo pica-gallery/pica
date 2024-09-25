@@ -1,4 +1,7 @@
+import 'requestidlecallback-polyfill';
+
 import type {Album, MediaItem} from './gallery';
+import {idleCallback} from '../util/utils';
 
 export type Predicate = {
   album?: (album: Album) => boolean,
@@ -9,21 +12,31 @@ export type ResultItem =
   | { type: 'album', timestamp: Date, album: Album }
   | { type: 'media', timestamp: Date, album: Album, media: MediaItem }
 
-export function* iterSearch(albums: Album[], predicate: Predicate): Generator<ResultItem> {
+export async function iterSearchAsync(albums: Album[], predicate: Predicate): Promise<ResultItem[]> {
+  const items: ResultItem[] = [];
+
+  let deadline = await idleCallback();
+
   for (const album of albums) {
+    if (deadline.timeRemaining() <= 1) {
+      deadline = await idleCallback();
+    }
+
     if (predicate.album != null && predicate.album(album)) {
-      yield {type: 'album', timestamp: album.timestamp, album}
+      items.push({type: 'album', timestamp: album.timestamp, album});
       continue;
     }
 
     if (predicate.media != null) {
       for (const media of album.items) {
         if (predicate.media(album, media)) {
-          yield {type: 'media', timestamp: media.timestamp, album, media}
+          items.push({type: 'media', timestamp: media.timestamp, album, media});
         }
       }
     }
   }
+
+  return items;
 }
 
 export function predicateOf(term: string): Predicate {
