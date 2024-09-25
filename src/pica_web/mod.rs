@@ -1,18 +1,18 @@
-use std::fmt::Display;
-
 use anyhow::Result;
-use axum::Router;
 use axum::routing::{get, post};
-use axum_login::{AuthManagerLayerBuilder, login_required};
-use axum_login::tower_sessions::{ExpiredDeletion, Expiry, SessionManagerLayer};
+use axum::Router;
 use axum_login::tower_sessions::cookie::time::Duration;
+use axum_login::tower_sessions::{ExpiredDeletion, Expiry, SessionManagerLayer};
+use axum_login::{login_required, AuthManagerLayerBuilder};
 use sqlx::SqlitePool;
+use std::fmt::Display;
+use std::sync::Arc;
 use tokio::net::ToSocketAddrs;
 use tokio::signal;
 use tokio::task::AbortHandle;
 use tower_http::compression::CompressionLayer;
-use tower_http::CompressionLevel;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use tower_http::CompressionLevel;
 use tower_sessions_sqlx_store::SqliteStore;
 use tracing::{info, Level};
 
@@ -22,8 +22,9 @@ use crate::pica::store::MediaStore;
 mod handlers;
 mod auth;
 
-pub use auth::User;
 use crate::pica::config::SourceConfig;
+use crate::pica_web::handlers::media::ScaleQueue;
+pub use auth::User;
 
 pub struct Options<A> {
     pub store: MediaStore,
@@ -39,15 +40,25 @@ pub struct AppState {
     pub store: MediaStore,
     pub accessor: MediaAccessor,
     pub sources: Vec<SourceConfig>,
+    pub scale_queue: Arc<ScaleQueue>,
 }
 
 pub async fn serve<A>(opts: Options<A>) -> Result<()>
-    where A: ToSocketAddrs + Display,
+where
+    A: ToSocketAddrs + Display,
 {
+    let scale_queue = Arc::new(ScaleQueue::new(opts.accessor.clone()));
+
+    for _idx in 0..8 {
+        let queue = scale_queue.clone();
+        tokio::spawn(async move { queue.work().await });
+    }
+
     let state = AppState {
         store: opts.store,
         accessor: opts.accessor,
         sources: opts.sources,
+        scale_queue,
     };
 
     info!("Create session store in database");
@@ -108,7 +119,7 @@ async fn shutdown_signal(deletion_task_abort_handle: AbortHandle) {
     };
 
     #[cfg(unix)]
-        let terminate = async {
+    let terminate = async {
         signal::unix::signal(signal::unix::SignalKind::terminate())
             .expect("failed to install signal handler")
             .recv()
@@ -116,7 +127,7 @@ async fn shutdown_signal(deletion_task_abort_handle: AbortHandle) {
     };
 
     #[cfg(not(unix))]
-        let terminate = std::future::pending::<()>();
+    let terminate = std::future::pending::<()>();
 
     tokio::select! {
         _ = ctrl_c => { deletion_task_abort_handle.abort() },

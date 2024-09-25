@@ -37,7 +37,7 @@ impl MediaAccessor {
         let root = self.sources
             .get(item.source.as_str())
             .ok_or_else(|| anyhow!("source {:?} not found", item.source))?;
-        
+
         Ok(root.join(item.relpath.as_ref()))
     }
 
