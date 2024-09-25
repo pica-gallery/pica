@@ -1,4 +1,3 @@
-use sqlx::database::{HasArguments, HasValueRef};
 use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
 use sqlx::Sqlite;
@@ -17,14 +16,14 @@ impl<T> sqlx::Type<Sqlite> for Id<T> {
 }
 
 impl<'q, T> sqlx::Encode<'q, Sqlite> for Id<T> {
-    fn encode_by_ref(&self, buf: &mut <Sqlite as HasArguments<'q>>::ArgumentBuffer) -> IsNull {
+    fn encode_by_ref(&self, buf: &mut <Sqlite as sqlx::Database>::ArgumentBuffer<'q>) -> Result<IsNull, BoxDynError> {
         let value = i64::from_be_bytes(self.value);
         sqlx::Encode::<'q, Sqlite>::encode(value, buf)
     }
 }
 
 impl<'r, T> sqlx::Decode<'r, Sqlite> for Id<T> {
-    fn decode(value: <Sqlite as HasValueRef<'r>>::ValueRef) -> Result<Self, BoxDynError> {
+    fn decode(value: <Sqlite as sqlx::Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let value = <i64 as sqlx::Decode<'r, Sqlite>>::decode(value)?;
         Ok(Id::from(value.to_be_bytes()))
     }
@@ -37,13 +36,13 @@ impl sqlx::Type<Sqlite> for ImageType {
 }
 
 impl<'q> sqlx::Encode<'q, Sqlite> for ImageType {
-    fn encode_by_ref(&self, buf: &mut <Sqlite as HasArguments<'q>>::ArgumentBuffer) -> IsNull {
+    fn encode_by_ref(&self, buf: &mut <Sqlite as sqlx::Database>::ArgumentBuffer<'q>) -> Result<IsNull, BoxDynError> {
         sqlx::Encode::<'q, Sqlite>::encode(self.mime_type(), buf)
     }
 }
 
 impl<'r> sqlx::Decode<'r, Sqlite> for ImageType {
-    fn decode(value: <Sqlite as HasValueRef<'r>>::ValueRef) -> Result<Self, BoxDynError> {
+    fn decode(value: <Sqlite as sqlx::Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         match <String as sqlx::Decode<'r, Sqlite>>::decode(value)?.as_str() {
             "image/avif" => Ok(Self::Avif),
             "image/jpeg" => Ok(Self::Jpeg),

@@ -4,6 +4,10 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use opentelemetry::global;
+use opentelemetry::trace::TracerProvider;
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::propagation::BaggagePropagator;
+use opentelemetry_sdk::runtime::Tokio;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tracing::info;
@@ -27,13 +31,17 @@ fn initialize_tracing(jaeger_endpoint: Option<String>) -> Result<()> {
     let opentelemetry = jaeger_endpoint
         .map(|jaeger_endpoint| -> Result<_> {
             // Allows you to pass along context (i.e., trace IDs) across services
-            global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
-
-            // Sets up the machinery needed to export data to Jaeger
-            let tracer = opentelemetry_jaeger::new_agent_pipeline()
-                .with_endpoint(jaeger_endpoint)
-                .with_service_name("pica")
-                .install_simple()?;
+            global::set_text_map_propagator(BaggagePropagator::new());
+            
+            let tracer = opentelemetry_otlp::new_pipeline()
+                .tracing()
+                .with_exporter(
+                    opentelemetry_otlp::new_exporter()
+                        .tonic()
+                        .with_endpoint(jaeger_endpoint)
+                )
+                .install_batch(Tokio)?
+                .tracer("pica");
 
             // Create a tracing layer with the configured tracer
             Ok(tracing_opentelemetry::layer().with_tracer(tracer))

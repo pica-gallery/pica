@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.87"
+anyhow = "1.0.89"
 byteorder = "1.5.0"
-quick-xml = { version = "0.31.0", features = ["serialize"] }
+quick-xml = { version = "0.36.2", features = ["serialize"] }
 serde = { version = "1.0.210", features = ["derive"] }
 tee_readwrite = "0.2.0"
 

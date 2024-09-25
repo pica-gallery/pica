@@ -7,7 +7,6 @@ use axum::http::{HeaderValue, Request};
 use axum::response::{IntoResponse, Response};
 use mime::Mime;
 use std::str::FromStr;
-use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex, Notify};
 use tower::ServiceExt;
 use tower_http::services::ServeFile;

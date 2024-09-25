@@ -321,7 +321,7 @@ impl Indexer {
 async fn parse(item: &ScanItem) -> Result<MediaItem> {
     let path = block_in_place(|| pica_image::get(&item.path))?;
 
-    let reader = image::io::Reader::open(path.as_ref())?;
+    let reader = image::ImageReader::open(path.as_ref())?;
 
     let (width, height) = reader.with_guessed_format()?.into_dimensions()?;
 
@@ -359,9 +359,8 @@ fn timestamp_from_metadata(metadata: &Metadata) -> Result<DateTime<Utc>> {
     let modified = metadata.modified().or_else(|_| metadata.created())?;
     let epoch_seconds = modified.duration_since(SystemTime::UNIX_EPOCH)?.as_secs();
 
-    let timestamp = NaiveDateTime::from_timestamp_opt(epoch_seconds as i64, 0)
-        .ok_or_else(|| anyhow!("invalid unix timestamp {:?}", epoch_seconds))?
-        .and_utc();
+    let timestamp = DateTime::<Utc>::from_timestamp(epoch_seconds as i64, 0)
+        .ok_or_else(|| anyhow!("invalid unix timestamp {:?}", epoch_seconds))?;
 
     Ok(timestamp)
 }

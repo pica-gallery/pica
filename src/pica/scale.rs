@@ -8,15 +8,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use image::{image_dimensions, ImageFormat, io};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
-use sqlx::__rt::spawn_blocking;
+use image::{image_dimensions, ImageFormat, ImageReader};
 use tempfile::NamedTempFile;
 use tokio::sync::Semaphore;
+use tokio::task::spawn_blocking;
 use tracing::instrument;
 
-use pica_image::exif::{Orientation, parse_exif};
+use pica_image::exif::{parse_exif, Orientation};
 use ultrahdr_rs::{Jpeg, SegmentKind};
 
 pub struct Image {
@@ -103,7 +103,7 @@ impl MediaScaler {
             }
         };
 
-        spawn_blocking(task).await
+        spawn_blocking(task).await?
     }
 }
 
@@ -151,7 +151,7 @@ fn resize_imagemagick(source: &Path, format: &ImageType, size: u32) -> Result<Ve
 fn resize_rust(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> {
     let rotate = parse_exif(source).ok().flatten().map(|r| r.orientation);
 
-    let mut image = io::Reader::open(source)?.with_guessed_format()?.decode()?;
+    let mut image = ImageReader::open(source)?.with_guessed_format()?.decode()?;
 
     image = match rotate {
         Some(Orientation::FlipH) => image.fliph(),
