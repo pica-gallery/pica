@@ -1,9 +1,17 @@
-@if (albums(); as albums) {
-  <app-album-list
-    [albums]="albums"
-    [initialScrollState]="scrollState.initial"
-    (scrollChanged)="scrollState.update($event)"
-  />
-} @else {
-  <app-busy-full/>
+@if (albumsState(); as albumsState) {
+  @switch (albumsState.state) {
+    @case ('loading') {
+      <app-busy-full/>
+    }
+    @case ("success") {
+      <app-album-list
+        [albums]="albumsState.data"
+        [initialScrollState]="scrollState.initial"
+        (scrollChanged)="scrollState.update($event)"
+      />
+    }
+    @case ("error") {
+      <app-error-snackbar [errorState]="albumsState"/>
+    }
+  }
 }

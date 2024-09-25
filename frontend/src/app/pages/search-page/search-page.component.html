@@ -4,17 +4,25 @@
     (searchTermChanged)="searchTermChanged($event)"/>
 </div>
 
-@if (items(); as items) {
-  @if (items.length) {
-    <app-search-results
-      [items]="items"
-      (scrollChanged)="scrollChanged($event)"
-      [initialScrollState]="toScrollState()"
-    />
-  } @else {
-    <div class="no-results">No results</div>
+@if (itemsState(); as itemsState) {
+  @switch (itemsState.state) {
+    @case ('loading') {
+      <app-busy-full/>
+    }
+    @case ("success") {
+      @if (itemsState.data.length) {
+        <app-search-results
+          [items]="itemsState.data"
+          (scrollChanged)="scrollChanged($event)"
+          [initialScrollState]="toScrollState()"
+        />
+      } @else {
+        <div class="no-results">No results</div>
+      }
+    }
+    @case ("error") {
+      <app-error-snackbar [errorState]="itemsState"/>
+    }
   }
-} @else {
-  <app-busy-full/>
 }
 

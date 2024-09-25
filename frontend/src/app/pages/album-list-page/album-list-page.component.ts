@@ -5,6 +5,9 @@ import {AlbumListComponent} from '../../components/album-list/album-list.compone
 import {ProgressBarComponent} from '../../components/progressbar/progress-bar.component';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
 import {ScrollStateUpdater} from '../../service/scroll-state';
+import {toStateSignal} from '../../util';
+import {JsonPipe} from '@angular/common';
+import {ErrorSnackbarComponent} from '../../components/error-snackbar/error-snackbar.component';
 
 @Component({
   selector: 'app-album-list-page',
@@ -12,7 +15,9 @@ import {ScrollStateUpdater} from '../../service/scroll-state';
   imports: [
     AlbumListComponent,
     ProgressBarComponent,
-    BusyFullComponent
+    BusyFullComponent,
+    JsonPipe,
+    ErrorSnackbarComponent
   ],
   templateUrl: './album-list-page.component.html',
   styleUrl: './album-list-page.component.scss',
@@ -21,6 +26,6 @@ import {ScrollStateUpdater} from '../../service/scroll-state';
 export class AlbumListPageComponent {
   private readonly gallery = inject(Gallery);
 
-  protected readonly albums = toSignal(this.gallery.albums());
+  protected readonly albumsState = toStateSignal(this.gallery.albums());
   protected readonly scrollState = new ScrollStateUpdater();
 }

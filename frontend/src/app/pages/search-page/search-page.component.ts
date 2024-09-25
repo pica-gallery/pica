@@ -1,7 +1,6 @@
 import {ChangeDetectionStrategy, Component, computed, inject, signal} from '@angular/core';
 import {SearchInputComponent} from '../../components/search-input/search-input.component';
 import {Gallery} from '../../service/gallery';
-import {toSignal} from '@angular/core/rxjs-interop';
 import {AlbumListComponent} from '../../components/album-list/album-list.component';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
 import {iterSearch, predicateOf} from '../../service/search';
@@ -10,6 +9,8 @@ import {parseQuery, UrlStateUpdater} from '../../service/persistent-state';
 import {Router} from '@angular/router';
 import type {SavedScroll} from '../../components/list-view/list-view.component';
 import {object, string, transform, type TypeOf} from 'fud-ts';
+import {type State, toStateSignal} from '../../util';
+import {ErrorSnackbarComponent} from '../../components/error-snackbar/error-snackbar.component';
 
 
 @Component({
@@ -19,7 +20,8 @@ import {object, string, transform, type TypeOf} from 'fud-ts';
     SearchInputComponent,
     AlbumListComponent,
     BusyFullComponent,
-    SearchResultsComponent
+    SearchResultsComponent,
+    ErrorSnackbarComponent
   ],
   templateUrl: './search-page.component.html',
   styleUrl: './search-page.component.scss',
@@ -28,7 +30,7 @@ import {object, string, transform, type TypeOf} from 'fud-ts';
 export class SearchPageComponent {
   private initialState: UrlState | null = parseQuery(fUrlScrollState, 'st.');
 
-  private readonly albums = toSignal(inject(Gallery).albumsWithContent());
+  private readonly albumsState = toStateSignal(inject(Gallery).albumsWithContent());
   protected readonly searchTerm = signal(this.initialState?.searchQuery ?? '');
 
   protected readonly updater = new UrlStateUpdater<UrlState>(
@@ -43,20 +45,22 @@ export class SearchPageComponent {
     }
   }
 
-  protected readonly items = computed(() => {
-    const albums = this.albums();
-    if (albums == null) {
-      return null;
+  protected readonly itemsState = computed((): State<ResultListItem[]> => {
+    const albums = this.albumsState();
+    if (albums.state !== 'success') {
+      return albums;
     }
 
     const term = this.searchTerm().trim();
     if (!term.length) {
-      return [];
+      return {state: 'success', data: []};
     }
+
+    const startTime = Date.now();
 
     const results: ResultListItem[] = [];
 
-    for (const item of iterSearch(albums, predicateOf(term))) {
+    for (const item of iterSearch(albums.data, predicateOf(term))) {
       if (item.type === 'album') {
         results.push({
           viewType: 'Album',
@@ -78,14 +82,16 @@ export class SearchPageComponent {
       }
     }
 
-    return results;
+    console.info('Searching for \'%s\' took %sms', term, (Date.now() - startTime).toFixed(2));
+
+    return {state: 'success', data: results};
   })
 
   protected searchTermChanged(term: string) {
-    if(this.searchTerm() !== term) {
+    if (this.searchTerm() !== term) {
       this.searchTerm.set(term);
 
-      console.info("Reset scroll due to search term changed.");
+      console.info('Reset scroll due to search term changed.');
 
       this.updater.update({
         id: 0,

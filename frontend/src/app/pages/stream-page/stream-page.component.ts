@@ -7,6 +7,8 @@ import {toSignal} from '@angular/core/rxjs-interop';
 import {NavigationService} from '../../service/navigation';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
 import {ScrollStateUpdater} from '../../service/scroll-state';
+import {toStateSignal} from '../../util';
+import {ErrorSnackbarComponent} from '../../components/error-snackbar/error-snackbar.component';
 
 @Component({
   selector: 'app-stream-page',
@@ -14,7 +16,8 @@ import {ScrollStateUpdater} from '../../service/scroll-state';
   imports: [
     AlbumComponent,
     RouterOutlet,
-    BusyFullComponent
+    BusyFullComponent,
+    ErrorSnackbarComponent
   ],
   templateUrl: './stream-page.component.html',
   styleUrl: './stream-page.component.scss',
@@ -26,7 +29,7 @@ export class StreamPageComponent {
 
   protected readonly scrollState = new ScrollStateUpdater();
 
-  protected sections = toSignal(
+  protected sections = toStateSignal(
     this.gallery.stream().pipe(map(st => st.sections)),
   );
 
