@@ -39,7 +39,7 @@ regex = "1.10.6"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_with = "3.9.0"
 serde_yaml = "0.9.34"
-sha1_smol = "1.0.1"
+sha1_smol = { version = "1.0.1", features = ["std"] }
 sqlx = { version = "0.8.2", features = ["chrono", "sqlite", "migrate", "uuid", "macros", "runtime-tokio"], default-features = false }
 tokio = { version = "1.38.1", features = ["full"] }
 tower = { version = "0.5.1", features = ["util"] }

@@ -8,7 +8,7 @@ CREATE TABLE pica_media_cache
 
     -- source id of this media info item.
     source    text      NOT NULL,
-    
+
     -- relative path of this media item.
     -- Stored as a blob as the path is not necessarily utf8
     relpath   blob      NOT NULL,
@@ -50,23 +50,29 @@ CREATE TABLE pica_media_error
 CREATE TABLE pica_image
 (
     -- the media this image references.
-    media    integer REFERENCES pica_media_cache (id),
+    media integer REFERENCES pica_media_cache (id),
 
     -- the pixel size of the image (max (width, height))
-    size     INT4 NOT NULL,
+    size  INT4 NOT NULL,
+
+    -- image type of the image.
+    type  text NOT NULL,
+
+    -- the error that occurred when generating the thumbnail
+    error text,
+
+    -- the thumbnail content (if generation was successful)
+    hash  text REFERENCES pica_blob_storage (hash),
+
+    PRIMARY KEY (media, size)
+);
+
+CREATE TABLE pica_blob_storage
+(
+    hash     text PRIMARY KEY,
 
     -- store the file size of this image (for debugging purposes)
     bytesize INT4 GENERATED ALWAYS AS (LENGTH(content)),
 
-    -- image type of the image.
-    type     text NOT NULL,
-
-    -- the error that occurred when generating the thumbnail
-    error    text,
-
-    -- the thumbnail content (if generation was successful)
-    content  blob,
-
-
-    PRIMARY KEY (media, size)
+    content  blob
 );
