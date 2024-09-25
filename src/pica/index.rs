@@ -135,7 +135,7 @@ fn scan_path_for_items(source: &str, root: &Path) -> Vec<ScanItem> {
         .filter_entry(|entry| !file_is_hidden(entry.file_name()))
         // convert any error to anyhow errors.
         .map(|res| res.map_err(anyhow::Error::from))
-        // keep only jpeg files
+        // keep only indexable files
         .filter_ok(|entry| entry.file_type().is_file() && file_is_indexable(entry.path()))
         // extract metadata and convert into scan items
         .map_ok(move |entry| -> Result<ScanItem> {

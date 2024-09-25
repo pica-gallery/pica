@@ -34,7 +34,7 @@ CREATE TABLE pica_media_cache
 
     -- make sure that we only index every path & byte size once.
     -- this index is just an extra check to ensure id generation works.
-    UNIQUE (relpath, bytesize)
+    UNIQUE (source, relpath, bytesize)
 );
 
 
