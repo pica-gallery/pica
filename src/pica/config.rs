@@ -19,7 +19,6 @@ pub struct PicaConfig {
     pub use_image_magick: bool,
     pub image_codec: ImageCodecConfig,
     pub prefer_ultra_hdr: bool,
-    pub max_memory_in_megabytes: NonZeroU32,
 
     // sqlite database url
     pub database: String,

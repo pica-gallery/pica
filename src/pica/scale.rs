@@ -3,18 +3,15 @@ use std::fmt::Debug;
 use std::fs;
 use std::fs::File;
 use std::io::BufReader;
-use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
-use image::{image_dimensions, ImageFormat, ImageReader};
+use image::{ImageFormat, ImageReader};
 use tempfile::NamedTempFile;
-use tokio::sync::Semaphore;
 use tokio::task::spawn_blocking;
-use tracing::instrument;
+use tracing::{debug_span, instrument, Instrument};
 
 use pica_image::exif::{parse_exif, Orientation};
 use ultrahdr_rs::{Jpeg, SegmentKind};
@@ -44,19 +41,16 @@ pub struct Options {
     pub prefer_ultra_hdr: bool,
     pub use_image_magick: bool,
     pub image_type: ImageType,
-    pub max_memory: NonZeroU64,
 }
 
 #[derive(Clone)]
 pub struct MediaScaler {
     options: Options,
-    memory: Arc<Semaphore>,
 }
 
 impl MediaScaler {
     pub fn new(options: Options) -> Self {
         MediaScaler {
-            memory: Arc::new(Semaphore::new(options.max_memory.get() as _)),
             options,
         }
     }
@@ -64,19 +58,10 @@ impl MediaScaler {
     /// Generate a resized version of an image
     #[instrument(skip_all, fields(? path, size))]
     pub async fn scaled(&self, path: impl AsRef<Path> + Debug, size: u32) -> Result<Image> {
-        let (width, height) = image_dimensions(path.as_ref())?;
-
-        // memory to reserve
-        let memory = self.options.max_memory.get().min(width as u64 * height as u64 * 4);
-
-        // reserve some bytes to load the image into memory
-        let _guard = self
-            .memory
-            .acquire_many(u32::try_from(memory).unwrap_or(u32::MAX))
-            .await?;
-
         // run resize in a different task to not block the executor
-        let bytes = self.resize(path.as_ref(), size).await?;
+        let bytes = self.resize(path.as_ref(), size)
+            .instrument(debug_span!("resize"))
+            .await?;
 
         let thumb = Image {
             typ: self.options.image_type.clone(),
@@ -89,7 +74,11 @@ impl MediaScaler {
         let path = PathBuf::from(path.as_ref());
         let options = self.options.clone();
 
+        let span = debug_span!("resize-inner");
+
         let task = move || {
+            let _entered = span.entered();
+
             if options.prefer_ultra_hdr {
                 if ultrahdr_rs::is_ultrahdr(BufReader::new(File::open(&path)?))? {
                     return resize_ultrahdr(&path, size);
@@ -151,7 +140,10 @@ fn resize_imagemagick(source: &Path, format: &ImageType, size: u32) -> Result<Ve
 fn resize_rust(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> {
     let rotate = parse_exif(source).ok().flatten().map(|r| r.orientation);
 
-    let mut image = ImageReader::open(source)?.with_guessed_format()?.decode()?;
+    let mut image = {
+        let _span = debug_span!("read image");
+        ImageReader::open(source)?.with_guessed_format()?.decode()?
+    };
 
     image = match rotate {
         Some(Orientation::FlipH) => image.fliph(),
@@ -163,10 +155,15 @@ fn resize_rust(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> 
         Some(Orientation::Rotate270) => image.rotate270(),
         _ => image,
     };
-
-    let scaled = if size >= 512 {
+    
+    let scaled = if image.width() < size && image.height() < size {
+        // no resize needed
+        image
+    } else if size >= 512 {
+        let _span = debug_span!("resize gaussian", size=?size).entered();
         image.resize(size, size, FilterType::Gaussian)
     } else {
+        let _span = debug_span!("resize thumbnail", size=?size).entered();
         image.thumbnail(size, size)
     };
 
@@ -174,10 +171,12 @@ fn resize_rust(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> 
 
     match format {
         ImageType::Jpeg => {
+            let _span = debug_span!("write jpeg").entered();
             scaled.write_with_encoder(JpegEncoder::new_with_quality(&mut writer, 60))?;
         }
 
         ImageType::Avif => {
+            let _span = debug_span!("write avif").entered();
             scaled.write_with_encoder(image::codecs::avif::AvifEncoder::new_with_speed_quality(
                 &mut writer,
                 10,
