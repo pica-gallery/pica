@@ -3,11 +3,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
-use opentelemetry::global;
 use opentelemetry::trace::TracerProvider;
+use opentelemetry::{global, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::propagation::BaggagePropagator;
-use opentelemetry_sdk::runtime::Tokio;
+use opentelemetry_sdk::Resource;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tracing::info;
@@ -27,20 +27,25 @@ use crate::pica::{accessor, scale};
 pub mod pica;
 pub mod pica_web;
 
-fn initialize_tracing(jaeger_endpoint: Option<String>) -> Result<()> {
-    let opentelemetry = jaeger_endpoint
-        .map(|jaeger_endpoint| -> Result<_> {
+fn initialize_tracing(otlp_endpoint: Option<String>) -> Result<()> {
+    let opentelemetry = otlp_endpoint
+        .map(|otlp_endpoint| -> Result<_> {
             // Allows you to pass along context (i.e., trace IDs) across services
             global::set_text_map_propagator(BaggagePropagator::new());
-            
+
             let tracer = opentelemetry_otlp::new_pipeline()
                 .tracing()
+                .with_trace_config(
+                    opentelemetry_sdk::trace::Config::default().with_resource(Resource::new(vec![
+                        KeyValue::new("service.name", "pica"),
+                    ])),
+                )
                 .with_exporter(
                     opentelemetry_otlp::new_exporter()
                         .tonic()
-                        .with_endpoint(jaeger_endpoint)
+                        .with_endpoint(otlp_endpoint)
                 )
-                .install_batch(Tokio)?
+                .install_batch(opentelemetry_sdk::runtime::Tokio)?
                 .tracer("pica");
 
             // Create a tracing layer with the configured tracer
@@ -68,7 +73,7 @@ fn initialize_tracing(jaeger_endpoint: Option<String>) -> Result<()> {
 async fn main() -> Result<()> {
     let config = pica::config::load("./pica.config.yaml")?;
 
-    initialize_tracing(config.jaeger_tracing)?;
+    initialize_tracing(config.otlp_endpoint)?;
 
     // parse users from config
     let users: Vec<_> = config

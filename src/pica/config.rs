@@ -30,7 +30,7 @@ pub struct PicaConfig {
     pub users: Vec<UserConfig>,
 
     #[serde(default)]
-    pub jaeger_tracing: Option<String>,
+    pub otlp_endpoint: Option<String>,
 }
 
 #[derive(Clone, Deserialize)]

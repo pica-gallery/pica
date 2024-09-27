@@ -61,7 +61,7 @@ CREATE TABLE pica_image
     -- the error that occurred when generating the thumbnail
     error text,
 
-    -- the thumbnail content (if generation was successful)
+    -- the thumbnail content ref (if generation was successful)
     hash  text REFERENCES pica_blob_storage (hash),
 
     PRIMARY KEY (media, size)
