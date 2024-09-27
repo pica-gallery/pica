@@ -7,7 +7,7 @@ use anyhow::Result;
 use chrono::Utc;
 use sqlx::{Sqlite, Transaction};
 
-use crate::pica::{MediaId, MediaInfo, MediaItem};
+use crate::pica::{MediaId, MediaInfo, MediaItem, SourceId};
 
 #[derive(sqlx::FromRow)]
 struct MediaRow {
@@ -54,7 +54,8 @@ impl TryFrom<MediaRow> for MediaItem {
             longitude: row.longitude,
         };
 
-        MediaItem::from_media_info(row.id, row.source, relpath, row.bytesize as u64, info)
+        let source = SourceId(row.source.into());
+        MediaItem::from_media_info(row.id, source, relpath, row.bytesize as u64, info)
     }
 }
 

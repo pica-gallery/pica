@@ -8,8 +8,10 @@ use std::sync::Arc;
 use anyhow::{anyhow, ensure};
 use arcstr::ArcStr;
 use chrono::{DateTime, Utc};
+use derive_more::{AsRef, Deref};
+use serde::Serialize;
 use serde_with::{DeserializeFromStr, SerializeDisplay};
-
+use serde_with::serde_derive::Deserialize;
 pub use album::by_directory;
 use pica_image::MediaType;
 
@@ -95,6 +97,18 @@ impl<T> Display for Id<T> {
 
 pub type MediaId = Id<MediaItem>;
 
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Deref)]
+#[derive(Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SourceId(ArcStr);
+
+impl From<&str> for SourceId {
+    fn from(value: &str) -> Self {
+        Self(value.into())
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct MediaInfo {
     pub timestamp: DateTime<Utc>,
@@ -108,7 +122,7 @@ pub struct MediaInfo {
 #[derive(Clone, Debug)]
 pub struct MediaItem {
     pub id: MediaId,
-    pub source: ArcStr,
+    pub source: SourceId,
     pub relpath: Arc<PathBuf>,
     pub filesize: u64,
     pub name: ArcStr,
@@ -118,7 +132,7 @@ pub struct MediaItem {
 }
 
 impl MediaItem {
-    pub fn from_media_info(id: MediaId, source: String, relpath: PathBuf, filesize: u64, info: MediaInfo) -> anyhow::Result<Self> {
+    pub fn from_media_info(id: MediaId, source: SourceId, relpath: PathBuf, filesize: u64, info: MediaInfo) -> anyhow::Result<Self> {
         // take the file name and clear any invalid characters from it
         let name = relpath
             .file_name()
@@ -149,8 +163,8 @@ impl MediaItem {
             name,
             typ,
             location,
+            source,
             relpath: relpath.into(),
-            source: source.into(),
         })
     }
 }

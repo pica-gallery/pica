@@ -94,7 +94,7 @@ async fn main() -> Result<()> {
 
     for source in &config.sources {
         info!("Starting scanner for source {:?}", source.name);
-        let scanner = Scanner::new(&source.path, queue.clone(), &source.name);
+        let scanner = Scanner::new(&source.path, queue.clone(), source.name.as_str());
 
         tokio::task::spawn(scanner_loop(
             scanner,

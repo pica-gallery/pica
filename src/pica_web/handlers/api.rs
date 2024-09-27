@@ -16,7 +16,7 @@ use tracing::instrument;
 
 use pica_image::exif::parse_exif_generic;
 
-use crate::pica::{Album, AlbumId, by_directory, Location, MediaId, MediaItem};
+use crate::pica::{Album, AlbumId, by_directory, Location, MediaId, MediaItem, SourceId};
 use crate::pica_web::{AppState, User};
 use crate::pica_web::handlers::WebError;
 
@@ -128,10 +128,10 @@ fn user_has_access_pred<'a>(state: &'a AppState, user: &'a User) -> impl Fn(&Med
     // find all sources the customer is allowed to access
     let sources: Vec<_> = state.sources.iter()
         .filter(|s| s.access.contains(&user.name))
-        .map(|s| s.name.as_str())
+        .map(|s| SourceId::from(s.name.as_str()))
         .collect();
 
-    move |item: &MediaItem| sources.contains(&item.source.as_str())
+    move |item: &MediaItem| sources.contains(&item.source)
 }
 
 #[instrument(skip_all)]

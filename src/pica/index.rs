@@ -21,7 +21,7 @@ use walkdir::WalkDir;
 use crate::pica::accessor::MediaAccessor;
 use crate::pica::queue::{QueueItem, ScanQueue};
 use crate::pica::store::MediaStore;
-use crate::pica::{db, MediaId, MediaInfo, MediaItem};
+use crate::pica::{db, MediaId, MediaInfo, MediaItem, SourceId};
 use pica_image::MediaType;
 
 thread_local! {
@@ -31,7 +31,7 @@ thread_local! {
 
 pub struct ScanItem {
     pub id: MediaId,
-    pub source: String,
+    pub source: SourceId,
     pub path: PathBuf,
     pub relpath: PathBuf,
 
@@ -49,11 +49,11 @@ pub struct Scanner {
     root: PathBuf,
     queue: Arc<Mutex<ScanQueue>>,
     known: HashSet<MediaId>,
-    source: String,
+    source: SourceId,
 }
 
 impl Scanner {
-    pub fn new(root: impl Into<PathBuf>, queue: Arc<Mutex<ScanQueue>>, source: impl Into<String>) -> Self {
+    pub fn new(root: impl Into<PathBuf>, queue: Arc<Mutex<ScanQueue>>, source: impl Into<SourceId>) -> Self {
         Self {
             root: root.into(),
             queue,
@@ -123,7 +123,7 @@ fn collapse_raw_with_jpeg(items: Vec<ScanItem>) -> impl Iterator<Item = ScanItem
 
 /// Returns an iterator over files we might want to index
 #[instrument]
-fn scan_path_for_items(source: &str, root: &Path) -> Vec<ScanItem> {
+fn scan_path_for_items(source: &SourceId, root: &Path) -> Vec<ScanItem> {
     let files_iter = WalkDir::new(root)
         .same_file_system(true)
         .follow_links(false)
@@ -167,7 +167,7 @@ fn scan_path_for_items(source: &str, root: &Path) -> Vec<ScanItem> {
                 timestamp,
                 relpath,
                 typ,
-                source: source.to_owned(),
+                source: source.clone(),
                 filesize: meta.size(),
                 path: entry.into_path(),
             })
