@@ -10,7 +10,7 @@ use std::str::FromStr;
 use tokio::sync::{oneshot, Mutex, Notify};
 use tower::ServiceExt;
 use tower_http::services::ServeFile;
-use tracing::{debug, instrument};
+use tracing::{debug, debug_span, instrument, Instrument, Span};
 
 use crate::pica::accessor::MediaAccessor;
 use crate::pica::scale::Image;
@@ -61,7 +61,9 @@ async fn handle_image_scaled(id: MediaId, _auth: AuthSession, state: AppState, i
         .ok_or_else(|| anyhow!("unknown image {:?}", id))?;
 
     // scale image
-    let image = state.scale_queue.scale(media, image_type).await?;
+    let image = state.scale_queue.scaled(media, image_type)
+        .instrument(debug_span!("scaled"))
+        .await?;
 
     let resp = Response::builder()
         .header(http::header::CONTENT_TYPE, image.typ.mime_type())
@@ -107,6 +109,7 @@ pub struct ThumbnailTask {
     result: oneshot::Sender<Result<Image>>,
     media: MediaItem,
     image_type: ImageType,
+    span: Span,
 }
 
 pub struct ScaleQueue {
@@ -120,13 +123,24 @@ impl ScaleQueue {
         Self { notify: Notify::new(), tasks: Mutex::new(Vec::new()), accessor }
     }
 
-    async fn scale(&self, media: MediaItem, image_type: ImageType) -> Result<Image> {
+    async fn scaled(&self, media: MediaItem, image_type: ImageType) -> Result<Image> {
+        // check if it already exists before we go into the queue
+        let scaled = match image_type {
+            ImageType::Thumbnail => self.accessor.try_thumb(&media).await?,
+            ImageType::Preview => self.accessor.try_preview(&media).await?,
+        };
+
+        if let Some(scaled) = scaled {
+            return Ok(scaled);
+        }
+
         let (send, recv) = oneshot::channel();
 
         let task = ThumbnailTask {
             result: send,
             media,
             image_type,
+            span: Span::current(),
         };
 
         // enqueue the task to be processed by a worker
@@ -143,13 +157,17 @@ impl ScaleQueue {
 
             // process as many tasks as we can get
             while let Some(task) = self.pop_task().await {
-                if task.result.is_closed() {
-                    debug!("Receiver is already closed");
-                    continue;
-                }
+                let future = async {
+                    if task.result.is_closed() {
+                        debug!("Receiver is already closed");
+                        return;
+                    }
 
-                let result = self.process(&task.media, task.image_type).await;
-                let _ = task.result.send(result);
+                    let result = self.process(&task.media, task.image_type).await;
+                    let _ = task.result.send(result);
+                };
+
+                future.instrument(task.span).await;
             }
         }
     }

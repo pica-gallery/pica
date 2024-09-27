@@ -53,10 +53,31 @@ impl MediaAccessor {
             .await
     }
 
+    pub async fn try_thumb(&self, item: &MediaItem) -> Result<Option<Image>> {
+        self.try_scaled(item, self.sizes.thumb)
+            .instrument(debug_span!("try-scaled", size = self.sizes.thumb))
+            .await
+    }
+
+    pub async fn try_preview(&self, item: &MediaItem) -> Result<Option<Image>> {
+        self.try_scaled(item, self.sizes.preview)
+            .instrument(debug_span!("try-scaled", size = self.sizes.preview))
+            .await
+    }
+
     #[instrument(skip_all, fields(? media.relpath, size))]
-    async fn scaled(&self, media: &MediaItem, size: u32) -> Result<Image> {
+    async fn try_scaled(&self, media: &MediaItem, size: u32) -> Result<Option<Image>> {
         // check if the thumbnail is already in the database
         if let Some(image) = self.storage.load(media.id, size).await? {
+            return Ok(Some(image));
+        }
+
+        Ok(None)
+    }
+
+    #[instrument(skip_all, fields(? media.relpath, size))]
+    async fn scaled(&self, media: &MediaItem, size: u32) -> Result<Image> {
+        if let Some(image) = self.try_scaled(media, size).await? {
             return Ok(image);
         }
 
