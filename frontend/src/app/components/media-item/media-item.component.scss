@@ -1,3 +1,16 @@
 :host {
   display: block;
 }
+
+.thumb {
+  transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+}
+
+:host.selected {
+  background: antiquewhite;
+
+  .thumb {
+    opacity: 0.75;
+    transform: scale(0.9);
+  }
+}

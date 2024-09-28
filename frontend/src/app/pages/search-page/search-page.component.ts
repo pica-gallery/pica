@@ -29,13 +29,13 @@ import {derivedAsync} from 'ngxtension/derived-async';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SearchPageComponent {
-  private initialState: UrlState | null = parseQuery(fUrlScrollState, 'st.');
+  private initialState: UrlState | null = parseQuery(fUrlState, 'st.');
 
   private readonly albumsState = toStateSignal(inject(Gallery).albumsWithContent());
   protected readonly searchTerm = signal(this.initialState?.searchQuery ?? '');
 
   protected readonly updater = new UrlStateUpdater<UrlState>(
-    fUrlScrollState,
+    fUrlState,
     'st.',
     inject(Router),
   )
@@ -124,10 +124,10 @@ export class SearchPageComponent {
   }
 }
 
-const fUrlScrollState = object({
+const fUrlState = object({
   id: string().pipe(transform(value => parseInt(value, 10))),
   offset: string().pipe(transform(value => parseInt(value, 10))),
   searchQuery: string(),
 });
 
-type UrlState = TypeOf<typeof fUrlScrollState>;
+type UrlState = TypeOf<typeof fUrlState>;

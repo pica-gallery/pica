@@ -13,7 +13,8 @@
     <ng-template listViewItem="MediaItem" let-item>
       <app-media-item
         [media]="item.media"
-        (click)="mediaClicked.emit(item.media)"
+        [selected]="selected().has(item.media.id)"
+        (appTaps)="handleTap($event, item.media)"
         class="row-item"/>
     </ng-template>
   </app-list-view>

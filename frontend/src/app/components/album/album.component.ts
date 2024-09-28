@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, computed, EventEmitter, Input, input, output, Output} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, input, output, signal} from '@angular/core';
 import type {MediaItem, Section} from '../../service/gallery';
 import {
   type Child,
@@ -11,6 +11,8 @@ import {
 import {type SectionHeader, SectionHeaderComponent} from '../section-title/section-header.component';
 import {MediaItemComponent} from '../media-item/media-item.component';
 import {columnCount} from '../../util';
+import type {MediaId} from '../../service/api';
+import {TapsDirective, type TapType} from '../../directives/taps.directive';
 
 type SectionHeaderListItem = ListItem & {
   viewType: 'SectionHeader',
@@ -35,6 +37,7 @@ type RowListItem =
     ListViewComponent,
     MediaItemComponent,
     ListViewItemDirective,
+    TapsDirective,
   ],
   templateUrl: './album.component.html',
   styleUrls: ['./album.component.scss'],
@@ -46,6 +49,8 @@ export class AlbumComponent {
 
   public readonly mediaClicked = output<MediaItem>();
   public readonly scrollChanged = output<SavedScroll>();
+
+  protected readonly selected = signal(new Set<MediaId>());
 
   protected readonly layout = columnsLayout;
 
@@ -79,7 +84,33 @@ export class AlbumComponent {
     return this.sections().flatMap(section => convertSection(section));
   });
 
-  constructor() {
+  protected handleTap(tapType: TapType, media: MediaItem) {
+    if (tapType === 'long-tap') {
+      this.toggleSelection(media.id);
+      return;
+    }
+
+    if (tapType === 'tap') {
+      if (this.selected().size > 0) {
+        this.toggleSelection(media.id);
+        return;
+      }
+
+      this.mediaClicked.emit(media)
+    }
+  }
+
+  private toggleSelection(id: MediaId) {
+    // we're in selection mode
+    this.selected.update(set => {
+      if (set.has(id)) {
+        set.delete(id);
+      } else {
+        set.add(id);
+      }
+
+      return set;
+    })
   }
 }
 

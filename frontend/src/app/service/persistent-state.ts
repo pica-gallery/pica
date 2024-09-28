@@ -18,7 +18,7 @@ export class UrlStateUpdater<T extends Record<string, string | number>> {
     router: Router,
   ) {
     this.stateSubject
-      .pipe(auditTime(250))
+      .pipe(auditTime(500))
       .subscribe(state => this.persist(state));
 
     router.events

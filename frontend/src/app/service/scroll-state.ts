@@ -34,7 +34,7 @@ export class ScrollStateUpdater {
   public update(scroll: SavedScroll) {
     this.updater.update({
       id: scroll.index.toString(),
-      offset: scroll.offsetY,
+      offset: scroll.offsetY|0,
     })
   }
 }
