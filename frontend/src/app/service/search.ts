@@ -1,5 +1,3 @@
-import 'requestidlecallback-polyfill';
-
 import type {Album, MediaItem} from './gallery';
 import {idleCallback} from '../util/utils';
 
