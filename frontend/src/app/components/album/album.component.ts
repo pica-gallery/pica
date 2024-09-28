@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, computed, input, output, signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, inject, input, output, signal} from '@angular/core';
 import type {MediaItem, Section} from '../../service/gallery';
 import {
   type Child,
@@ -13,6 +13,7 @@ import {MediaItemComponent} from '../media-item/media-item.component';
 import {columnCount} from '../../util';
 import type {MediaId} from '../../service/api';
 import {TapsDirective, type TapType} from '../../directives/taps.directive';
+import {AlbumState} from './album.state';
 
 type SectionHeaderListItem = ListItem & {
   viewType: 'SectionHeader',
@@ -41,7 +42,8 @@ type RowListItem =
   ],
   templateUrl: './album.component.html',
   styleUrls: ['./album.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [AlbumState],
 })
 export class AlbumComponent {
   public readonly sections = input.required<Section[]>();
@@ -50,7 +52,7 @@ export class AlbumComponent {
   public readonly mediaClicked = output<MediaItem>();
   public readonly scrollChanged = output<SavedScroll>();
 
-  protected readonly selected = signal(new Set<MediaId>());
+  protected readonly state = inject(AlbumState);
 
   protected readonly layout = columnsLayout;
 
@@ -86,31 +88,18 @@ export class AlbumComponent {
 
   protected handleTap(tapType: TapType, media: MediaItem) {
     if (tapType === 'long-tap') {
-      this.toggleSelection(media.id);
+      this.state.toggle(media.id);
       return;
     }
 
     if (tapType === 'tap') {
-      if (this.selected().size > 0) {
-        this.toggleSelection(media.id);
+      if (this.state.hasSelected()) {
+        this.state.toggle(media.id);
         return;
       }
 
       this.mediaClicked.emit(media)
     }
-  }
-
-  private toggleSelection(id: MediaId) {
-    // we're in selection mode
-    this.selected.update(set => {
-      if (set.has(id)) {
-        set.delete(id);
-      } else {
-        set.add(id);
-      }
-
-      return set;
-    })
   }
 }
 
