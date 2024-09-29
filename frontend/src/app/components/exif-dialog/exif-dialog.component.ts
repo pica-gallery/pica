@@ -1,5 +1,5 @@
 import {ChangeDetectionStrategy, Component, inject, input} from '@angular/core';
-import {Gallery} from '../../service/gallery';
+import {GalleryClient} from '../../service/gallery-client.service';
 import {AsyncPipe} from '@angular/common';
 import {BusyFullComponent} from '../busy-full/busy-full.component';
 import {derivedAsync} from 'ngxtension/derived-async';
@@ -16,7 +16,7 @@ import {derivedAsync} from 'ngxtension/derived-async';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ExifDialogComponent {
-  private readonly gallery = inject(Gallery);
+  private readonly gallery = inject(GalleryClient);
 
   protected readonly info = derivedAsync(() => this.gallery.exifInfo(this.mediaId()));
 

@@ -31,3 +31,21 @@ export function toStateObservable<T>(o: Observable<T>): Observable<State<T>> {
     })
   )
 }
+
+export function mapSuccess<T, R>(state: State<T>, transform: (value: T) => R): State<R> {
+  if (state.state === 'success') {
+    return {state: 'success', data: transform(state.data)}
+  }
+
+  return state;
+}
+
+export function unwrapState<T>(state: State<T>, fallbackValue: T): T {
+  if (state.state === 'success') {
+    return state.data;
+  }
+
+  return fallbackValue;
+}
+
+export const LOADING = {state: 'loading'} as const;

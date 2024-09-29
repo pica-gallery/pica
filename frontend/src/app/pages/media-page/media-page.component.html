@@ -1,9 +1,11 @@
-@if (items$|async; as items) {
-  <app-image-swiper
-    [items]="items"
-    [mediaToShowOnInit]="mediaId()"
-    (itemChanged)="itemChanged($event)"
-  ></app-image-swiper>
+@if (items(); as items) {
+  @if (items.state === 'success') {
+    <app-image-swiper
+      [items]="items.data"
+      [mediaToShowOnInit]="mediaId()"
+      (itemChanged)="itemChanged($event)"
+    ></app-image-swiper>
+  }
 }
 
 <div class="actions">

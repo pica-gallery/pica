@@ -6,18 +6,12 @@ import {
   type ExifInfoTo,
   type MediaItemTo,
   type MediaUrls,
-  mediaUrlsOf,
-  type StreamTo
+  mediaUrlsOf
 } from './api';
-import {map, Observable, shareReplay} from 'rxjs';
+import {map, Observable} from 'rxjs';
 
 export type MediaItem = MediaItemTo & {
   urls: MediaUrls,
-}
-
-export type Stream = {
-  sections: Section[],
-  items: MediaItem[],
 }
 
 export type Section = {
@@ -48,61 +42,28 @@ export type ExifInfo = {
 }
 
 @Injectable({providedIn: 'root'})
-export class Gallery {
-  private readonly albumCache = new Map<string, Observable<Album>>();
-  private readonly exifCache = new Map<string, Observable<ExifInfo>>();
-
-  private readonly stream$ = this.apiService.stream().pipe(
-    map(stream => convertStream(stream, Daily)),
-    shareReplay({bufferSize: 1, refCount: false}),
-  )
-
-  private readonly albums$ = this.apiService.albums().pipe(
-    map(albums => convertAlbums(albums)),
-    shareReplay({bufferSize: 1, refCount: false}),
-  )
-
-  private readonly albumsWithContent$ = this.apiService.albumsWithContent().pipe(
-    map(albums => convertAlbums(albums)),
-    shareReplay({bufferSize: 1, refCount: false}),
-  )
-
+export class GalleryClient {
   constructor(private readonly apiService: ApiService) {
   }
 
-  public stream(): Observable<Stream> {
-    return this.stream$;
+  public stream(): Observable<MediaItem[]> {
+    return this.apiService.stream().pipe(map(st => convertItems(st.items)));
   }
 
   public albums(): Observable<Album[]> {
-    return this.albums$;
+    return this.apiService.albums().pipe(map(convertAlbums));
   }
 
   public albumsWithContent(): Observable<Album[]> {
-    return this.albumsWithContent$;
+    return this.apiService.albumsWithContent().pipe(map(convertAlbums));
   }
 
   public album(albumId: string): Observable<Album> {
-    return this.withCache(this.albumCache, albumId, () => {
-      return this.apiService.album(albumId).pipe(map(convertAlbum));
-    });
+    return this.apiService.album(albumId).pipe(map(convertAlbum));
   }
 
   public exifInfo(mediaId: string): Observable<ExifInfo> {
-    return this.withCache(this.exifCache, mediaId, () => {
-      return this.apiService.exif(mediaId).pipe(map(convertExifInfo));
-    });
-  }
-
-  private withCache<Id, T>(cache: Map<Id, Observable<T>>, id: Id, fetch: () => Observable<T>): Observable<T> {
-    const cached$ = cache.get(id);
-    if (cached$ != null) {
-      return cached$
-    }
-
-    const fetched$ = fetch().pipe(shareReplay({bufferSize: 1, refCount: false}));
-    cache.set(id, fetched$);
-    return fetched$;
+    return this.apiService.exif(mediaId).pipe(map(convertExifInfo));
   }
 }
 
@@ -117,7 +78,7 @@ function convertExifInfo(info: ExifInfoTo): ExifInfo {
   }
 }
 
-function convertAlbums(albums: AlbumTo[]): Album[] {
+export function convertAlbums(albums: AlbumTo[]): Album[] {
   return albums
     .map(al => convertAlbum(al))
     .sort((lhs, rhs) => rhs.timestamp.getTime() - lhs.timestamp.getTime());
@@ -163,9 +124,8 @@ function mainLocationOf(items: MediaItem[]): string | null {
   return null;
 }
 
-function convertAlbum(album: AlbumTo): Album {
-  const items = album.items
-    .map(item => convertItem(item))
+export function convertAlbum(album: AlbumTo): Album {
+  const items = convertItems(album.items)
     .sort((lhs, rhs) => rhs.timestamp.getTime() - lhs.timestamp.getTime())
 
   return {
@@ -179,9 +139,7 @@ function convertAlbum(album: AlbumTo): Album {
   }
 }
 
-function convertStream(stream: StreamTo, grouping: GroupingStrategy): Stream {
-  const items = stream.items.map(item => convertItem(item));
-
+export function groupStream(items: MediaItem[], grouping: GroupingStrategy): Section[] {
   items.sort((lhs, rhs) => {
     return rhs.timestamp.getTime() - lhs.timestamp.getTime();
   });
@@ -209,7 +167,7 @@ function convertStream(stream: StreamTo, grouping: GroupingStrategy): Stream {
     section.items.push(item);
   }
 
-  return {items, sections};
+  return sections;
 }
 
 export type GroupingStrategy = {
@@ -256,6 +214,10 @@ export const Monthly: GroupingStrategy = {
 
 function convertItem(item: MediaItemTo): MediaItem {
   return {...item, urls: mediaUrlsOf(item)}
+}
+
+export function convertItems(items: MediaItemTo[]): MediaItem[] {
+  return items.map(item => convertItem(item));
 }
 
 

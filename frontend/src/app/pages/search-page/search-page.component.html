@@ -1,10 +1,10 @@
 <div class="search">
   <app-search-input
-    [initialValue]="searchTerm()"
+    [initialValue]="store.searchTermTrimmed()"
     (searchTermChanged)="searchTermChanged($event)"/>
 </div>
 
-@if (itemsState(); as itemsState) {
+@if (store.results(); as itemsState) {
   @switch (itemsState.state) {
     @case ('loading') {
       <app-busy-full/>

@@ -1,14 +1,12 @@
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {AlbumComponent} from '../../components/album/album.component';
 import {RouterOutlet} from '@angular/router';
-import {Gallery, type MediaItem} from '../../service/gallery';
-import {map} from 'rxjs';
-import {toSignal} from '@angular/core/rxjs-interop';
+import {type MediaItem} from '../../service/gallery-client.service';
 import {NavigationService} from '../../service/navigation';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
 import {ScrollStateUpdater} from '../../service/scroll-state';
-import {toStateSignal} from '../../util';
 import {ErrorSnackbarComponent} from '../../components/error-snackbar/error-snackbar.component';
+import {StreamStore} from '../../service/stream.store';
 
 @Component({
   selector: 'app-stream-page',
@@ -24,14 +22,10 @@ import {ErrorSnackbarComponent} from '../../components/error-snackbar/error-snac
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StreamPageComponent {
-  private readonly gallery = inject(Gallery);
   private readonly router = inject(NavigationService);
 
   protected readonly scrollState = new ScrollStateUpdater();
-
-  protected sections = toStateSignal(
-    this.gallery.stream().pipe(map(st => st.sections)),
-  );
+  protected readonly sections = inject(StreamStore).sections;
 
   protected async mediaClicked(item: MediaItem) {
     await this.router.media(item.id)

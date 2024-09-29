@@ -1,8 +1,18 @@
-@if (sections(); as sections) {
-  <app-album [sections]="sections"
-             [initialScrollState]="scrollState.initial"
-             (mediaClicked)="mediaClicked($event)"
-             (scrollChanged)="scrollState.update($event)"/>
-} @else {
-  <app-busy-full/>
+@if (sections(); as sectionsState) {
+  @switch (sectionsState.state) {
+    @case('success') {
+      <app-album [sections]="sectionsState.data"
+                 [initialScrollState]="scrollState.initial"
+                 (mediaClicked)="mediaClicked($event)"
+                 (scrollChanged)="scrollState.update($event)"/>
+    }
+
+    @case('loading') {
+      <app-busy-full/>
+    }
+
+    @case ("error") {
+      <app-error-snackbar [errorState]="sectionsState"/>
+    }
+  }
 }

@@ -1,6 +1,6 @@
 import {ChangeDetectionStrategy, Component, computed, effect, input, signal} from '@angular/core';
 import {CommonModule} from '@angular/common';
-import type {MediaItem} from '../../service/gallery';
+import type {MediaItem} from '../../service/gallery-client.service';
 import {ProgressBarComponent} from '../progressbar/progress-bar.component';
 import {concatWith, map, startWith, timer} from 'rxjs';
 import {derivedAsync} from 'ngxtension/derived-async';

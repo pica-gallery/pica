@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, EventEmitter, inject, input, Input, output, Output} from '@angular/core';
+import {ChangeDetectionStrategy, Component, inject, input, Input, output} from '@angular/core';
 import {
   type ListItem,
   ListViewComponent,
@@ -6,7 +6,7 @@ import {
   type SavedScroll
 } from '../list-view/list-view.component';
 import {AlbumListItemComponent} from '../album-list-item/album-list-item.component';
-import type {Album, MediaItem} from '../../service/gallery';
+import type {Album, MediaItem} from '../../service/gallery-client.service';
 import {ArrayDataSource} from '../list-view/datasource';
 import {MediaItemComponent} from '../media-item/media-item.component';
 import {gridLayout} from '../../layouts';

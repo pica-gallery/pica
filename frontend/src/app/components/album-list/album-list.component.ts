@@ -1,5 +1,5 @@
-import {ChangeDetectionStrategy, Component, computed, EventEmitter, input, output, Output} from '@angular/core';
-import type {Album} from '../../service/gallery';
+import {ChangeDetectionStrategy, Component, computed, input, output} from '@angular/core';
+import type {Album} from '../../service/gallery-client.service';
 import {type ListItem, ListViewComponent, type SavedScroll} from '../list-view/list-view.component';
 import {AlbumListItemComponent} from '../album-list-item/album-list-item.component';
 import {gridLayout} from '../../layouts';

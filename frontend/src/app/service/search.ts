@@ -1,4 +1,4 @@
-import type {Album, MediaItem} from './gallery';
+import type {Album, MediaItem} from './gallery-client.service';
 import {idleCallback} from '../util/utils';
 
 export type Predicate = {

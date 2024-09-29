@@ -1,5 +1,5 @@
-import {ChangeDetectionStrategy, Component, computed, inject, input, output, signal} from '@angular/core';
-import type {MediaItem, Section} from '../../service/gallery';
+import {ChangeDetectionStrategy, Component, computed, inject, input, output} from '@angular/core';
+import type {MediaItem, Section} from '../../service/gallery-client.service';
 import {
   type Child,
   type LayoutHelper,
@@ -11,7 +11,6 @@ import {
 import {type SectionHeader, SectionHeaderComponent} from '../section-title/section-header.component';
 import {MediaItemComponent} from '../media-item/media-item.component';
 import {columnCount} from '../../util';
-import type {MediaId} from '../../service/api';
 import {TapsDirective, type TapType} from '../../directives/taps.directive';
 import {AlbumState} from './album.state';
 

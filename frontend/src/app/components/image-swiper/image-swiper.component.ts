@@ -9,19 +9,18 @@ import {
   NgZone,
   type OnDestroy,
   output,
-  signal, viewChild,
-  ViewChild
+  signal,
+  viewChild
 } from '@angular/core';
 import {CommonModule} from '@angular/common';
 import type {MediaId} from '../../service/api';
 import {ImageViewComponent} from '../image-view/image-view.component';
-import type {MediaItem} from '../../service/gallery';
-import {asyncScheduler, concatMap, fromEvent, observeOn, queueScheduler} from 'rxjs';
+import type {MediaItem} from '../../service/gallery-client.service';
+import {fromEvent} from 'rxjs';
 import PointerTracker from 'pointer-tracker';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {observeElementSize} from '../../util';
 import {Touch} from './touch';
-import {nextAnimationFrame} from '../../util/utils';
 
 type ViewItem = {
   id: MediaId,

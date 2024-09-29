@@ -1,13 +1,11 @@
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
-import {Gallery} from '../../service/gallery';
-import {toSignal} from '@angular/core/rxjs-interop';
 import {AlbumListComponent} from '../../components/album-list/album-list.component';
 import {ProgressBarComponent} from '../../components/progressbar/progress-bar.component';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
 import {ScrollStateUpdater} from '../../service/scroll-state';
-import {toStateSignal} from '../../util';
 import {JsonPipe} from '@angular/common';
 import {ErrorSnackbarComponent} from '../../components/error-snackbar/error-snackbar.component';
+import {AlbumStore} from '../../service/album.store';
 
 @Component({
   selector: 'app-album-list-page',
@@ -24,8 +22,12 @@ import {ErrorSnackbarComponent} from '../../components/error-snackbar/error-snac
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AlbumListPageComponent {
-  private readonly gallery = inject(Gallery);
+  private readonly albumsStore = inject(AlbumStore);
 
-  protected readonly albumsState = toStateSignal(this.gallery.albums());
+  protected readonly albumsState = this.albumsStore.albums;
   protected readonly scrollState = new ScrollStateUpdater();
+
+  constructor() {
+    this.albumsStore.loadAlbums();
+  }
 }

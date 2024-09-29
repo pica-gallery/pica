@@ -1,5 +1,5 @@
-import {ChangeDetectionStrategy, Component, computed, HostListener, inject, input, Input} from '@angular/core';
-import type {Album} from '../../service/gallery';
+import {ChangeDetectionStrategy, Component, HostListener, inject, input} from '@angular/core';
+import type {Album} from '../../service/gallery-client.service';
 import {DatePipe} from '@angular/common';
 import {NavigationService} from '../../service/navigation';
 import {ThumbnailComponent} from '../thumbnail/thumbnail.component';

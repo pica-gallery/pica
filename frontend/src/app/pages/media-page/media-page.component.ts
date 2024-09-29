@@ -1,6 +1,5 @@
-import {ChangeDetectionStrategy, Component, inject, input, Input, signal} from '@angular/core';
-import {Gallery, type MediaItem} from '../../service/gallery';
-import {map, type Observable} from 'rxjs';
+import {ChangeDetectionStrategy, Component, computed, inject, input, type Signal, signal} from '@angular/core';
+import {type MediaItem} from '../../service/gallery-client.service';
 import {AsyncPipe} from '@angular/common';
 import {ImageSwiperComponent} from '../../components/image-swiper/image-swiper.component';
 import type {AlbumId, MediaId} from '../../service/api';
@@ -10,6 +9,9 @@ import {ActivatedRoute} from '@angular/router';
 import {ExifDialogComponent} from '../../components/exif-dialog/exif-dialog.component';
 import {BottomSheetComponent} from '../../components/bottom-sheet/bottom-sheet.component';
 import {iterActivatedRoute} from '../../util/utils';
+import {StreamStore} from '../../service/stream.store';
+import {AlbumStore} from '../../service/album.store';
+import {mapSuccess, type State} from '../../util';
 
 @Component({
   selector: 'app-media-page',
@@ -25,7 +27,7 @@ export class MediaPageComponent {
 
   public readonly mediaId = input<MediaId>();
 
-  protected readonly items$: Observable<MediaItem[]>;
+  protected readonly items: Signal<State<MediaItem[]>>;
 
   constructor(
     private readonly navigationService: NavigationService,
@@ -42,10 +44,20 @@ export class MediaPageComponent {
       }
     }
 
-    const gallery = inject(Gallery);
-    this.items$ = albumId
-      ? gallery.album(albumId).pipe(map(alb => alb.items))
-      : gallery.stream().pipe(map(stream => stream.items));
+    const streamStore = inject(StreamStore);
+
+    if (albumId) {
+      const albumStore = inject(AlbumStore);
+      this.items = computed(() => {
+        return mapSuccess(
+          albumStore.byId(albumId),
+          album => album.items,
+        );
+      });
+    } else {
+      const streamStore = inject(StreamStore);
+      this.items = streamStore.items
+    }
   }
 
   protected close() {
