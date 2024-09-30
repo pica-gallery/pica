@@ -13,9 +13,17 @@
     <ng-template listViewItem="MediaItem" let-item>
       <app-media-item
         [media]="item.media"
-        [selected]="state.isSelected(item.media.id)"
+        [selected]="store.isSelected(item.media.id)"
         (appTaps)="handleTap($event, item.media)"
         class="row-item"/>
     </ng-template>
   </app-list-view>
+
+  @if (store.hasSelected()) {
+    <div class="actions">
+      <a class="download" target="_blank" [href]="store.zipUrl()">
+        <app-icon name="download"></app-icon>
+      </a>
+    </div>
+  }
 }

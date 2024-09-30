@@ -7,3 +7,29 @@ app-list-view {
   height: 100%;
 }
 
+.actions {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+
+  height: 48px;
+  box-shadow: 8px 0 4px rgba(0, 0, 0, 0.5);
+
+  display: flex;
+  background: white;
+
+  align-items: center;
+  justify-content: end;
+
+  .download {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+
+    color: #333;
+    text-decoration: none;
+  }
+}
+

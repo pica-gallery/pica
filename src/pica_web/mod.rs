@@ -21,6 +21,7 @@ use crate::pica::store::MediaStore;
 
 mod handlers;
 mod auth;
+mod streamzip;
 
 use crate::pica::config::SourceConfig;
 use crate::pica_web::handlers::media::ScaleQueue;
@@ -90,6 +91,7 @@ where
         .route("/media/preview/sdr/:id/*path", get(handlers::media::handle_preview_sdr))
         .route("/media/preview/hdr/:id/*path", get(handlers::media::handle_preview_hdr))
         .route("/media/fullsize/:id/*path", get(handlers::media::handle_fullsize))
+        .route("/media/multi", get(handlers::media::handle_download_zip))
         .route("/api/auth/touch", post(handlers::auth::touch))
         .route_layer(login_required!(auth::Backend))
         .route("/api/auth/login", post(handlers::auth::login))

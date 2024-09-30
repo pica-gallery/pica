@@ -7,12 +7,17 @@ export type AlbumState = {
 }
 
 export const AlbumState = signalStore(
-  withState({
-    selected: new Set(),
+  withState<AlbumState>({
+    selected: new Set<MediaId>(),
   }),
 
   withComputed(store => ({
     hasSelected: computed(() => store.selected().size > 0),
+
+    zipUrl: computed(() => {
+      const query = [...store.selected()].map(id => `m=${id}`).join('&');
+      return '/media/multi?' + query;
+    })
   })),
 
   withMethods(store => ({

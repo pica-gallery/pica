@@ -13,6 +13,7 @@ import {MediaItemComponent} from '../media-item/media-item.component';
 import {columnCount} from '../../util';
 import {TapsDirective, type TapType} from '../../directives/taps.directive';
 import {AlbumState} from './album.state';
+import {IconComponent} from '../icon/icon.component';
 
 type SectionHeaderListItem = ListItem & {
   viewType: 'SectionHeader',
@@ -38,6 +39,7 @@ type RowListItem =
     MediaItemComponent,
     ListViewItemDirective,
     TapsDirective,
+    IconComponent,
   ],
   templateUrl: './album.component.html',
   styleUrls: ['./album.component.scss'],
@@ -51,7 +53,7 @@ export class AlbumComponent {
   public readonly mediaClicked = output<MediaItem>();
   public readonly scrollChanged = output<SavedScroll>();
 
-  protected readonly state = inject(AlbumState);
+  protected readonly store = inject(AlbumState);
 
   protected readonly layout = columnsLayout;
 
@@ -87,13 +89,13 @@ export class AlbumComponent {
 
   protected handleTap(tapType: TapType, media: MediaItem) {
     if (tapType === 'long-tap') {
-      this.state.toggle(media.id);
+      this.store.toggle(media.id);
       return;
     }
 
     if (tapType === 'tap') {
-      if (this.state.hasSelected()) {
-        this.state.toggle(media.id);
+      if (this.store.hasSelected()) {
+        this.store.toggle(media.id);
         return;
       }
 

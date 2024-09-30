@@ -55,3 +55,7 @@ async-trait = "0.1.83"
 tower-sessions-sqlx-store = { version = "0.14.0", features = ["sqlite"] }
 htpasswd-verify = "0.3.0"
 opentelemetry-jaeger-propagator = "0.25.0"
+zip = { version = "2.2.0", default-features = false }
+tokio-stream = { version = "0.1.16", features = ["fs"] }
+futures-util = { version = "0.3.30", features = ["io"] }
+axum-extra = { version = "0.9.4", features = ["query"] }
