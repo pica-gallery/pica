@@ -110,12 +110,11 @@ class TemplateLookup {
 }
 
 @Component({
-  selector: 'app-list-view',
-  standalone: true,
-  imports: [],
-  templateUrl: './list-view.component.html',
-  styleUrl: './list-view.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-list-view',
+    imports: [],
+    templateUrl: './list-view.component.html',
+    styleUrl: './list-view.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ListViewComponent implements AfterViewInit, AfterContentInit, OnChanges, OnDestroy {
   private readonly applicationRef = inject(ApplicationRef);

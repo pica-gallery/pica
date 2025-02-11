@@ -14,12 +14,11 @@ import {AlbumStore} from '../../service/album.store';
 import {mapSuccess, type State} from '../../util';
 
 @Component({
-  selector: 'app-media-page',
-  standalone: true,
-  imports: [AsyncPipe, ImageSwiperComponent, IconComponent, BottomSheetComponent, ExifDialogComponent],
-  templateUrl: './media-page.component.html',
-  styleUrl: './media-page.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-media-page',
+    imports: [AsyncPipe, ImageSwiperComponent, IconComponent, BottomSheetComponent, ExifDialogComponent],
+    templateUrl: './media-page.component.html',
+    styleUrl: './media-page.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MediaPageComponent {
   protected readonly currentItem = signal<MediaItem | null>(null);

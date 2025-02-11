@@ -10,14 +10,13 @@ export type SectionHeader = {
 }
 
 @Component({
-  selector: 'app-section-header',
-  standalone: true,
-  imports: [
-    DatePipe
-  ],
-  templateUrl: './section-header.component.html',
-  styleUrl: './section-header.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-section-header',
+    imports: [
+        DatePipe
+    ],
+    templateUrl: './section-header.component.html',
+    styleUrl: './section-header.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SectionHeaderComponent {
   public readonly header = input.required<SectionHeader>();

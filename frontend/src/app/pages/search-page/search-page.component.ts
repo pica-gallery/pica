@@ -12,19 +12,18 @@ import {SearchPageStore} from './search-page.store';
 
 
 @Component({
-  selector: 'app-search-page',
-  standalone: true,
-  imports: [
-    SearchInputComponent,
-    AlbumListComponent,
-    BusyFullComponent,
-    SearchResultsComponent,
-    ErrorSnackbarComponent
-  ],
-  templateUrl: './search-page.component.html',
-  styleUrl: './search-page.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [SearchPageStore],
+    selector: 'app-search-page',
+    imports: [
+        SearchInputComponent,
+        AlbumListComponent,
+        BusyFullComponent,
+        SearchResultsComponent,
+        ErrorSnackbarComponent
+    ],
+    templateUrl: './search-page.component.html',
+    styleUrl: './search-page.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    providers: [SearchPageStore]
 })
 export class SearchPageComponent {
   private initialState: UrlState | null = parseQuery(fUrlState, 'st.');

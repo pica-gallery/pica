@@ -21,12 +21,11 @@ function convertToSections(album: Album): Section[] {
 }
 
 @Component({
-  selector: 'app-album-page',
-  standalone: true,
-  imports: [RouterOutlet, AsyncPipe, AlbumComponent, BusyFullComponent, ErrorSnackbarComponent],
-  templateUrl: './album-page.component.html',
-  styleUrls: ['./album-page.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-album-page',
+    imports: [RouterOutlet, AsyncPipe, AlbumComponent, BusyFullComponent, ErrorSnackbarComponent],
+    templateUrl: './album-page.component.html',
+    styleUrls: ['./album-page.component.scss'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AlbumPageComponent {
   private readonly albumStore = inject(AlbumStore);

@@ -9,17 +9,16 @@ import {ErrorSnackbarComponent} from '../../components/error-snackbar/error-snac
 import {StreamStore} from '../../service/stream.store';
 
 @Component({
-  selector: 'app-stream-page',
-  standalone: true,
-  imports: [
-    AlbumComponent,
-    RouterOutlet,
-    BusyFullComponent,
-    ErrorSnackbarComponent
-  ],
-  templateUrl: './stream-page.component.html',
-  styleUrl: './stream-page.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-stream-page',
+    imports: [
+        AlbumComponent,
+        RouterOutlet,
+        BusyFullComponent,
+        ErrorSnackbarComponent
+    ],
+    templateUrl: './stream-page.component.html',
+    styleUrl: './stream-page.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StreamPageComponent {
   private readonly router = inject(NavigationService);

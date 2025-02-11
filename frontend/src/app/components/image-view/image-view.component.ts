@@ -7,15 +7,14 @@ import {derivedAsync} from 'ngxtension/derived-async';
 import {toObservable} from '@angular/core/rxjs-interop';
 
 @Component({
-  selector: 'app-image-view',
-  standalone: true,
-  imports: [CommonModule, ProgressBarComponent],
-  templateUrl: './image-view.component.html',
-  styleUrls: ['./image-view.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '[style.--aspect-ratio]': 'aspectRatioValue()'
-  }
+    selector: 'app-image-view',
+    imports: [CommonModule, ProgressBarComponent],
+    templateUrl: './image-view.component.html',
+    styleUrls: ['./image-view.component.scss'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    host: {
+        '[style.--aspect-ratio]': 'aspectRatioValue()'
+    }
 })
 export class ImageViewComponent {
   private readonly loaded = signal(false);

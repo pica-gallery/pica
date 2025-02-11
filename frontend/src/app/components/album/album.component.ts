@@ -31,20 +31,19 @@ type RowListItem =
   | ThumbnailsListItem
 
 @Component({
-  selector: 'app-album',
-  standalone: true,
-  imports: [
-    SectionHeaderComponent,
-    ListViewComponent,
-    MediaItemComponent,
-    ListViewItemDirective,
-    TapsDirective,
-    IconComponent,
-  ],
-  templateUrl: './album.component.html',
-  styleUrls: ['./album.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [AlbumState],
+    selector: 'app-album',
+    imports: [
+        SectionHeaderComponent,
+        ListViewComponent,
+        MediaItemComponent,
+        ListViewItemDirective,
+        TapsDirective,
+        IconComponent,
+    ],
+    templateUrl: './album.component.html',
+    styleUrls: ['./album.component.scss'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    providers: [AlbumState]
 })
 export class AlbumComponent {
   public readonly sections = input.required<Section[]>();

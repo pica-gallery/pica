@@ -5,14 +5,13 @@ import {AlbumListItemComponent} from '../album-list-item/album-list-item.compone
 import {gridLayout} from '../../layouts';
 
 @Component({
-  selector: 'app-album-list',
-  standalone: true,
-  imports: [
-    ListViewComponent
-  ],
-  templateUrl: './album-list.component.html',
-  styleUrl: './album-list.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-album-list',
+    imports: [
+        ListViewComponent
+    ],
+    templateUrl: './album-list.component.html',
+    styleUrl: './album-list.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AlbumListComponent {
   protected readonly layout = gridLayout({

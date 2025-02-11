@@ -30,12 +30,11 @@ type ViewItem = {
 }
 
 @Component({
-  selector: 'app-image-swiper',
-  standalone: true,
-  imports: [CommonModule, ImageViewComponent],
-  templateUrl: './image-swiper.component.html',
-  styleUrls: ['./image-swiper.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-image-swiper',
+    imports: [CommonModule, ImageViewComponent],
+    templateUrl: './image-swiper.component.html',
+    styleUrls: ['./image-swiper.component.scss'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
   public readonly items = input.required<MediaItem[]>()

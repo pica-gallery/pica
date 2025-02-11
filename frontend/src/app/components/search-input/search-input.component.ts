@@ -6,15 +6,14 @@ import {distinctUntilChanged} from 'rxjs';
 import {IconComponent} from '../icon/icon.component';
 
 @Component({
-  selector: 'app-search-input',
-  standalone: true,
-  imports: [
-    ReactiveFormsModule,
-    IconComponent
-  ],
-  templateUrl: './search-input.component.html',
-  styleUrl: './search-input.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-search-input',
+    imports: [
+        ReactiveFormsModule,
+        IconComponent
+    ],
+    templateUrl: './search-input.component.html',
+    styleUrl: './search-input.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SearchInputComponent implements OnInit {
   protected readonly searchTerm = new FormControl('');

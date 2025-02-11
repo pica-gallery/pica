@@ -30,12 +30,11 @@ export type IconName =
   | 'close'
 
 @Component({
-  selector: 'app-icon',
-  standalone: true,
-  imports: [],
-  templateUrl: './icon.component.html',
-  styleUrl: './icon.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-icon',
+    imports: [],
+    templateUrl: './icon.component.html',
+    styleUrl: './icon.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class IconComponent {
   public readonly name = input.required<IconName>();

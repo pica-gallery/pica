@@ -6,15 +6,14 @@ import {NavigationService} from '../../service/navigation';
 import {derivedAsync} from 'ngxtension/derived-async';
 
 @Component({
-  selector: 'app-login-page',
-  standalone: true,
-  imports: [
-    ReactiveFormsModule,
-    FormsModule
-  ],
-  templateUrl: './login-page.component.html',
-  styleUrl: './login-page.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-login-page',
+    imports: [
+        ReactiveFormsModule,
+        FormsModule
+    ],
+    templateUrl: './login-page.component.html',
+    styleUrl: './login-page.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LoginPageComponent {
   private readonly authService = inject(AuthService);

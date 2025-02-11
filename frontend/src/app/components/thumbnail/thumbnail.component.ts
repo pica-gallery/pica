@@ -11,12 +11,11 @@ import {
 } from '@angular/core';
 
 @Component({
-  selector: 'app-thumbnail',
-  standalone: true,
-  imports: [],
-  template: '<img #Image loading="eager" decoding="async" [alt]="alt()" fetchpriority="low">',
-  styleUrls: ['./thumbnail.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-thumbnail',
+    imports: [],
+    template: '<img #Image loading="eager" decoding="async" [alt]="alt()" fetchpriority="low">',
+    styleUrls: ['./thumbnail.component.scss'],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ThumbnailComponent {
   protected readonly imageView = viewChild.required<ElementRef>('Image');

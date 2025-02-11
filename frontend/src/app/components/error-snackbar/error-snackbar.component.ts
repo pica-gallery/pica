@@ -4,14 +4,13 @@ import type {ErrorState} from '../../util';
 import {HttpErrorResponse} from '@angular/common/http';
 
 @Component({
-  selector: 'app-error-snackbar',
-  standalone: true,
-  imports: [
-    SnackbarComponent
-  ],
-  templateUrl: './error-snackbar.component.html',
-  styleUrl: './error-snackbar.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-error-snackbar',
+    imports: [
+        SnackbarComponent
+    ],
+    templateUrl: './error-snackbar.component.html',
+    styleUrl: './error-snackbar.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ErrorSnackbarComponent {
   public readonly errorState = input.required<ErrorState>();

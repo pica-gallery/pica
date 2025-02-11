@@ -5,15 +5,14 @@ import {NavigationService} from '../../service/navigation';
 import {ThumbnailComponent} from '../thumbnail/thumbnail.component';
 
 @Component({
-  selector: 'app-album-list-item',
-  standalone: true,
-  imports: [
-    DatePipe,
-    ThumbnailComponent
-  ],
-  templateUrl: './album-list-item.component.html',
-  styleUrl: './album-list-item.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-album-list-item',
+    imports: [
+        DatePipe,
+        ThumbnailComponent
+    ],
+    templateUrl: './album-list-item.component.html',
+    styleUrl: './album-list-item.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AlbumListItemComponent {
   private readonly navigationService = inject(NavigationService);

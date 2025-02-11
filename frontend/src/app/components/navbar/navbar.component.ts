@@ -4,16 +4,15 @@ import {NavLinkActivateDirective} from '../../directives/nav-link-activate.direc
 import {NavLinkDirective} from '../../directives/nav-link.directive';
 
 @Component({
-  selector: 'app-navbar',
-  standalone: true,
-  imports: [
-    NavbarItemComponent,
-    NavLinkActivateDirective,
-    NavLinkDirective
-  ],
-  templateUrl: './navbar.component.html',
-  styleUrl: './navbar.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-navbar',
+    imports: [
+        NavbarItemComponent,
+        NavLinkActivateDirective,
+        NavLinkDirective
+    ],
+    templateUrl: './navbar.component.html',
+    styleUrl: './navbar.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class NavbarComponent {
 }

@@ -5,12 +5,11 @@ import {filter, fromEvent} from 'rxjs';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 
 @Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss'],
-  standalone: true,
-  imports: [RouterOutlet],
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: 'app-root',
+    templateUrl: './app.component.html',
+    styleUrls: ['./app.component.scss'],
+    imports: [RouterOutlet],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AppComponent {
   constructor() {

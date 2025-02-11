@@ -39,17 +39,16 @@ export type ResultListItem =
 const disableItemComparator = true;
 
 @Component({
-  selector: 'app-search-results',
-  standalone: true,
-  imports: [
-    ListViewComponent,
-    ListViewItemDirective,
-    MediaItemComponent,
-    AlbumListItemComponent
-  ],
-  templateUrl: './search-results.component.html',
-  styleUrl: './search-results.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-search-results',
+    imports: [
+        ListViewComponent,
+        ListViewItemDirective,
+        MediaItemComponent,
+        AlbumListItemComponent
+    ],
+    templateUrl: './search-results.component.html',
+    styleUrl: './search-results.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SearchResultsComponent {
   private readonly navigation = inject(NavigationService);

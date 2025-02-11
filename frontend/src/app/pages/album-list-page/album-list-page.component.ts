@@ -8,18 +8,17 @@ import {ErrorSnackbarComponent} from '../../components/error-snackbar/error-snac
 import {AlbumStore} from '../../service/album.store';
 
 @Component({
-  selector: 'app-album-list-page',
-  standalone: true,
-  imports: [
-    AlbumListComponent,
-    ProgressBarComponent,
-    BusyFullComponent,
-    JsonPipe,
-    ErrorSnackbarComponent
-  ],
-  templateUrl: './album-list-page.component.html',
-  styleUrl: './album-list-page.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-album-list-page',
+    imports: [
+        AlbumListComponent,
+        ProgressBarComponent,
+        BusyFullComponent,
+        JsonPipe,
+        ErrorSnackbarComponent
+    ],
+    templateUrl: './album-list-page.component.html',
+    styleUrl: './album-list-page.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AlbumListPageComponent {
   private readonly albumsStore = inject(AlbumStore);

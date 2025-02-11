@@ -5,15 +5,14 @@ import {BusyFullComponent} from '../busy-full/busy-full.component';
 import {derivedAsync} from 'ngxtension/derived-async';
 
 @Component({
-  selector: 'app-exif-dialog',
-  standalone: true,
-  imports: [
-    AsyncPipe,
-    BusyFullComponent
-  ],
-  templateUrl: './exif-dialog.component.html',
-  styleUrl: './exif-dialog.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-exif-dialog',
+    imports: [
+        AsyncPipe,
+        BusyFullComponent
+    ],
+    templateUrl: './exif-dialog.component.html',
+    styleUrl: './exif-dialog.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ExifDialogComponent {
   private readonly gallery = inject(GalleryClient);

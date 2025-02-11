@@ -27,11 +27,11 @@
           name = "pica-frontend";
 
           buildInputs = with pkgs; [
-            nodejs_20
+            nodejs_22
           ];
 
           src = ./frontend;
-          npmDepsHash = "sha256-kB9cfzzdQqVlecjZx7M/1uJasM34B/VroFBezkfIaa4=";
+          npmDepsHash = "sha256-TlS2gC3QHPJNICSH8l+xiSCgafQKghSEHyDjIJy7s74=";
 
           installPhase = ''
             mkdir $out
@@ -124,7 +124,7 @@
           config = {
             WorkingDir = "/app/";
             Entrypoint = [ "${backend}/bin/pica" ];
-            ExposedPorts = {"3000/tcp" = {};};
+            ExposedPorts = { "3000/tcp" = { }; };
           };
         };
 
