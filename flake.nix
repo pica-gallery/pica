@@ -1,10 +1,9 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-24.05";
+    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-24.11";
 
     crane = {
       url = "github:ipetkov/crane";
-      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     rust-overlay = {
@@ -31,7 +30,7 @@
           ];
 
           src = ./frontend;
-          npmDepsHash = "sha256-TlS2gC3QHPJNICSH8l+xiSCgafQKghSEHyDjIJy7s74=";
+          npmDepsHash = "sha256-WuDtTqRkUFrsWOZdbvxcwZOPrC04Gvt5EzgrimBzR1c=";
 
           installPhase = ''
             mkdir $out
@@ -155,125 +154,8 @@
 
           $DOCKER manifest push ghcr.io/pica-gallery/pica:$TAG
         '';
-
-
-        #  buildForCrossSytem = { crossSystem, nixpkgs, rust-overlay }:
-        #    let
-        #      pkgsCross = import nixpkgs {
-        #        src = nixpkgs;
-        #        inherit localSystem crossSystem;
-
-        #        overlays = [
-        #          rust-overlay.overlays.default
-        #        ];
-        #      };
-
-        #      rustToolchain = pkgsCross.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
-
-        #      rustPlatform = pkgsCross.makeRustPlatform {
-        #        cargo = rustToolchain;
-        #        rustc = rustToolchain;
-        #      };
-
-        #      serviceName = "pica";
-
-        #      servicePackage = rustPlatform.buildRustPackage {
-        #        pname = serviceName;
-        #        version = "0.1.0";
-        #        src = ./.;
-        #        cargoLock.lockFile = ./Cargo.lock;
-
-        #        nativeBuildInputs = with pkgsCross; [
-        #          # Will add some dependencies like libiconv
-        #          # pkgsBuildHost.libiconv
-        #          pkgsBuildHost.nasm
-        #          # Cargo crate dependenciesr
-        #          # cargoDeps.rocksdb-sys
-        #          # cargoDeps.rdkafka-sys
-        #          # cargoDeps.openssl-sys
-        #        ];
-
-        #        # Libraries essential to build the service binaries
-        #        buildInputs = [
-        #          # Enable Rust cross-compilation support
-        #          # rustCrossHook
-        #          pkgsCross.sqlite
-        #        ];
-
-        #        preBuild = ''
-        #          cp -ra ${frontend.out}/dist frontend
-        #        '';
-        #      };
-        #    in
-        #    pkgsCross.pkgsBuildHost.dockerTools.buildLayeredImage {
-        #      name = serviceName;
-        #      tag = crossSystem.config;
-
-        #      contents = with pkgsCross; [
-        #        servicePackage
-        #        dockerTools.caCertificates
-        #        imagemagick
-        #        ./docker
-        #        # Utilites like ldd and bash to help image debugging
-        #        # stdenv.cc.libc_bin
-        #        # coreutils
-        #        # bashInteractive
-        #      ];
-
-        #      config = {
-        #        Entrypoint = [ serviceName ];
-        #        WorkingDir = "/app";
-        #        Expose = 3000;
-        #      };
-        #    };
       in
       {
-        #  packages.dockerImage-aarch64 = buildForCrossSytem {
-        #    inherit (inputs) nixpkgs rust-overlay;
-        #    crossSystem = {
-        #      config = "aarch64-unknown-linux-gnu";
-        #      useLLVM = true;
-        #    };
-        #  };
-
-        #  packages.dockerImage-x86_64 = buildForCrossSytem {
-        #    inherit (inputs) nixpkgs rust-overlay;
-        #    crossSystem = {
-        #      config = "x86_64-unknown-linux-gnu";
-        #      useLLVM = true;
-        #    };
-        #  };
-
-        #  packages.dockerImage-armv7 = buildForCrossSytem {
-        #    inherit (inputs) nixpkgs rust-overlay;
-        #    crossSystem = {
-        #      config = "armv7l-unknown-linux-gnueabihf";
-        #      useLLVM = true;
-        #    };
-        #  };
-
-        #  packages.dockerImage = pkgs.writeShellScriptBin "push"
-        #    ''
-        #      set -euxo pipefail
-        #      docker=${pkgs.docker}/bin/docker
-
-        #      docker load -qi ${packages.dockerImage-aarch64}
-        #      docker load -qi ${packages.dockerImage-x86_64}
-        #      docker load -qi ${packages.dockerImage-armv7}
-
-        #      for arch in aarch64-unknown-linux-musl x86_64-unknown-linux-musl armv7l-unknown-linux-gnueabihf ; do
-        #        docker tag pica:$arch ghcr.io/pica-gallery/pica:$arch
-        #        docker push ghcr.io/pica-gallery/pica:$arch
-        #      done
-
-        #      $docker manifest create --amend ghcr.io/pica-gallery/pica:latest  \
-        #        ghcr.io/pica-gallery/pica:aarch64-unknown-linux-musl \
-        #        ghcr.io/pica-gallery/pica:x86_64-unknown-linux-musl \
-        #        ghcr.io/pica-gallery/pica:armv7l-unknown-linux-gnueabihf
-
-        #      $docker manifest push ghcr.io/pica-gallery/pica:latest
-        #    '';
-
         packages = {
           inherit frontend backend-amd64 backend-aarch64;
           inherit dockerImage dockerImage-aarch64 dockerImage-amd64;
