@@ -1,12 +1,12 @@
-use std::num::NonZeroU64;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry::{global, KeyValue};
-use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::propagation::BaggagePropagator;
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use opentelemetry_sdk::Resource;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
@@ -33,19 +33,19 @@ fn initialize_tracing(otlp_endpoint: Option<String>) -> Result<()> {
             // Allows you to pass along context (i.e., trace IDs) across services
             global::set_text_map_propagator(BaggagePropagator::new());
 
-            let tracer = opentelemetry_otlp::new_pipeline()
-                .tracing()
-                .with_trace_config(
-                    opentelemetry_sdk::trace::Config::default().with_resource(Resource::new(vec![
-                        KeyValue::new("service.name", "pica"),
-                    ])),
-                )
-                .with_exporter(
-                    opentelemetry_otlp::new_exporter()
-                        .tonic()
-                        .with_endpoint(otlp_endpoint)
-                )
-                .install_batch(opentelemetry_sdk::runtime::Tokio)?
+            let exporter = SpanExporter::builder()
+                .with_tonic()
+                .with_endpoint(otlp_endpoint)
+                .build()?;
+
+            let resource = Resource::builder()
+                .with_attribute(KeyValue::new("service.name", "pica"))
+                .build();
+
+            let tracer = SdkTracerProvider::builder()
+                .with_batch_exporter(exporter)
+                .with_resource(resource)
+                .build()
                 .tracer("pica");
 
             // Create a tracing layer with the configured tracer

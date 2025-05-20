@@ -1,13 +1,12 @@
-use std::borrow::Cow;
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use axum::async_trait;
+use async_trait::async_trait;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::http::StatusCode;
-use axum_login::{AuthnBackend, AuthUser, UserId};
+use axum_login::{AuthUser, AuthnBackend, UserId};
 use htpasswd_verify::{Hash, MD5Hash};
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 pub type AuthSession = axum_login::AuthSession<Backend>;
 
@@ -50,7 +49,6 @@ impl AuthUser for User {
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for User
     where
         S: Send + Sync,

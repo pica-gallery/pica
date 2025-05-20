@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::io;
-use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, Write};
 
 use anyhow::{anyhow, Result};
 use byteorder::{BigEndian, WriteBytesExt};
@@ -105,50 +105,6 @@ impl Jpeg {
         //     position: 0,
         //     jpeg: self,
         // }
-    }
-}
-
-struct JpegRead<'a> {
-    position: usize,
-    jpeg: &'a Jpeg,
-}
-
-impl<'a> Read for JpegRead<'a> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let Some(curr) = self.jpeg.segments.iter().rev().find(|seg| seg.offset <= self.position) else {
-            // we're at the end of the stream
-            return Ok(0);
-        };
-
-        let offset_in_segment = self.position - curr.offset;
-
-        // get the rest of the jpeg. The slice also implements Read
-        let mut bytes = &curr.bytes[offset_in_segment..];
-
-        // and read the data into the target buffer
-        let n = bytes.read(buf)?;
-        self.position += n;
-
-        Ok(n)
-    }
-}
-
-impl<'a> Seek for JpegRead<'a> {
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        match pos {
-            SeekFrom::Start(pos) => {
-                self.position = pos as usize;
-                Ok(self.position as u64)
-            }
-            SeekFrom::Current(offset) => {
-                self.position = self.position.saturating_add_signed(offset as isize);
-                Ok(self.position as u64)
-            }
-            SeekFrom::End(_) => {
-                // TODO implement if needed
-                return Err(io::Error::from(ErrorKind::Unsupported));
-            }
-        }
     }
 }
 

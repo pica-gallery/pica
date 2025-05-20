@@ -21,41 +21,40 @@ pica_geo = { path = "./pica_geo" }
 pica_image = { path = "./pica_image" }
 ultrahdr-rs = { path = "./ultrahdr-rs" }
 
-anyhow = "1.0.89"
-axum = "0.7.6"
-chrono = { version = "0.4.38", features = ["serde"] }
-derive_more = "0.99.18"
+anyhow = "1.0.98"
+axum = "0.8.4"
+chrono = { version = "0.4.41", features = ["serde"] }
+derive_more = { version = "2.0.1", default-features = false, features = ["as_ref", "deref"] }
 hex = "0.4.3"
-image = { version = "0.25.2", default-features = false, features = ["jpeg", "png", "avif"] }
+image = { version = "0.25.6", default-features = false, features = ["jpeg", "png", "avif"] }
 include_dir = { version = "0.7.4" }
-itertools = "0.13.0"
+itertools = "0.14.0"
 mime = "0.3.17"
 mime_guess = "2.0.5"
-opentelemetry = "0.25.0"
-opentelemetry_sdk = { version = "0.25.0" , features = ["rt-tokio"]}
-opentelemetry-otlp = "0.25.0"
-priority-queue = "2.1.1"
-regex = "1.10.6"
-serde = { version = "1.0.210", features = ["derive"] }
-serde_with = "3.9.0"
+opentelemetry = "0.29.1"
+opentelemetry_sdk = { version = "0.29.0", features = ["rt-tokio"]}
+opentelemetry-otlp = { version = "0.29.0" , features = ["grpc-tonic", "tokio"]}
+priority-queue = "2.3.1"
+regex = "1.11.1"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_with = "3.12.0"
 serde_yaml = "0.9.34"
 sha1_smol = { version = "1.0.1", features = ["std"] }
-sqlx = { version = "0.8.2", features = ["chrono", "sqlite", "migrate", "uuid", "macros", "runtime-tokio"], default-features = false }
-tokio = { version = "1.38.1", features = ["full"] }
-tower = { version = "0.5.1", features = ["util"] }
-tower-http = { version = "0.6.1", features = ["fs", "util", "compression-gzip", "set-header", "trace"] }
-tracing = "0.1.40"
-tracing-opentelemetry = "0.26.0"
-tracing-subscriber = { version = "0.3.18", features = ["fmt", "env-filter"] }
+sqlx = { version = "0.8.6", features = ["chrono", "sqlite", "migrate", "uuid", "macros", "runtime-tokio"], default-features = false }
+tokio = { version = "1.45.0", features = ["full"] }
+tower = { version = "0.5.2", features = ["util"] }
+tower-http = { version = "0.6.4", features = ["fs", "util", "compression-gzip", "set-header", "trace"] }
+tracing = "0.1.41"
+tracing-opentelemetry = "0.30.0"
+tracing-subscriber = { version = "0.3.19", features = ["fmt", "env-filter"] }
 walkdir = "2.5.0"
-tempfile = "3.12.0"
+tempfile = "3.20.0"
 arcstr = { version = "1.2.0", default-features = false, features = ["serde"] }
-axum-login = "0.16.0"
-async-trait = "0.1.83"
-tower-sessions-sqlx-store = { version = "0.14.0", features = ["sqlite"] }
+axum-login = "0.17.0"
+async-trait = "0.1.88"
+tower-sessions-sqlx-store = { version = "0.15.0", features = ["sqlite"] }
 htpasswd-verify = "0.3.0"
-opentelemetry-jaeger-propagator = "0.25.0"
-zip = { version = "2.2.0", default-features = false }
-tokio-stream = { version = "0.1.16", features = ["fs"] }
-futures-util = { version = "0.3.30", features = ["io"] }
-axum-extra = { version = "0.9.4", features = ["query"] }
+zip = { version = "3.0.0", default-features = false }
+tokio-stream = { version = "0.1.17", features = ["fs"] }
+futures-util = { version = "0.3.31", features = ["io"] }
+axum-extra = { version = "0.10.1", features = ["query"] }
