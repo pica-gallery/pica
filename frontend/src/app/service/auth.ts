@@ -1,5 +1,5 @@
 import {inject, Injectable} from '@angular/core';
-import {catchError, map, type Observable, of, tap} from 'rxjs';
+import {catchError, map, type Observable, of, retry, Subject, take, tap} from 'rxjs';
 import {HttpClient, HttpErrorResponse, type HttpEvent, type HttpInterceptorFn} from '@angular/common/http';
 import {NavigationService} from './navigation';
 
@@ -10,6 +10,8 @@ export type Credentials = {
 
 @Injectable({providedIn: 'root'})
 export class AuthService {
+  readonly loginSuccess$ = new Subject();
+
   constructor(
     private readonly navigationService: NavigationService,
     private readonly httpClient: HttpClient,
@@ -44,6 +46,7 @@ export class AuthService {
       .post('/api/auth/login', creds, {responseType: 'blob'})
       .pipe(
         map(() => true),
+        tap(() => this.loginSuccess$.next(null)),
         catchError(err => {
           if (err instanceof HttpErrorResponse) {
             if (err.status === 401) {
@@ -61,16 +64,23 @@ export const AuthInterceptor: HttpInterceptorFn = (req, next): Observable<HttpEv
   const authService = inject(AuthService);
 
   return next(req).pipe(
-    tap({
-      error: err => {
+    retry({
+      // retry on successful login
+      delay: err => {
         if (err instanceof HttpErrorResponse) {
           if (err.status === 401) {
             console.info('Session is not authenticated, redirecting to login page.')
             authService.redirectToLogin();
+
+            // wait for the login to succeed, then try again
+            return authService.loginSuccess$.pipe(take(1))
           }
         }
-      }
-    })
+
+        // just forward the error
+        return of(err)
+      },
+    }),
   )
 }
 
