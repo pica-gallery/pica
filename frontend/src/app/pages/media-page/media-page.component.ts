@@ -1,6 +1,5 @@
 import {ChangeDetectionStrategy, Component, computed, inject, input, type Signal, signal} from '@angular/core';
 import {type MediaItem} from '../../service/gallery-client.service';
-import {AsyncPipe} from '@angular/common';
 import {ImageSwiperComponent} from '../../components/image-swiper/image-swiper.component';
 import type {AlbumId, MediaId} from '../../service/api';
 import {IconComponent} from '../../components/icon/icon.component';
@@ -15,7 +14,7 @@ import {mapSuccess, type State} from '../../util';
 
 @Component({
     selector: 'app-media-page',
-    imports: [AsyncPipe, ImageSwiperComponent, IconComponent, BottomSheetComponent, ExifDialogComponent],
+  imports: [ImageSwiperComponent, IconComponent, BottomSheetComponent, ExifDialogComponent],
     templateUrl: './media-page.component.html',
     styleUrl: './media-page.component.scss',
     changeDetection: ChangeDetectionStrategy.OnPush

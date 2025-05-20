@@ -1,6 +1,5 @@
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {AlbumComponent} from '../../components/album/album.component';
-import {RouterOutlet} from '@angular/router';
 import {type MediaItem} from '../../service/gallery-client.service';
 import {NavigationService} from '../../service/navigation';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
@@ -10,12 +9,11 @@ import {StreamStore} from '../../service/stream.store';
 
 @Component({
     selector: 'app-stream-page',
-    imports: [
-        AlbumComponent,
-        RouterOutlet,
-        BusyFullComponent,
-        ErrorSnackbarComponent
-    ],
+  imports: [
+    AlbumComponent,
+    BusyFullComponent,
+    ErrorSnackbarComponent
+  ],
     templateUrl: './stream-page.component.html',
     styleUrl: './stream-page.component.scss',
     changeDetection: ChangeDetectionStrategy.OnPush

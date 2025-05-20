@@ -1,8 +1,6 @@
 import {ChangeDetectionStrategy, Component, computed, inject, input} from '@angular/core';
-import {RouterOutlet} from '@angular/router';
 import type {AlbumId} from '../../service/api';
 import {type Album, type MediaItem, type Section} from '../../service/gallery-client.service';
-import {AsyncPipe} from '@angular/common';
 import {AlbumComponent} from '../../components/album/album.component';
 import {NavigationService} from '../../service/navigation';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
@@ -22,7 +20,7 @@ function convertToSections(album: Album): Section[] {
 
 @Component({
     selector: 'app-album-page',
-    imports: [RouterOutlet, AsyncPipe, AlbumComponent, BusyFullComponent, ErrorSnackbarComponent],
+  imports: [AlbumComponent, BusyFullComponent, ErrorSnackbarComponent],
     templateUrl: './album-page.component.html',
     styleUrls: ['./album-page.component.scss'],
     changeDetection: ChangeDetectionStrategy.OnPush

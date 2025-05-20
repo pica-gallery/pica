@@ -1,6 +1,5 @@
 import {ChangeDetectionStrategy, Component, effect, inject} from '@angular/core';
 import {SearchInputComponent} from '../../components/search-input/search-input.component';
-import {AlbumListComponent} from '../../components/album-list/album-list.component';
 import {BusyFullComponent} from '../../components/busy-full/busy-full.component';
 import {SearchResultsComponent} from '../../components/search-results/search-results.component';
 import {parseQuery, UrlStateUpdater} from '../../service/persistent-state';
@@ -13,13 +12,12 @@ import {SearchPageStore} from './search-page.store';
 
 @Component({
     selector: 'app-search-page',
-    imports: [
-        SearchInputComponent,
-        AlbumListComponent,
-        BusyFullComponent,
-        SearchResultsComponent,
-        ErrorSnackbarComponent
-    ],
+  imports: [
+    SearchInputComponent,
+    BusyFullComponent,
+    SearchResultsComponent,
+    ErrorSnackbarComponent
+  ],
     templateUrl: './search-page.component.html',
     styleUrl: './search-page.component.scss',
     changeDetection: ChangeDetectionStrategy.OnPush,

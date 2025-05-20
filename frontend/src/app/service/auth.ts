@@ -1,6 +1,6 @@
 import {inject, Injectable} from '@angular/core';
 import {catchError, map, type Observable, of, tap} from 'rxjs';
-import { HttpClient, HttpErrorResponse, type HttpEvent, type HttpInterceptorFn } from '@angular/common/http';
+import {HttpClient, HttpErrorResponse, type HttpEvent, type HttpInterceptorFn} from '@angular/common/http';
 import {NavigationService} from './navigation';
 
 export type Credentials = {

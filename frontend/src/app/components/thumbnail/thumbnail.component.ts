@@ -1,14 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  type ElementRef,
-  input,
-  type OnChanges,
-  type SimpleChanges,
-  untracked,
-  viewChild
-} from '@angular/core';
+import {ChangeDetectionStrategy, Component, effect, type ElementRef, input, untracked, viewChild} from '@angular/core';
 
 @Component({
     selector: 'app-thumbnail',

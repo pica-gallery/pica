@@ -1,14 +1,5 @@
-import {
-  Directive, effect,
-  ElementRef,
-  input,
-  type OnChanges,
-  type OnDestroy,
-  Renderer2,
-  type SimpleChanges
-} from '@angular/core';
+import {Directive, effect, ElementRef, input, Renderer2} from '@angular/core';
 import {NavigationEnd, Router} from '@angular/router';
-import type {Subscription} from 'rxjs';
 import {NavLinkDirective} from './nav-link.directive';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 
