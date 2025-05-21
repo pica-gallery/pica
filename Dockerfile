@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:21.5.0-bookworm AS js-builder
+FROM node:24.0.2-bookworm AS js-builder
 
 COPY frontend/ /app/
 
@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=/app/node_modules/ \
  && npm run -- ng build
 
 
-FROM rust:1.75.0-bookworm AS rust-builder
+FROM rust:1.87.0-bookworm AS rust-builder
 
 RUN apt update && apt install -y nasm
 
@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/app/target/ \
     cd /app && cargo build --release \
  && cp /app/target/release/pica /app/pica
 
-FROM debian:bookworm-20240110-slim
+FROM debian:bookworm-20250428-slim
 
 RUN --mount=type=cache,target=/var/cache/apt \
     apt update \
@@ -34,7 +34,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
 
 WORKDIR /app/
 
-COPY pica.docker-config.yaml ./pica.config.yaml
+COPY docker/app/pica.config.yaml ./pica.config.yaml
 COPY --from=rust-builder /app/pica ./pica
 
 EXPOSE 3000
