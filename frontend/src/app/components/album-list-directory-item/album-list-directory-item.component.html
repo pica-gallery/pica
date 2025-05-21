@@ -1,0 +1,19 @@
+<!-- <app-thumbnail [src]="node().cover.urls.thumb" class="thumb"/> -->
+
+<div class="thumb">
+  <div class="thumb-grid-{{ thumbnails().length }}">
+    @for (url of thumbnails(); track url) {
+      <app-thumbnail [src]="url"/>
+    }
+  </div>
+</div>
+
+<div class="info">
+  <div class="title">
+    {{ albumTree().name }}
+  </div>
+
+  <div class="subtitle">
+    {{ albumTree().allAlbumCount }} albums
+  </div>
+</div>

@@ -1,0 +1,48 @@
+:host {
+  display: block;
+  cursor: pointer;
+}
+
+.thumb {
+  display: block;
+
+  .thumb-grid-2 {
+    display: grid;
+    grid-template-columns: 100%;
+
+    // disable border of thumbnail component
+    --thumbnail-border-radius: 0;
+    --thumbnail-aspect-ratio: 2;
+
+    // create our own border around the thumb-grid
+    overflow: hidden;
+    border-radius: var(--thumbnail-border-radius, 8px);
+  }
+
+  .thumb-grid-3, .thumb-grid-4 {
+    display: grid;
+    grid-template-columns: 50% 50%;
+
+    // disable border of thumbnail component
+    --thumbnail-border-radius: 0;
+
+    // create our own border around the thumb-grid
+    overflow: hidden;
+    border-radius: var(--thumbnail-border-radius, 8px);
+  }
+}
+
+.info {
+  padding-top: 8px;
+
+  .title {
+    font-weight: bold;
+    line-height: 24px;
+  }
+
+  .subtitle {
+    opacity: 0.75;
+    font-size: 14px;
+    line-height: 24px;
+  }
+}

@@ -10,6 +10,7 @@ export type NavAction =
   | { action: 'login' }
   | { action: 'top' }
   | { action: 'albums' }
+  | { action: 'albums-tree', prefix: string[] }
   | { action: 'search' }
   | { action: 'album', albumId: AlbumId }
 // | { action: 'media', mediaId: MediaId }
@@ -86,6 +87,8 @@ export class NavigationService {
         return await this.stream();
       case 'albums':
         return await this.albums();
+      case 'albums-tree':
+        return await this.albumsTree(navAction.prefix);
       case 'search':
         return await this.search();
       case 'album':
@@ -101,6 +104,18 @@ export class NavigationService {
 
   public async albums() {
     await this.navToTop('albums', '/albums')
+  }
+
+  public async albumsTree(prefix: string[]) {
+    // navigate to sub album page by setting query param
+    await this.router.navigate(['/albums'], {
+      queryParams: {
+        'albumTree.prefix': prefix.join('/'),
+      },
+
+      queryParamsHandling: 'replace',
+      state: {navStack: [...currentStack(), {name: 'albums-tree'}]},
+    })
   }
 
   public async search() {
@@ -162,6 +177,11 @@ export class NavigationService {
         return this.router.createUrlTree(['/stream']);
       case 'albums':
         return this.router.createUrlTree(['albums']);
+      case 'albums-tree':
+        return this.router.createUrlTree(['albums'], {
+            queryParams: {'albumTree.prefix': navAction.prefix.join('/')},
+          },
+        );
       case 'search':
         return this.router.createUrlTree(['search']);
       case 'album':

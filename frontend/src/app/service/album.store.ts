@@ -1,4 +1,4 @@
-import {patchState, signalStore, withComputed, withMethods, withState} from '@ngrx/signals';
+import {patchState, signalStore, withMethods, withState} from '@ngrx/signals';
 import {type Album, GalleryClient} from './gallery-client.service';
 import {LOADING, type State, toStateObservable} from '../util';
 import {rxMethod} from '@ngrx/signals/rxjs-interop';
@@ -20,10 +20,6 @@ export const AlbumStore = signalStore(
     albumsWithContent: LOADING,
     albumsById: new Map(),
   }),
-
-  withComputed(store => ({
-    // TODO
-  })),
 
   withMethods(store => {
     const galleryService = inject(GalleryClient);

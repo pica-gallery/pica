@@ -5,7 +5,8 @@
     }
     @case ("success") {
       <app-album-list
-        [albums]="albumsState.data"
+        [albums]="albumsState.data.albums"
+        [albumTree]="albumsState.data.tree"
         [initialScrollState]="scrollState.initial"
         (scrollChanged)="scrollState.update($event)"
       />

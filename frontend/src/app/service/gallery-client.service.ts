@@ -26,6 +26,7 @@ export type Album = {
   name: string,
   timestamp: Date,
   relpath: string | null,
+  relpathSegments: string[],
   items: MediaItem[],
   cover: MediaItem,
   location: string | null,
@@ -128,6 +129,11 @@ export function convertAlbum(album: AlbumTo): Album {
   const items = convertItems(album.items)
     .sort((lhs, rhs) => rhs.timestamp.getTime() - lhs.timestamp.getTime())
 
+  // split path in segments, remove empty segments
+  const relpathSegments = album
+    .relpath?.split('/')
+    .filter(seg => seg.length) ?? [];
+
   return {
     id: album.id,
     name: album.name,
@@ -136,6 +142,7 @@ export function convertAlbum(album: AlbumTo): Album {
     items: items,
     cover: convertItem(album.cover),
     location: mainLocationOf(items),
+    relpathSegments,
   }
 }
 
