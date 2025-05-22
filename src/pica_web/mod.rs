@@ -74,7 +74,8 @@ where
     );
 
     let session_layer = SessionManagerLayer::new(session_store)
-        .with_expiry(Expiry::OnInactivity(Duration::weeks(4)));
+        .with_expiry(Expiry::OnInactivity(Duration::weeks(4)))
+        .with_secure(false);
 
     let auth_backend = auth::Backend::from(opts.users);
 
