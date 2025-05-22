@@ -37,6 +37,10 @@ scanIntervalInSeconds: 30
 # Address to bind the http server to.
 httpAddress: 0.0.0.0:3000
 
+# Set to false to not allow access over http. This controls the 'Secure' attribute
+# on the login cookie. If you serve pica over https, best set this to 'false'.
+allowAccessOverHTTP: true
+
 # Specify jaeger tracing endpoint, or comment out for no tracing
 # jaegerTracing: 192.168.86.5:6831
 

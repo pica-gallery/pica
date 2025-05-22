@@ -15,6 +15,9 @@ pub struct PicaConfig {
     pub indexer_threads: NonZeroU8,
     pub http_address: String,
 
+    #[serde(rename = "allowAccessOverHTTP", default = "allow_access_over_http_default")]
+    pub allow_access_over_http: bool,
+
     // use image magick to generate thumbnails and preview images
     pub use_image_magick: bool,
     pub image_codec: ImageCodecConfig,
@@ -65,4 +68,8 @@ pub fn load(path: impl AsRef<Path>) -> Result<PicaConfig> {
     let fp = File::open(path)?;
     let config = serde_yaml::from_reader(fp)?;
     Ok(config)
+}
+
+fn allow_access_over_http_default() -> bool {
+    true
 }

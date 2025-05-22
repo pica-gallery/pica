@@ -145,6 +145,7 @@ async fn main() -> Result<()> {
     let opts = pica_web::Options {
         accessor: media,
         addr: config.http_address,
+        session_secure: !config.allow_access_over_http,
         sources: config.sources,
         store,
         users,

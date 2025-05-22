@@ -14,13 +14,13 @@ use tower_http::compression::CompressionLayer;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tower_http::CompressionLevel;
 use tower_sessions_sqlx_store::SqliteStore;
-use tracing::{info, Level};
+use tracing::{info, warn, Level};
 
 use crate::pica::accessor::MediaAccessor;
 use crate::pica::store::MediaStore;
 
-mod handlers;
 mod auth;
+mod handlers;
 mod streamzip;
 
 use crate::pica::config::SourceConfig;
@@ -32,6 +32,7 @@ pub struct Options<A> {
     pub accessor: MediaAccessor,
     pub sources: Vec<SourceConfig>,
     pub addr: A,
+    pub session_secure: bool,
     pub db: SqlitePool,
     pub users: Vec<User>,
 }
@@ -70,12 +71,16 @@ where
     let delete_task = tokio::task::spawn(
         session_store
             .clone()
-            .continuously_delete_expired(std::time::Duration::from_secs(60))
+            .continuously_delete_expired(std::time::Duration::from_secs(60)),
     );
+
+    if !opts.session_secure {
+        warn!("Secure session cookie is disabled. If you serve pica over ssl only it is best to disable the config option 'allowAccessOverHTTP'");
+    }
 
     let session_layer = SessionManagerLayer::new(session_store)
         .with_expiry(Expiry::OnInactivity(Duration::weeks(4)))
-        .with_secure(false);
+        .with_secure(opts.session_secure);
 
     let auth_backend = auth::Backend::from(opts.users);
 
@@ -89,8 +94,14 @@ where
         .route("/api/media/{id}/exif", get(handlers::api::handle_exif_get))
         .layer(CompressionLayer::new().gzip(true).quality(CompressionLevel::Fastest))
         .route("/media/thumb/{id}/{*path}", get(handlers::media::handle_thumbnail))
-        .route("/media/preview/sdr/{id}/{*path}", get(handlers::media::handle_preview_sdr))
-        .route("/media/preview/hdr/{id}/{*path}", get(handlers::media::handle_preview_hdr))
+        .route(
+            "/media/preview/sdr/{id}/{*path}",
+            get(handlers::media::handle_preview_sdr),
+        )
+        .route(
+            "/media/preview/hdr/{id}/{*path}",
+            get(handlers::media::handle_preview_hdr),
+        )
         .route("/media/fullsize/{id}/{*path}", get(handlers::media::handle_fullsize))
         .route("/media/multi", get(handlers::media::handle_download_zip))
         .route("/api/auth/touch", post(handlers::auth::touch))
@@ -116,9 +127,7 @@ where
 
 async fn shutdown_signal(deletion_task_abort_handle: AbortHandle) {
     let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
+        signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
     };
 
     #[cfg(unix)]
