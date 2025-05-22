@@ -41,6 +41,7 @@ export class Touch {
     private containerWidth: number,
     private containerHeight: number,
     private idxCurrent: number,
+    private itemCount: number,
   ) {
   }
 
@@ -212,7 +213,9 @@ export class Touch {
   }
 
   private animateToInner(targetIndex: number) {
-    console.log('Animate to', targetIndex);
+    targetIndex = this.clampTargetIndex(targetIndex);
+
+    console.debug('Animate to', targetIndex);
     this.idxCurrent = targetIndex;
 
     this.events.emit({
@@ -308,6 +311,10 @@ export class Touch {
     }
 
     return null;
+  }
+
+  private clampTargetIndex(targetIndex: number): number {
+    return Math.max(0, Math.min(targetIndex, this.itemCount - 1));
   }
 
   private get zoomScale(): number {

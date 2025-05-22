@@ -64,7 +64,7 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
     // jump to the selected image
     const mediaToShowOnInit = this.mediaToShowOnInit();
     const initialIndex = Math.max(0, this.items().findIndex(img => img.id === mediaToShowOnInit));
-    const touch = new Touch(containerWidth, containerHeight, initialIndex);
+    const touch = new Touch(containerWidth, containerHeight, initialIndex, this.items().length);
 
     this.ngZone.runOutsideAngular(() => {
       // when an animation stops, we update the visibility
