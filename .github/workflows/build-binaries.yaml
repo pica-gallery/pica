@@ -12,8 +12,6 @@ jobs:
             tag: linux-amd64
           - platform: linux/arm64
             tag: linux-arm64
-          - platform: linux/arm/v7
-            tag: linux-armv7
 
     runs-on: ubuntu-latest
     steps:
