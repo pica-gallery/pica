@@ -1,5 +1,5 @@
 import {ChangeDetectionStrategy, Component, input} from '@angular/core';
-import {DatePipe} from '@angular/common';
+import {ShortDatePipe} from '../../pipes/short-date.pipe';
 
 
 export type SectionHeader = {
@@ -11,9 +11,9 @@ export type SectionHeader = {
 
 @Component({
     selector: 'app-section-header',
-    imports: [
-        DatePipe
-    ],
+  imports: [
+    ShortDatePipe
+  ],
     templateUrl: './section-header.component.html',
     styleUrl: './section-header.component.scss',
     changeDetection: ChangeDetectionStrategy.OnPush

@@ -1,15 +1,15 @@
 import {ChangeDetectionStrategy, Component, HostListener, inject, input} from '@angular/core';
 import type {Album} from '../../service/gallery-client.service';
-import {DatePipe} from '@angular/common';
 import {NavigationService} from '../../service/navigation';
 import {ThumbnailComponent} from '../thumbnail/thumbnail.component';
+import {ShortDatePipe} from '../../pipes/short-date.pipe';
 
 @Component({
     selector: 'app-album-list-item',
-    imports: [
-        DatePipe,
-        ThumbnailComponent
-    ],
+  imports: [
+    ThumbnailComponent,
+    ShortDatePipe
+  ],
     templateUrl: './album-list-item.component.html',
     styleUrl: './album-list-item.component.scss',
     changeDetection: ChangeDetectionStrategy.OnPush
