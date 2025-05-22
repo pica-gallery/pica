@@ -45,7 +45,7 @@ jobs:
         uses: cachix/install-nix-action@v24
 
       - name: Build docker image
-        run: nix build ".#dockerImage"
+        run: nix build ".#dockerImage" --print-build-logs
 
       - name: Push docker image
         if: ${{ github.event_name != 'pull_request' }}
