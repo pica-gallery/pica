@@ -7,10 +7,13 @@ jobs:
   Build:
     strategy:
       matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
-          - linux/arm/v7
+        config:
+          - platform: linux/amd64
+            tag: linux-amd64
+          - platform: linux/arm64
+            tag: linux-arm64
+          - platform: linux/arm/v7
+            tag: linux-armv7
 
     runs-on: ubuntu-latest
     steps:
@@ -26,19 +29,19 @@ jobs:
       - name: Build image
         uses: docker/build-push-action@v6
         with:
-          platforms: ${{ matrix.platform }}
+          platforms: ${{ matrix.config.platform }}
           load: true
-          tags: pica:${{ matrix.platform }}
+          tags: pica:${{ matrix.config.tag }}
 
       - name: Extract binary from container image
         run: |
-          ID=$(docker create pica:${{ matrix.platform }})
-          docker cp $ID:/app/pica pica
+          ID=$(docker create pica:${{ matrix.config.tag }})
+          docker cp $ID:/app/pica pica-${{ matrix.config.tag }}
 
       - name: Archive pica binary
         uses: actions/upload-artifact@v4
         with:
-          name: pica-${{ matrix.platform }}
-          path: pica
+          name: pica-${{ matrix.config.tag }}
+          path: pica-${{ matrix.config.tag }}
 
 
