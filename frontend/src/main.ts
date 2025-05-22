@@ -7,7 +7,8 @@ import './app/history';
 import {instrumentHistoryTracking} from './app/history';
 import {AuthInterceptor} from './app/service/auth';
 import {ContentWrapperComponent} from './app/components/content-wrapper/content-wrapper.component';
-import {provideExperimentalZonelessChangeDetection} from '@angular/core';
+import {LOCALE_ID, provideAppInitializer, provideExperimentalZonelessChangeDetection} from '@angular/core';
+import {registerLocaleData} from '@angular/common';
 
 const routes: Route[] = [
   {
@@ -57,6 +58,31 @@ const routes: Route[] = [
 
 instrumentHistoryTracking();
 
+const knownLocales = ['en', 'de'];
+
+function provideLocaleId() {
+  const known = knownLocales.includes(navigator.language?.slice(0, 2));
+
+  return {
+    provide: LOCALE_ID,
+    useValue: known ? navigator.language : 'en-US',
+  }
+}
+
+async function loadCurrentLocale() {
+  const locale = navigator.language?.slice(0, 2) ?? 'en';
+  switch (locale) {
+    case 'de':
+      registerLocaleData(await import('@angular/common/locales/de').then(m => m.default), 'de');
+      return
+
+    case 'en':
+    default:
+      registerLocaleData(await import('@angular/common/locales/en').then(m => m.default), 'en');
+      return
+  }
+}
+
 void bootstrapApplication(AppComponent, {
   providers: [
     provideExperimentalZonelessChangeDetection(),
@@ -68,5 +94,8 @@ void bootstrapApplication(AppComponent, {
       // withDebugTracing(),
       // withInMemoryScrolling({scrollPositionRestoration: 'enabled'}),
     ),
+
+    provideLocaleId(),
+    provideAppInitializer(loadCurrentLocale)
   ],
 });

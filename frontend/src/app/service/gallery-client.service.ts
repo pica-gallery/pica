@@ -190,16 +190,11 @@ export const Daily: GroupingStrategy = {
   },
 
   nameOf(timestamp: Date) {
-    let result = '';
-
-    result = MONTHS[timestamp.getMonth()];
-    if (timestamp.getFullYear() !== YEAR) {
-      result = result + ', ' + timestamp.getFullYear();
+    if (timestamp.getFullYear() !== CURRENT_YEAR) {
+      return FORMAT_YEAR_MONTH_DAY.format(timestamp);
     }
 
-    result = timestamp.getDate() + '. ' + result
-
-    return result
+    return FORMAT_MONTH_DAY.format(timestamp);
   }
 }
 
@@ -210,12 +205,11 @@ export const Monthly: GroupingStrategy = {
   },
 
   nameOf(timestamp: Date) {
-    const month = MONTHS[timestamp.getMonth()];
-    if (timestamp.getFullYear() !== YEAR) {
-      return month + ', ' + timestamp.getFullYear();
+    if (timestamp.getFullYear() !== CURRENT_YEAR) {
+      return FORMAT_YEAR_MONTH.format(timestamp);
     }
 
-    return month
+    return FORMAT_MONTH.format(timestamp);
   }
 }
 
@@ -227,20 +221,17 @@ export function convertItems(items: MediaItemTo[]): MediaItem[] {
   return items.map(item => convertItem(item));
 }
 
+const CURRENT_YEAR = new Date().getFullYear();
 
-const YEAR = new Date().getFullYear();
 
-const MONTHS = [
-  'Januar',
-  'Februar',
-  'März',
-  'April',
-  'Mai',
-  'Juni',
-  'Juli',
-  'August',
-  'September',
-  'Oktober',
-  'November',
-  'Dezember',
-]
+const FORMAT_MONTH = new Intl
+  .DateTimeFormat(navigator.language, {month: 'long'});
+
+const FORMAT_MONTH_DAY = new Intl
+  .DateTimeFormat(navigator.language, {month: 'long', day: 'numeric'});
+
+const FORMAT_YEAR_MONTH = new Intl
+  .DateTimeFormat(navigator.language, {month: 'long', year: 'numeric'});
+
+const FORMAT_YEAR_MONTH_DAY = new Intl
+  .DateTimeFormat(navigator.language, {month: 'long', year: 'numeric', day: 'numeric'});
