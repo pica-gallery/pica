@@ -1,0 +1,44 @@
+name: Binaries
+
+on:
+  push:
+
+jobs:
+  Build:
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+          - linux/arm/v7
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up docker buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: pica:${{ matrix.platform }}
+
+      - name: Extract binary from container image
+        run: |
+          ID=$(docker create pica:${{ matrix.platform }})
+          docker cp $ID:/app/pica pica
+
+      - name: Archive pica binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-${{ matrix.platform }}
+          path: pica
+
+
