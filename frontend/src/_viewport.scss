@@ -1,0 +1,11 @@
+@mixin small {
+  @media (width < 480px) {
+    @content
+  }
+}
+
+@mixin large {
+  @media (width >= 480px) {
+    @content
+  }
+}

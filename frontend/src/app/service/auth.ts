@@ -1,5 +1,5 @@
 import {inject, Injectable} from '@angular/core';
-import {catchError, map, type Observable, of, retry, Subject, take, tap} from 'rxjs';
+import {catchError, map, type Observable, of, retry, Subject, take, tap, throwError} from 'rxjs';
 import {HttpClient, HttpErrorResponse, type HttpEvent, type HttpInterceptorFn} from '@angular/common/http';
 import {NavigationService} from './navigation';
 
@@ -67,7 +67,11 @@ export const AuthInterceptor: HttpInterceptorFn = (req, next): Observable<HttpEv
     retry({
       // retry on successful login
       delay: err => {
-        if (err instanceof HttpErrorResponse) {
+        const isLoginCall = req.url.endsWith("/auth/login")
+        console.info(req.url, isLoginCall);
+
+
+        if (!isLoginCall && err instanceof HttpErrorResponse) {
           if (err.status === 401) {
             console.info('Session is not authenticated, redirecting to login page.')
             authService.redirectToLogin();
@@ -78,7 +82,7 @@ export const AuthInterceptor: HttpInterceptorFn = (req, next): Observable<HttpEv
         }
 
         // just forward the error
-        return of(err)
+        return throwError(() => err)
       },
     }),
   )

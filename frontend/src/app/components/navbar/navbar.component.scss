@@ -1,8 +1,20 @@
+@use "../../../viewport";
+
 :host {
+  display: block;
+  background: white;
+}
+
+.content {
   display: flex;
   flex-direction: row;
   justify-content: space-around;
-  gap: 8px;
 
-  background: white;
+  padding: 6px 0;
+
+  @include viewport.large {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 12px 0;
+  }
 }
