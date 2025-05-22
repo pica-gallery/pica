@@ -30,7 +30,7 @@
           ];
 
           src = ./frontend;
-          npmDepsHash = "sha256-WuDtTqRkUFrsWOZdbvxcwZOPrC04Gvt5EzgrimBzR1c=";
+          npmDepsHash = "sha256-uWaYAn1v1AU83o2cwJ5XWLolNoq4MHdt2B9L+5rFcZw=";
 
           installPhase = ''
             mkdir $out
