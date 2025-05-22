@@ -1,11 +1,9 @@
 <!-- <app-thumbnail [src]="node().cover.urls.thumb" class="thumb"/> -->
 
-<div class="thumb">
-  <div class="thumb-grid-{{ thumbnails().length }}">
-    @for (url of thumbnails(); track url) {
-      <app-thumbnail [src]="url"/>
-    }
-  </div>
+<div class="thumb-grid-{{ thumbnails().length }}">
+  @for (url of thumbnails(); track url) {
+    <app-thumbnail [src]="url"/>
+  }
 </div>
 
 <div class="info">

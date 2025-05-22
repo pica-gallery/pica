@@ -8,25 +8,29 @@
   }
 }
 
-<div class="actions">
-  <button class="button button-back" (click)="close()">
+<app-top-bar class="actions">
+  <button leading class="button button-back" (click)="close()">
     <app-icon name="arrow-left"/>
   </button>
 
   @if (currentItem(); as item) {
-    <div class="name">
+    <div headline class="name">
       {{ item.name }}
     </div>
-
-    <a class="button" [download]="item.name" [href]="item.urls.fullsize">
-      <app-icon name="download"/>
-    </a>
-
-    <button class="button" (click)="showExifViewer()">
-      <app-icon name="info"/>
-    </button>
   }
-</div>
+
+  @if (currentItem(); as item) {
+    <ng-container trailing>
+      <a class="button" [download]="item.name" [href]="item.urls.fullsize">
+        <app-icon name="download"/>
+      </a>
+
+      <button class="button" (click)="showExifViewer()">
+        <app-icon name="info"/>
+      </button>
+    </ng-container>
+  }
+</app-top-bar>
 
 @if (exifViewerMediaId(); as mediaId) {
   @defer (on immediate) {

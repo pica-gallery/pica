@@ -1,0 +1,27 @@
+:host {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+
+  box-sizing: border-box;
+  padding: 0 4px;
+  height: 64px;
+
+  align-items: center;
+}
+
+.leading {
+  display: block;
+  width: 48px;
+  height: 48px;
+}
+
+.headline {
+  flex: 1;
+}
+
+.trailing {
+  display: flex;
+  flex-direction: row;
+  height: 48px;
+}

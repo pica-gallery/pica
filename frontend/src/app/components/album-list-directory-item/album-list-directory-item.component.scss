@@ -1,35 +1,41 @@
 :host {
   display: block;
   cursor: pointer;
+
+  // radius for thumbnails
+  --thumbnail-border-radius: 8px;
 }
 
-.thumb {
-  display: block;
+.thumb-grid-2 {
+  display: grid;
+  grid-template-columns: 100%;
 
-  .thumb-grid-2 {
-    display: grid;
-    grid-template-columns: 100%;
-
+  app-thumbnail {
     // disable border of thumbnail component
     --thumbnail-border-radius: 0;
     --thumbnail-aspect-ratio: 2;
-
-    // create our own border around the thumb-grid
-    overflow: hidden;
-    border-radius: var(--thumbnail-border-radius, 8px);
   }
 
-  .thumb-grid-3, .thumb-grid-4 {
-    display: grid;
-    grid-template-columns: 50% 50%;
+  // create our own border around the thumb-grid
+  overflow: hidden;
+  border-radius: var(--thumbnail-border-radius, 8px);
+}
 
+.thumb-grid-3, .thumb-grid-4 {
+  display: grid;
+  grid-template-columns: calc(50% - 1px) calc(50% - 1px);
+  gap: 2px;
+
+  background-color: #eee;
+
+  app-thumbnail {
     // disable border of thumbnail component
     --thumbnail-border-radius: 0;
-
-    // create our own border around the thumb-grid
-    overflow: hidden;
-    border-radius: var(--thumbnail-border-radius, 8px);
   }
+
+  // create our own border around the thumb-grid
+  overflow: hidden;
+  border-radius: var(--thumbnail-border-radius, 8px);
 }
 
 .info {

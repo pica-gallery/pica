@@ -11,10 +11,11 @@ import {iterActivatedRoute} from '../../util/utils';
 import {StreamStore} from '../../service/stream.store';
 import {AlbumStore} from '../../service/album.store';
 import {mapSuccess, type State} from '../../util';
+import {TopBarComponent} from '../../components/topbar/top-bar.component';
 
 @Component({
     selector: 'app-media-page',
-  imports: [ImageSwiperComponent, IconComponent, BottomSheetComponent, ExifDialogComponent],
+  imports: [ImageSwiperComponent, IconComponent, BottomSheetComponent, ExifDialogComponent, TopBarComponent],
     templateUrl: './media-page.component.html',
     styleUrl: './media-page.component.scss',
     changeDetection: ChangeDetectionStrategy.OnPush

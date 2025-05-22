@@ -7,18 +7,14 @@
 }
 
 .actions {
-  display: flex;
   position: absolute;
   top: 0;
   width: 100%;
-  align-items: center;
   color: white;
 }
 
 .name {
-  flex: 1;
   font-weight: bold;
-  line-height: 24px;
 
   text-overflow: ellipsis;
   max-width: calc(100vw - 48px * 3);
