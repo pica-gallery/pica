@@ -16,7 +16,7 @@ import {CommonModule} from '@angular/common';
 import type {MediaId} from '../../service/api';
 import {ImageViewComponent} from '../image-view/image-view.component';
 import type {MediaItem} from '../../service/gallery-client.service';
-import {fromEvent} from 'rxjs';
+import {animationFrameScheduler, fromEvent, observeOn} from 'rxjs';
 import PointerTracker from 'pointer-tracker';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {observeElementSize} from '../../util';
@@ -79,6 +79,10 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
         end: (pointer, _event, _cancelled) => touch.end(this.tracker, pointer),
       })
 
+      fromEvent<WheelEvent>(container, "mousewheel")
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(event => touch.handleWheel(event))
+
       observeElementSize(container)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe(size => touch.onWindowResize(size))
@@ -101,10 +105,8 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
         return currentChild;
       }
 
-      touch.events.subscribe(event => {
+      touch.events.pipe(observeOn(animationFrameScheduler)).subscribe(event => {
         this.ngZone.run(() => {
-          console.log("Got event", event.type);
-
           switch (event.type) {
             case 'animateSwipe':
               console.info('Start animation to swipe target', event.transformX);

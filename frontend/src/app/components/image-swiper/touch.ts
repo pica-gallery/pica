@@ -57,7 +57,32 @@ export class Touch {
     });
   }
 
-  start(tracker: PointerTracker, pointer: Pointer): boolean {
+  handleWheel(event: WheelEvent) {
+    if (this.state === 'undecided') {
+      this.state = 'zooming';
+    }
+
+    if (this.state === 'zooming') {
+      const bbOffset = this.zoomTransform.transformPoint({x: 0, y: 0});
+
+      // origin to zoom around
+      const originX = event.pageX - bbOffset.x;
+      const originY = event.pageY - bbOffset.y;
+
+      this.updateZoomTransform({
+        panX: 0, panY: 0,
+        scale: 1 - 0.005 * event.deltaY,
+        originX, originY
+      })
+
+      if (!this.zoomed && event.deltaY > 0) {
+        // fully zoomed out, stop zooming state
+        this.state = 'undecided'
+      }
+    }
+  }
+
+  start(tracker: PointerTracker, _pointer: Pointer): boolean {
     if (this.state === 'blocked') {
       // do not accept new touch input right now
       return false;
@@ -136,12 +161,6 @@ export class Touch {
           originY,
         })
       }
-
-      this.events.emit({
-        type: 'applyZoomTransform',
-        currentIndex: this.idxCurrent,
-        transform: this.zoomTransform,
-      });
     }
   }
 
@@ -413,6 +432,12 @@ export class Touch {
 
     this.zoomLookingAt.x -= width / 2 - widthOfImage / 2;
     this.zoomLookingAt.y -= height / 2 - heightOfImage / 2;
+
+    this.events.emit({
+      type: 'applyZoomTransform',
+      currentIndex: this.idxCurrent,
+      transform: this.zoomTransform,
+    });
   }
 
   private zoomConfig() {
