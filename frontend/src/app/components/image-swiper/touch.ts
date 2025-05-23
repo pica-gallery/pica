@@ -1,6 +1,7 @@
 import {EventEmitter} from '@angular/core';
 import PointerTracker, {type Pointer} from 'pointer-tracker';
 import type {Size} from '../../util';
+import {animationFrames, map, pairwise, startWith, Subscription, takeWhile, tap} from 'rxjs';
 
 type TouchState =
   | 'blocked'
@@ -32,6 +33,10 @@ export class Touch {
   private swipeTranslateX: number = 0;
   private swipeFlingTo: number = 0;
 
+  private velocityTracked: Point | null = null;
+  private velocityTrackingUpdated: number | null = null;
+  private decayVelocitySubscription: Subscription = new Subscription();
+
   public readonly events = new EventEmitter<AnimationEvent>();
 
   public currentAspectRatio: number = 1;
@@ -58,6 +63,8 @@ export class Touch {
   }
 
   handleWheel(event: WheelEvent) {
+    this.decayVelocitySubscription.unsubscribe();
+
     if (this.state === 'undecided') {
       this.state = 'zooming';
     }
@@ -83,6 +90,8 @@ export class Touch {
   }
 
   start(tracker: PointerTracker, _pointer: Pointer): boolean {
+    this.decayVelocitySubscription.unsubscribe();
+
     if (this.state === 'blocked') {
       // do not accept new touch input right now
       return false;
@@ -104,7 +113,7 @@ export class Touch {
         return;
       }
 
-      console.info('Comitted to state:', this.state);
+      console.info('Committed to state:', this.state);
 
       if (newState === 'swiping-horizontal') {
         this.swipeTranslateXStart = this.swipeXOfIndex(this.idxCurrent);
@@ -136,6 +145,24 @@ export class Touch {
         const dy = current[0].clientY - previous[0].clientY;
 
         this.updateZoomTransform({panX: dx, panY: dy, scale: 1, originX: 0, originY: 0});
+
+        const now = Date.now();
+        if (this.velocityTrackingUpdated) {
+          const dt = (now - this.velocityTrackingUpdated) * 0.001
+          const velX = -dx / dt;
+          const velY = -dy / dt;
+
+          this.velocityTracked = {
+            x: 0.9 * (this.velocityTracked?.x ?? velX) + 0.1 * velX,
+            y: 0.9 * (this.velocityTracked?.y ?? velY) + 0.1 * velY,
+          }
+
+          if (lengthSqr(this.velocityTracked) < 4) {
+            this.velocityTracked = null;
+          }
+        }
+
+        this.velocityTrackingUpdated = now;
       }
 
       if (previous.length === 2) {
@@ -189,7 +216,15 @@ export class Touch {
           currentIndex: this.idxCurrent,
           transform: this.zoomTransform,
         });
+      } else {
+        // animate the velocity
+
+        if (this.velocityTracked) {
+          this.decayVelocityStart(this.velocityTracked);
+        }
       }
+
+      this.velocityTracked = null;
     }
 
     if (this.state === 'undecided') {
@@ -460,12 +495,42 @@ export class Touch {
 
     return {width, height, widthOfImage, heightOfImage};
   }
+
+  private decayVelocityStart(initialVelocity: Point) {
+    const updates$ = animationFrames().pipe(
+      startWith({elapsed: 0}),
+      pairwise(),
+
+      map(([curr, prev]) => {
+        const dt = (prev.elapsed - curr.elapsed) * 0.001;
+
+        const scale = Math.exp(curr.elapsed * -0.001) * dt;
+        return scaled(initialVelocity, scale)
+      }),
+      tap(val => console.info(val)),
+      takeWhile(vel => vel != null && lengthSqr(vel) > 0.1),
+      map(vel => vel!),
+    );
+
+    this.decayVelocitySubscription.unsubscribe();
+    this.decayVelocitySubscription = updates$.subscribe((vel) => {
+      this.updateZoomTransform({panX: -vel.x, panY: -vel.y, scale: 1, originX: 0, originY: 0});
+    })
+  }
 }
 
 function distanceTo(lhs: Pointer, rhs: Pointer): number {
   const dx = lhs.clientX - rhs.clientX;
   const dy = lhs.clientY - rhs.clientY;
   return Math.sqrt(dx * dx + dy * dy)
+}
+
+function lengthSqr(p: Point): number {
+  return p.x * p.x + p.y * p.y
+}
+
+function scaled(p: Point, f: number): Point {
+  return {x: p.x * f, y: p.y * f}
 }
 
 type Point = { x: number, y: number };
