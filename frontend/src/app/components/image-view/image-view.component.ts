@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, computed, effect, input, signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, input, linkedSignal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import type {MediaItem} from '../../service/gallery-client.service';
 import {ProgressBarComponent} from '../progressbar/progress-bar.component';
@@ -7,21 +7,30 @@ import {derivedAsync} from 'ngxtension/derived-async';
 import {toObservable} from '@angular/core/rxjs-interop';
 
 @Component({
-    selector: 'app-image-view',
-    imports: [CommonModule, ProgressBarComponent],
-    templateUrl: './image-view.component.html',
-    styleUrls: ['./image-view.component.scss'],
-    changeDetection: ChangeDetectionStrategy.OnPush,
-    host: {
-        '[style.--aspect-ratio]': 'aspectRatioValue()'
-    }
+  selector: 'app-image-view',
+  imports: [CommonModule, ProgressBarComponent],
+  templateUrl: './image-view.component.html',
+  styleUrls: ['./image-view.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[style.--aspect-ratio]': 'aspectRatioValue()'
+  }
 })
 export class ImageViewComponent {
-  private readonly loaded = signal(false);
-  private readonly notYetLoaded$ = toObservable(this.loaded).pipe(map(loaded => !loaded));
-
   public readonly media = input.required<MediaItem>({alias: 'media'});
   public readonly focus = input(false);
+
+  // if we unfocus, we need to mark the image as not loaded again,
+  // as we might need to re-load the image the next time we focus it again
+  private readonly loaded = linkedSignal<boolean, boolean>({
+    source: this.focus,
+    computation: (focus, previous) => {
+      const previousValue = previous?.value ?? false;
+      return !focus ? false : previousValue
+    },
+  })
+
+  private readonly notYetLoaded$ = toObservable(this.loaded).pipe(map(loaded => !loaded));
 
   protected readonly loaderIsVisible = derivedAsync(() => {
     if (this.focus()) {
@@ -37,16 +46,6 @@ export class ImageViewComponent {
   protected readonly aspectRatioValue = computed(() => {
     return this.media().width / this.media().height
   })
-
-  constructor() {
-    effect(() => {
-      // if we unfocus, we need to mark the image as not loaded again,
-      // was we might need to re-load the image the next time we focus it again
-      if (!this.focus()) {
-        this.loaded.set(false);
-      }
-    }, {allowSignalWrites: true});
-  }
 
   protected onImageLoad() {
     this.loaded.set(true);
