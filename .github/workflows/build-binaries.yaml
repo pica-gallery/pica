@@ -2,6 +2,8 @@ name: Binaries
 
 on:
   push:
+    tags: v*
+    branches: [main]
 
 jobs:
   Build:
@@ -42,4 +44,26 @@ jobs:
           name: pica-${{ matrix.config.tag }}
           path: pica-${{ matrix.config.tag }}
 
+  Release:
+    runs-on: ubuntu-latest
+    needs: Build
+
+    steps:
+      - name: Download previously created artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pica-linux-amd64
+
+      - name: Download previously created artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pica-linux-arm64
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          files: |
+            pica-linux-amd64
+            pica-linux-arm64
 
