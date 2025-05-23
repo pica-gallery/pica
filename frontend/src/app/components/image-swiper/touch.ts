@@ -1,7 +1,7 @@
 import {EventEmitter} from '@angular/core';
 import PointerTracker, {type Pointer} from 'pointer-tracker';
 import type {Size} from '../../util';
-import {animationFrames, map, pairwise, startWith, Subscription, takeWhile, tap} from 'rxjs';
+import {animationFrames, map, pairwise, startWith, Subscription, takeWhile} from 'rxjs';
 
 type TouchState =
   | 'blocked'
@@ -156,10 +156,6 @@ export class Touch {
             x: 0.9 * (this.velocityTracked?.x ?? velX) + 0.1 * velX,
             y: 0.9 * (this.velocityTracked?.y ?? velY) + 0.1 * velY,
           }
-
-          if (lengthSqr(this.velocityTracked) < 4) {
-            this.velocityTracked = null;
-          }
         }
 
         this.velocityTrackingUpdated = now;
@@ -217,14 +213,19 @@ export class Touch {
           transform: this.zoomTransform,
         });
       } else {
-        // animate the velocity
-
-        if (this.velocityTracked) {
-          this.decayVelocityStart(this.velocityTracked);
+        // the user zoomed into the image and was dragging the image around.
+        // they now removed their last finger, and we'll try to continue any
+        // movement that was present
+        if (this.velocityTracked && this.velocityTrackingUpdated) {
+          // only start decay if we had movement within the last few frames
+          if (Date.now() - this.velocityTrackingUpdated < 3 * 17) {
+            this.decayVelocityStart();
+          }
         }
       }
 
       this.velocityTracked = null;
+      this.velocityTrackingUpdated = null;
     }
 
     if (this.state === 'undecided') {
@@ -496,23 +497,34 @@ export class Touch {
     return {width, height, widthOfImage, heightOfImage};
   }
 
-  private decayVelocityStart(initialVelocity: Point) {
+  private decayVelocityStart() {
+    // stop any previous animation
+    this.decayVelocitySubscription.unsubscribe();
+
+    const initialVelocity = this.velocityTracked;
+    if (initialVelocity == null) {
+      return;
+    }
+
     const updates$ = animationFrames().pipe(
+      // pairwise would emit only on second frame, so we fake a frace
       startWith({elapsed: 0}),
       pairwise(),
 
+      // decay velocity based on time and calculate delta position
+      // for the current frame.
       map(([curr, prev]) => {
+        // animate for two seconds
+        const scale = 1 - easeOutQuart(curr.elapsed / 2_000);
         const dt = (prev.elapsed - curr.elapsed) * 0.001;
-
-        const scale = Math.exp(curr.elapsed * -0.001) * dt;
-        return scaled(initialVelocity, scale)
+        return scaled(initialVelocity, scale * dt)
       }),
-      tap(val => console.info(val)),
+
+      // stop animation if velocity is small
       takeWhile(vel => vel != null && lengthSqr(vel) > 0.1),
       map(vel => vel!),
     );
 
-    this.decayVelocitySubscription.unsubscribe();
     this.decayVelocitySubscription = updates$.subscribe((vel) => {
       this.updateZoomTransform({panX: -vel.x, panY: -vel.y, scale: 1, originX: 0, originY: 0});
     })
@@ -556,4 +568,8 @@ function pointerCount(state: TouchState): number | undefined {
   }
 
   return;
+}
+
+function easeOutQuart(x: number): number {
+  return 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 4);
 }
