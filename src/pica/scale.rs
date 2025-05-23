@@ -155,7 +155,7 @@ fn resize_rust(source: &Path, format: &ImageType, size: u32) -> Result<Vec<u8>> 
         Some(Orientation::Rotate270) => image.rotate270(),
         _ => image,
     };
-    
+
     let scaled = if image.width() < size && image.height() < size {
         // no resize needed
         image
@@ -209,8 +209,6 @@ fn resize_ultrahdr(source: &Path, size: u32) -> Result<Vec<u8>> {
 
     // put it after app0 tag
     gainmap.segments.insert(2, xmp);
-
-    dbg!(&gainmap);
 
     // write a new uhdr image
     //  TODO add the necessary segments to the jpegs

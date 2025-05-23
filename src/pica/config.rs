@@ -3,7 +3,8 @@ use std::num::{NonZeroU32, NonZeroU8};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use serde::Deserialize;
+use serde::de::Error;
+use serde::{Deserialize, Deserializer};
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +31,8 @@ pub struct PicaConfig {
     pub sources: Vec<SourceConfig>,
 
     pub users: Vec<UserConfig>,
+
+    pub album_config: AlbumConfig,
 
     #[serde(default)]
     pub otlp_endpoint: Option<String>,
@@ -64,6 +67,16 @@ pub enum ImageCodecConfig {
     Jpeg,
 }
 
+#[derive(Clone, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct AlbumConfig {
+    #[serde(deserialize_with = "deserialize_bytes_regex")]
+    pub classify_as_album: regex::bytes::Regex,
+
+    #[serde(deserialize_with = "deserialize_regex_opt")]
+    pub strip_title: Option<regex::Regex>,
+}
+
 pub fn load(path: impl AsRef<Path>) -> Result<PicaConfig> {
     let fp = File::open(path)?;
     let config = serde_yaml::from_reader(fp)?;
@@ -72,4 +85,32 @@ pub fn load(path: impl AsRef<Path>) -> Result<PicaConfig> {
 
 fn allow_access_over_http_default() -> bool {
     true
+}
+
+fn deserialize_bytes_regex<'de, D: Deserializer<'de>>(deserialize: D) -> Result<regex::bytes::Regex, D::Error> {
+    let pattern = String::deserialize(deserialize)?;
+    let regex = regex::bytes::Regex::new(&pattern).map_err(|err| {
+        let text = format!("parse regex {:?}: {}", pattern, err);
+        Error::custom(text)
+    })?;
+
+    Ok(regex)
+}
+
+fn deserialize_regex_opt<'de, D: Deserializer<'de>>(deserialize: D) -> Result<Option<regex::Regex>, D::Error> {
+    let Some(pattern) = Option::<String>::deserialize(deserialize)? else {
+        return Ok(None);
+    };
+
+    if pattern.is_empty() {
+        // interpret empty string as no value too
+        return Ok(None);
+    }
+
+    let regex = regex::Regex::new(&pattern).map_err(|err| {
+        let text = format!("parse regex {:?}: {}", pattern, err);
+        Error::custom(text)
+    })?;
+
+    Ok(Some(regex))
 }

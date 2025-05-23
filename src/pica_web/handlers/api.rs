@@ -7,8 +7,8 @@ use anyhow::anyhow;
 use arcstr::ArcStr;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::Json;
 use axum::response::{IntoResponse, Response};
+use axum::Json;
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use serde::Serialize;
@@ -16,9 +16,9 @@ use tracing::instrument;
 
 use pica_image::exif::parse_exif_generic;
 
-use crate::pica::{Album, AlbumId, by_directory, Location, MediaId, MediaItem, SourceId};
-use crate::pica_web::{AppState, User};
+use crate::pica::{album, Album, AlbumId, Location, MediaId, MediaItem, SourceId};
 use crate::pica_web::handlers::WebError;
+use crate::pica_web::{AppState, User};
 
 #[derive(Serialize)]
 struct MediaItemView {
@@ -151,7 +151,7 @@ async fn albums_get(state: AppState, user: User, n: usize) -> Result<Response, W
         .filter(user_has_access_pred(&state, &user))
         .collect_vec();
 
-    let albums = by_directory(images);
+    let albums = album::by_directory(&state.album_config, images);
 
     let albums = albums.into_iter().map(|al| AlbumView::from_album(al, n)).collect_vec();
 
@@ -165,7 +165,7 @@ pub async fn handle_album_get(Path(id): Path<AlbumId>, user: User, State(state):
         .filter(user_has_access_pred(&state, &user))
         .collect_vec();
 
-    let albums = by_directory(images);
+    let albums = album::by_directory(&state.album_config, images);
 
     let album = albums
         .into_iter()

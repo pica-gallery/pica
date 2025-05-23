@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-pub use album::by_directory;
 use anyhow::{anyhow, ensure};
 use arcstr::ArcStr;
 use chrono::{DateTime, Utc};
@@ -15,7 +14,7 @@ use serde::Serialize;
 use serde_with::serde_derive::Deserialize;
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 
-mod album;
+pub mod album;
 pub mod index;
 
 pub mod accessor;

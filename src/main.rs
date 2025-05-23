@@ -22,7 +22,7 @@ use crate::pica::index::{Indexer, Scanner};
 use crate::pica::queue::ScanQueue;
 use crate::pica::scale::{ImageType, MediaScaler};
 use crate::pica::store::MediaStore;
-use crate::pica::{accessor, scale};
+use crate::pica::{accessor, album, scale};
 
 pub mod pica;
 pub mod pica_web;
@@ -147,6 +147,10 @@ async fn main() -> Result<()> {
         addr: config.http_address,
         session_secure: !config.allow_access_over_http,
         sources: config.sources,
+        album_config: album::Config {
+            classify_as_album: config.album_config.classify_as_album,
+            strip_title: config.album_config.strip_title,
+        },
         store,
         users,
         db,

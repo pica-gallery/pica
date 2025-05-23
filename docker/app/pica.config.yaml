@@ -44,6 +44,23 @@ allowAccessOverHTTP: true
 # Specify jaeger tracing endpoint, or comment out for no tracing
 # jaegerTracing: 192.168.86.5:6831
 
+albumConfig:
+  # To derive album membership for an image, pica walks the images directory path backwards
+  # until it finds a path segment that matches the regex provided here. That is the albums root.
+  # If no match can be found, the image will not be included into any album.
+  # 
+  # If you want to just take the directory of the image itself as its album, you can just
+  # specify a regex that matches any path, e.g. `.`
+  #
+  classifyAsAlbum: ""
+  
+  # A regex that is used to strip any string from the albums title. Leave empty to use the 
+  # directory name without any modification as the albums title.
+  # 
+  # This is useful if you include a date in your directory, e.g. `2024-03-14 Vacation`, in this
+  # case you would like the album to be named "Vacation", so you specify a regex like `^[0-9- ]+ `.
+  stripTitle: ""
+
 users:
   - name: admin
 

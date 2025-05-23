@@ -1,20 +1,32 @@
+use crate::info;
 use arcstr::ArcStr;
+use itertools::Itertools;
+use std::borrow::Cow;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
-
-use itertools::Itertools;
+use std::sync::Arc;
 use tracing::instrument;
 
 use crate::pica::{Album, AlbumId, AlbumInfo, MediaItem};
 
-#[instrument(skip_all)]
-pub fn by_directory(items: impl IntoIterator<Item = MediaItem>) -> Vec<Album> {
-    let re_album = regex::bytes::Regex::new(r#"Sony|staging|20\d\d-[01]\d-[0123]\d "#).unwrap();
-    let re_clean = regex::Regex::new(r#"^20\d\d-[01]\d-[0123]\d\s+"#).unwrap();
+#[derive(Clone)]
+pub struct Config {
+    // regex that identifies a directory as an album. To identify all directories as an album,
+    // use a regex that matches any name
+    pub classify_as_album: regex::bytes::Regex,
 
+    // a regex to clean the name of an album,
+    // e.g. removing a date prefix from the directory, if any,
+    pub strip_title: Option<regex::Regex>,
+}
+
+#[instrument(skip_all)]
+pub fn by_directory(conf: &Config, items: impl IntoIterator<Item = MediaItem>) -> Vec<Album> {
     let mut albums = HashMap::<PathBuf, Album>::new();
+
+    info!("Path: {:?}", conf.classify_as_album);
 
     for item in items {
         let Some(parent) = item.relpath.parent() else {
@@ -22,8 +34,10 @@ pub fn by_directory(items: impl IntoIterator<Item = MediaItem>) -> Vec<Album> {
         };
 
         let Some(relpath) = parent.ancestors().find(|path| {
-            let name = path.file_name().map(|path| path.as_bytes());
-            name.map(|name| re_album.is_match_at(name, 0)).unwrap_or_default()
+            path.file_name()
+                .map(|path| path.as_bytes())
+                .map(|name| conf.classify_as_album.is_match_at(name, 0))
+                .unwrap_or_default()
         }) else {
             continue;
         };
@@ -31,10 +45,10 @@ pub fn by_directory(items: impl IntoIterator<Item = MediaItem>) -> Vec<Album> {
         let name = relpath
             .file_name()
             .and_then(|f| f.to_str())
-            .map(|name| re_clean.replace(name, ""))
+            .map(|name| cleanup_album_title(conf, name))
             .unwrap_or("Unknown".into());
 
-        let album = albums.entry(relpath.into()).or_insert_with_key(|_relpath| {
+        let album = albums.entry(relpath.into()).or_insert_with_key(|relpath| {
             let info = AlbumInfo {
                 id: album_id_for_relpath(relpath),
                 name: ArcStr::from(name),
@@ -43,7 +57,7 @@ pub fn by_directory(items: impl IntoIterator<Item = MediaItem>) -> Vec<Album> {
 
             Album {
                 info,
-                relpath: Some(relpath.to_owned().into()),
+                relpath: Some(Arc::new(relpath.clone())),
                 items: Vec::new(),
                 cover: item.clone(),
             }
@@ -66,6 +80,13 @@ pub fn by_directory(items: impl IntoIterator<Item = MediaItem>) -> Vec<Album> {
     }
 
     albums
+}
+
+fn cleanup_album_title<'a>(config: &Config, title: &'a str) -> Cow<'a, str> {
+    match &config.strip_title {
+        None => title.into(),
+        Some(re) => re.replace_all(title, ""),
+    }
 }
 
 fn album_id_for_relpath(path: &Path) -> AlbumId {

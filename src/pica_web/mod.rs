@@ -23,6 +23,7 @@ mod auth;
 mod handlers;
 mod streamzip;
 
+use crate::pica::album;
 use crate::pica::config::SourceConfig;
 use crate::pica_web::handlers::media::ScaleQueue;
 pub use auth::User;
@@ -31,6 +32,7 @@ pub struct Options<A> {
     pub store: MediaStore,
     pub accessor: MediaAccessor,
     pub sources: Vec<SourceConfig>,
+    pub album_config: album::Config,
     pub addr: A,
     pub session_secure: bool,
     pub db: SqlitePool,
@@ -43,6 +45,7 @@ pub struct AppState {
     pub accessor: MediaAccessor,
     pub sources: Vec<SourceConfig>,
     pub scale_queue: Arc<ScaleQueue>,
+    pub album_config: album::Config,
 }
 
 pub async fn serve<A>(opts: Options<A>) -> Result<()>
@@ -60,6 +63,7 @@ where
         store: opts.store,
         accessor: opts.accessor,
         sources: opts.sources,
+        album_config: opts.album_config,
         scale_queue,
     };
 
