@@ -9,6 +9,8 @@
   box-sizing: border-box;
   user-select: none;
 
+  cursor: pointer;
+
   @include viewport.small {
     flex-direction: column;
     flex: 1;
