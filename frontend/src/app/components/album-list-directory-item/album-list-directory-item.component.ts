@@ -1,6 +1,6 @@
 import {ChangeDetectionStrategy, Component, computed, HostListener, inject, input} from '@angular/core';
 import {NavigationService} from '../../service/navigation';
-import type {AlbumTree} from '../../service/album-tree';
+import {type AlbumTree, pathOf} from '../../service/album-tree';
 import {ThumbnailComponent} from '../thumbnail/thumbnail.component';
 
 @Component({
@@ -30,7 +30,7 @@ export class AlbumListDirectoryItemComponent {
 
     void this.navigationService.navigate({
       action: 'albums-tree',
-      prefix: node.path,
+      prefix: pathOf(node),
     });
   }
 }

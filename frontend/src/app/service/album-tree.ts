@@ -3,8 +3,8 @@ import type {Album} from './gallery-client.service';
 export type AlbumTree = {
   // name of the current tree (often last segment of 'path')
   name: string,
-  // path to the current tree
-  path: string[],
+  // the parent of this AlbumTree
+  parent: AlbumTree | null,
   // albums in this node
   albums: Album[],
   // children by next segment
@@ -30,8 +30,9 @@ export function buildAlbumTree(albums: Album[]): AlbumTree {
   }
 
   // remove empty prefix directories as long as they contain only one child node
-  while(root.albums.length === 0 && root.children.size === 1) {
+  while (root.albums.length === 0 && root.children.size === 1) {
     root = [...root.children.values()][0]
+    root.parent = null;
   }
 
   return root
@@ -44,7 +45,7 @@ export function byPath(node: AlbumTree, path: string[]): AlbumTree {
       // next child does not exist, create it as a child of the current node
       child = {
         ...emptyAlbumTree(seg),
-        path: [...node.path, seg],
+        parent: node,
       }
 
       node.children.set(seg, child);
@@ -57,10 +58,23 @@ export function byPath(node: AlbumTree, path: string[]): AlbumTree {
   return node;
 }
 
+export function pathOf(node: AlbumTree): string[] {
+  const path: string[] = [];
+
+  while (true) {
+    if (node.parent == null) {
+      return path.reverse()
+    }
+
+    path.push(node.name);
+    node = node.parent
+  }
+}
+
 function emptyAlbumTree(name: string): AlbumTree {
   return {
     name,
-    path: [],
+    parent: null,
     albums: [],
     children: new Map(),
     allAlbums: [],
