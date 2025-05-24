@@ -16,7 +16,7 @@ export type AlbumTree = {
 }
 
 export function buildAlbumTree(albums: Album[]): AlbumTree {
-  let root = emptyAlbumTree('root');
+  const root = emptyAlbumTree('root');
 
   for (const album of albums) {
     // remove last component, as that is the album itself
@@ -27,11 +27,6 @@ export function buildAlbumTree(albums: Album[]): AlbumTree {
     node.albums.push(album);
 
     incrementAlbumCount(root, path, album);
-  }
-
-  // remove empty prefix directories as long as they contain only one child node
-  while(root.albums.length === 0 && root.children.size === 1) {
-    root = [...root.children.values()][0]
   }
 
   return root
