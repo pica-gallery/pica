@@ -68,4 +68,4 @@ export class AlbumListComponent {
   public readonly scrollChanged = output<SavedScroll>();
 }
 
-let firstVisible: number;
+let firstVisible: number | null = null;

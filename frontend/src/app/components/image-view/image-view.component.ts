@@ -1,5 +1,5 @@
 import {ChangeDetectionStrategy, Component, computed, input, linkedSignal} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import type {MediaItem} from '../../service/gallery-client.service';
 import {ProgressBarComponent} from '../progressbar/progress-bar.component';
 import {concatWith, map, startWith, timer} from 'rxjs';
@@ -8,7 +8,7 @@ import {toObservable} from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-image-view',
-  imports: [CommonModule, ProgressBarComponent],
+  imports: [ProgressBarComponent],
   templateUrl: './image-view.component.html',
   styleUrls: ['./image-view.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -1,4 +1,5 @@
 import {EventEmitter} from '@angular/core';
+// @ts-ignore
 import PointerTracker, {type Pointer} from 'pointer-tracker';
 import type {Size} from '../../util';
 import {animationFrames, map, pairwise, startWith, Subscription, takeWhile} from 'rxjs';

@@ -7,7 +7,7 @@ import './app/history';
 import {instrumentHistoryTracking} from './app/history';
 import {AuthInterceptor} from './app/service/auth';
 import {ContentWrapperComponent} from './app/components/content-wrapper/content-wrapper.component';
-import {provideExperimentalZonelessChangeDetection} from '@angular/core';
+import {provideZonelessChangeDetection} from '@angular/core';
 
 const routes: Route[] = [
   {
@@ -60,7 +60,7 @@ instrumentHistoryTracking();
 
 void bootstrapApplication(AppComponent, {
   providers: [
-    provideExperimentalZonelessChangeDetection(),
+    provideZonelessChangeDetection(),
     provideHttpClient(withFetch(), withInterceptors([AuthInterceptor])),
     provideRouter(
       routes,

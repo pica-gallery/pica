@@ -17,7 +17,8 @@ import type {MediaId} from '../../service/api';
 import {ImageViewComponent} from '../image-view/image-view.component';
 import type {MediaItem} from '../../service/gallery-client.service';
 import {animationFrameScheduler, fromEvent, observeOn} from 'rxjs';
-import PointerTracker from 'pointer-tracker';
+// @ts-ignore
+import PointerTracker, {type Pointer} from 'pointer-tracker';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {observeElementSize} from '../../util';
 import {Touch} from './touch';
@@ -30,18 +31,18 @@ type ViewItem = {
 }
 
 @Component({
-    selector: 'app-image-swiper',
-    imports: [CommonModule, ImageViewComponent],
-    templateUrl: './image-swiper.component.html',
-    styleUrls: ['./image-swiper.component.scss'],
-    changeDetection: ChangeDetectionStrategy.OnPush
+  selector: 'app-image-swiper',
+  imports: [CommonModule, ImageViewComponent],
+  templateUrl: './image-swiper.component.html',
+  styleUrls: ['./image-swiper.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
   public readonly items = input.required<MediaItem[]>()
 
   public readonly mediaToShowOnInit = input<MediaId>();
 
-  protected container = viewChild.required<ElementRef<HTMLElement>>("Container");
+  protected container = viewChild.required<ElementRef<HTMLElement>>('Container');
 
   protected readonly itemChanged = output<MediaItem>();
   protected readonly visibleItems = signal<ViewItem[]>([], {equal: itemsAreEqual})
@@ -74,12 +75,12 @@ export class ImageSwiperComponent implements AfterViewInit, OnDestroy {
 
       this.tracker = new PointerTracker(container, {
         // avoidPointerEvents: true,
-        start: (pointer, _event) => touch.start(this.tracker, pointer),
-        move: (previous, _changed, _event) => touch.move(this.tracker, previous),
-        end: (pointer, _event, _cancelled) => touch.end(this.tracker, pointer),
+        start: (pointer: Pointer) => touch.start(this.tracker, pointer),
+        move: (previous: Pointer) => touch.move(this.tracker, previous),
+        end: (pointer: Pointer) => touch.end(this.tracker, pointer),
       })
 
-      fromEvent<WheelEvent>(container, "mousewheel")
+      fromEvent<WheelEvent>(container, 'mousewheel')
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe(event => touch.handleWheel(event))
 
