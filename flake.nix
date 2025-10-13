@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-24.11";
+    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-25.05";
 
     crane = {
       url = "github:ipetkov/crane";
@@ -30,7 +30,7 @@
           ];
 
           src = ./frontend;
-          npmDepsHash = "sha256-Rvhoyip87T9ZVpgavDMjUOmVwU58Vzx+6lJlDd/xSTY=";
+          npmDepsHash = "sha256-lXmoqTUW8F6cz2JcdoyYdbIvBw/F0BMxhZzwb82DblI=";
 
           installPhase = ''
             mkdir $out
@@ -127,7 +127,7 @@
           };
         };
 
-        dockerImage-aarch64 = dockerImage-arch backend-aarch64 "aarch64" pkgs.pkgsCross.aarch64-multiplatform "aarch64-linux";
+        dockerImage-aarch64 = dockerImage-arch backend-aarch64 "arm64" pkgs.pkgsCross.aarch64-multiplatform "aarch64-linux";
         dockerImage-amd64 = dockerImage-arch backend-amd64 "amd64" pkgs.pkgsCross.gnu64 "x86_64-linux";
 
         dockerImage = pkgs.writeShellScriptBin "dockerImage" ''
@@ -142,7 +142,7 @@
 
           ${dockerImage-aarch64} | ${pkgs.skopeo}/bin/skopeo --insecure-policy \
             copy docker-archive:/dev/stdin \
-            docker://ghcr.io/pica-gallery/pica:$TAG-aarch64
+            docker://ghcr.io/pica-gallery/pica:$TAG-arm64
 
           # we need to delete the previous manifest before we can create a new one
           # otherwise it does not get updated, even with the --amend parameter.
@@ -150,7 +150,7 @@
 
           $DOCKER manifest create ghcr.io/pica-gallery/pica:$TAG \
             ghcr.io/pica-gallery/pica:$TAG-amd64 \
-            ghcr.io/pica-gallery/pica:$TAG-aarch64
+            ghcr.io/pica-gallery/pica:$TAG-arm64
 
           $DOCKER manifest push ghcr.io/pica-gallery/pica:$TAG
         '';

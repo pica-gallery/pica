@@ -10,8 +10,8 @@ use arcstr::ArcStr;
 use chrono::{DateTime, Utc};
 use derive_more::Deref;
 use pica_image::MediaType;
+use serde::Deserialize;
 use serde::Serialize;
-use serde_with::serde_derive::Deserialize;
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 
 pub mod album;
@@ -96,9 +96,7 @@ impl<T> Display for Id<T> {
 
 pub type MediaId = Id<MediaItem>;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-#[derive(Deref)]
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deref, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SourceId(ArcStr);
 
@@ -131,7 +129,13 @@ pub struct MediaItem {
 }
 
 impl MediaItem {
-    pub fn from_media_info(id: MediaId, source: SourceId, relpath: PathBuf, filesize: u64, info: MediaInfo) -> anyhow::Result<Self> {
+    pub fn from_media_info(
+        id: MediaId,
+        source: SourceId,
+        relpath: PathBuf,
+        filesize: u64,
+        info: MediaInfo,
+    ) -> anyhow::Result<Self> {
         // take the file name and clear any invalid characters from it
         let name = relpath
             .file_name()
